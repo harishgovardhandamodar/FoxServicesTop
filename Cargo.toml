@@ -1,0 +1,90 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/core",
+    "crates/runtime",
+    "crates/adapters",
+    "crates/collectors",
+    "crates/state",
+    "crates/history",
+    "crates/compression",
+    "crates/store",
+    "crates/manager",
+    "crates/ui",
+    "crates/fox-services-top",
+]
+
+[workspace.package]
+version = "2.2.0"
+edition = "2024"
+rust-version = "1.92"
+license = "Apache-2.0"
+repository = "https://github.com/harishgovardhandamodar/fox-services-top"
+
+[workspace.dependencies]
+# Workspace crates. Only the `fox-services-top` composition root may depend on more than
+# `fox-services-top-core` (and the pure `fox-services-top-compression`, D-79);
+# scripts/check_boundaries.py enforces this.
+fox-services-top-core = { path = "crates/core", version = "2.2.0" }
+fox-services-top-runtime = { path = "crates/runtime", version = "2.2.0" }
+fox-services-top-adapters = { path = "crates/adapters", version = "2.2.0" }
+fox-services-top-collectors = { path = "crates/collectors", version = "2.2.0" }
+fox-services-top-state = { path = "crates/state", version = "2.2.0" }
+fox-services-top-history = { path = "crates/history", version = "2.2.0" }
+fox-services-top-compression = { path = "crates/compression", version = "2.2.0" }
+fox-services-top-store = { path = "crates/store", version = "2.2.0" }
+fox-services-top-manager = { path = "crates/manager", version = "2.2.0" }
+fox-services-top-ui = { path = "crates/ui", version = "2.2.0" }
+
+# DTO / serialization (allowed in core).
+serde = { version = "1.0.229", features = ["derive", "rc"] }
+serde_json = "1.0.151"
+uuid = { version = "1.27.0", features = ["v4", "serde"] }
+thiserror = "2.0.21"
+sha2 = "0.11.0"
+
+# Runtime mechanics.
+crossbeam-channel = "0.5.17"
+libc = "0.2.180"
+nix = { version = "0.31.3", features = ["fs", "poll", "process", "signal", "time", "term", "user", "resource"] }
+
+# Drivers and persistence.
+nvml-wrapper = "0.12.1"
+rusqlite = { version = "=0.40.2", features = ["bundled"] }
+
+# Terminal UI.
+ratatui = { version = "0.30.2", default-features = false, features = ["crossterm", "underline-color"] }
+crossterm = "0.29.0"
+unicode-width = "0.2.2"
+
+# CLI.
+clap = { version = "4.6.7", features = ["derive"] }
+
+# Test-only.
+proptest = "1.11.0"
+jsonschema = { version = "0.58.5", default-features = false }
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+unwrap_used = "warn"
+expect_used = "warn"
+todo = "warn"
+unimplemented = "warn"
+dbg_macro = "warn"
+cast_possible_truncation = "warn"
+cast_possible_wrap = "warn"
+cast_sign_loss = "warn"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+# Identity, quota and counter arithmetic must stay checked in release builds.
+overflow-checks = true
+panic = "unwind"
+
+[profile.dev]
+overflow-checks = true

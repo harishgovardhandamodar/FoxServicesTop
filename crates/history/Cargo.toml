@@ -1,0 +1,20 @@
+[package]
+name = "fox-services-top-history"
+description = "fox-services-top history: collects committed data, classifies and keeps it, decides what is saved, answers history reads and follows GPU process runs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+fox-services-top-compression.workspace = true
+fox-services-top-core.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+fox-services-top-core = { workspace = true, features = ["test-support"] }
+
+[lints]
+workspace = true

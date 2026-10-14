@@ -1,0 +1,50 @@
+//! # fox-services-top-manager
+//!
+//! Application layer: sampling scheduler, device catalog, quality policy,
+//! ingestion (single logical writer), history, configuration, protected
+//! process actions, presentation pacing and view sessions — all driven by
+//! one control thread that never blocks on I/O. Depends only on
+//! `fox-services-top-core` ports; the composition root supplies the implementations.
+//!
+//! Entry points: [`Manager::new`] (with [`ManagerSetup`] and
+//! [`ManagerPorts`]), [`Manager::open_session`] (a [`SessionHandle`]
+//! implementing `fox_services_top_core::ports::SessionPort`),
+//! [`Manager::shutdown_trigger`] and [`Manager::run`].
+
+mod archive;
+mod catalog;
+mod config;
+mod control;
+mod effects;
+mod error;
+mod history;
+mod hosts;
+mod ingestion;
+mod manager;
+mod overload;
+mod pacing;
+mod policy;
+pub mod presentation;
+mod process;
+mod process_link;
+mod projection;
+mod results;
+mod scheduler;
+mod session;
+mod setup;
+mod shutdown;
+#[cfg(test)]
+mod test_support;
+#[cfg(any(test, feature = "test-support"))]
+pub mod testing;
+mod time_format;
+mod views;
+
+pub use error::ManagerError;
+pub use manager::{Manager, ManagerChannels};
+pub use session::SessionHandle;
+pub use setup::{
+    CONTROL_INBOX_CAPACITY, INGESTION_INBOX_CAPACITY, ManagerInboxes, ManagerPorts, ManagerSetup,
+    ProcessHistoryHandles,
+};
+pub use shutdown::{ShutdownSummary, ShutdownTrigger};

@@ -1,0 +1,256 @@
+//! Rows of the tiers database (D-82): series the history let go deleted,
+//! series upserted by their identity, closed buckets written as the history
+//! hands them, each (series, size) cut to the latest the journal asks for,
+//! what is held then for the history's budget (D-95), and the read at
+//! startup. Only prepared statements with bound parameters.
+
+use std::collections::BTreeSet;
+use std::time::Duration;
+
+use fox_services_top_core::history::SeriesInEveryBoot;
+use fox_services_top_core::identity::{EntityId, HostId, MetricId, Scope};
+use fox_services_top_core::overview_history::{
+    OverviewBucket, StoredTierSeries, TierJournal, TierRow, TierStoreUsage,
+};
+use fox_services_top_core::tiers::Tier;
+use rusqlite::{Connection, Row, Transaction, params};
+
+use crate::sqlite::{
+    BucketTable, DatabaseFailure, StepError, checkpoint, immediate_transaction, used_bytes,
+};
+
+/// A transaction waits this long for the write lock at most.
+const BUSY_DEADLINE: Duration = Duration::from_millis(500);
+const TIER_BUCKETS: BucketTable = BucketTable {
+    table: "tier_buckets",
+    owner_column: "series_id",
+};
+/// Deletes the series the journal forgets, writes its buckets (one written
+/// again replaces the earlier), then keeps the latest `keep_latest` of
+/// every (series, size) it touched; returns what the database holds then.
+pub(super) fn append(
+    connection: &mut Connection,
+    journal: &TierJournal,
+) -> Result<TierStoreUsage, DatabaseFailure> {
+    if journal.rows.is_empty() && journal.forget.is_empty() {
+        return usage(connection).map_err(DatabaseFailure::statement("history_tiers.usage"));
+    }
+    let held = immediate_transaction(connection, BUSY_DEADLINE, |transaction| {
+        for series in &journal.forget {
+            delete_series(transaction, series)?;
+        }
+        let mut touched = BTreeSet::new();
+        for row in journal.rows.iter() {
+            let Some(tier) = stored_tier(row.tier) else {
+                continue;
+            };
+            let series_id = upsert_series(transaction, row)?;
+            touched.insert((series_id, tier));
+            insert_bucket(transaction, series_id, tier, &row.bucket)?;
+        }
+        // The older buckets are in the coarser sizes already.
+        let keep = u64::from(journal.keep_latest);
+        for (series_id, tier) in touched {
+            TIER_BUCKETS.keep_latest(transaction, series_id, tier, keep)?;
+        }
+        Ok::<_, StepError<()>>(usage(transaction)?)
+    })
+    .map_err(DatabaseFailure::transaction("history_tiers.append"))?;
+    checkpoint(connection).map_err(DatabaseFailure::statement("history_tiers.checkpoint"))?;
+    Ok(held)
+}
+
+/// The pages in use and the series held.
+fn usage(connection: &Connection) -> rusqlite::Result<TierStoreUsage> {
+    let series: i64 = connection
+        .prepare_cached("SELECT count(*) FROM tier_series")?
+        .query_row([], |row| row.get(0))?;
+    Ok(TierStoreUsage {
+        used_bytes: used_bytes(connection)?,
+        series: u64::try_from(series).unwrap_or(0),
+    })
+}
+
+/// Deletes one series and every bucket of it.
+fn delete_series(
+    transaction: &Transaction<'_>,
+    series: &SeriesInEveryBoot,
+) -> rusqlite::Result<()> {
+    let identity = params![
+        series.host_id.as_str(),
+        series.entity_id.as_str(),
+        series.metric_id.as_str(),
+        series.scope.as_str(),
+    ];
+    transaction
+        .prepare_cached(
+            "DELETE FROM tier_buckets WHERE series_id IN (SELECT series_id FROM tier_series \
+             WHERE host_id = ?1 AND entity_id = ?2 AND metric_id = ?3 AND scope = ?4)",
+        )?
+        .execute(identity)?;
+    transaction
+        .prepare_cached(
+            "DELETE FROM tier_series \
+             WHERE host_id = ?1 AND entity_id = ?2 AND metric_id = ?3 AND scope = ?4",
+        )?
+        .execute(identity)?;
+    Ok(())
+}
+
+/// The code of a size the database keeps (not the 5 s one).
+fn stored_tier(tier: Tier) -> Option<i64> {
+    (tier != Tier::Recent).then(|| tier.code())
+}
+
+/// The series' id, adding it when new. The no-op update is there because
+/// `DO NOTHING` returns no row for a series already stored.
+fn upsert_series(transaction: &Transaction<'_>, row: &TierRow) -> rusqlite::Result<i64> {
+    let series = &row.series;
+    transaction
+        .prepare_cached(
+            "INSERT INTO tier_series (host_id, entity_id, metric_id, scope) \
+             VALUES (?1, ?2, ?3, ?4) \
+             ON CONFLICT (host_id, entity_id, metric_id, scope) DO UPDATE SET \
+             host_id = excluded.host_id \
+             RETURNING series_id",
+        )?
+        .query_row(
+            params![
+                series.host_id.as_str(),
+                series.entity_id.as_str(),
+                series.metric_id.as_str(),
+                series.scope.as_str(),
+            ],
+            |found| found.get(0),
+        )
+}
+
+fn insert_bucket(
+    transaction: &Transaction<'_>,
+    series_id: i64,
+    tier: i64,
+    bucket: &OverviewBucket,
+) -> rusqlite::Result<()> {
+    if bucket.is_empty() {
+        return Ok(());
+    }
+    let finite = |value: f64| value.is_finite().then_some(value);
+    let total = bucket.total_exact.then(|| bucket.total.to_string());
+    transaction
+        .prepare_cached(
+            "INSERT OR REPLACE INTO tier_buckets (series_id, tier, start_utc_ns, covered_ns, \
+             weighted_sum, minimum, maximum, sample_count, total) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        )?
+        .execute(params![
+            series_id,
+            tier,
+            bucket.start_utc_ns,
+            i64::try_from(bucket.covered_ns).unwrap_or(i64::MAX),
+            bucket.weighted_sum,
+            finite(bucket.minimum),
+            finite(bucket.maximum),
+            bucket.samples,
+            total,
+        ])?;
+    Ok(())
+}
+
+/// Every series with its buckets, in identity order (the order the unique
+/// index gave before it was asked for), each size oldest first. A series
+/// whose identity no longer parses is left out (kept on disk).
+pub(super) fn load(connection: &mut Connection) -> Result<Vec<StoredTierSeries>, DatabaseFailure> {
+    let mut statement = connection
+        .prepare(
+            "SELECT series_id, host_id, entity_id, metric_id, scope FROM tier_series \
+             ORDER BY host_id, entity_id, metric_id, scope",
+        )
+        .map_err(DatabaseFailure::statement("history_tiers.load"))?;
+    let failed = DatabaseFailure::statement("history_tiers.load");
+    let series: Vec<(i64, SeriesInEveryBoot)> = statement
+        .query_map([], series_of)
+        .map_err(&failed)?
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(&failed)?
+        .into_iter()
+        .flatten()
+        .collect();
+    drop(statement);
+    series
+        .into_iter()
+        .map(|(series_id, series)| {
+            Ok(StoredTierSeries {
+                series,
+                buckets: buckets_of(connection, series_id)?,
+            })
+        })
+        .collect()
+}
+
+fn series_of(row: &Row<'_>) -> rusqlite::Result<Option<(i64, SeriesInEveryBoot)>> {
+    let series_id: i64 = row.get(0)?;
+    let text = |index: usize| row.get::<_, String>(index);
+    let (host, entity, metric, scope) = (text(1)?, text(2)?, text(3)?, text(4)?);
+    let parsed = (|| {
+        Some(SeriesInEveryBoot {
+            host_id: HostId::new(host).ok()?,
+            entity_id: EntityId::new(entity).ok()?,
+            metric_id: MetricId::new(metric).ok()?,
+            scope: Scope::new(scope).ok()?,
+        })
+    })();
+    Ok(parsed.map(|series| (series_id, series)))
+}
+
+/// One series' buckets, each size oldest first. A bucket SQLite cannot
+/// read as this build's types, or of a size this build does not know,
+/// fails the read.
+fn buckets_of(
+    connection: &Connection,
+    series_id: i64,
+) -> Result<Vec<(Tier, OverviewBucket)>, DatabaseFailure> {
+    let failed = DatabaseFailure::statement("history_tiers.buckets");
+    let mut statement = connection
+        .prepare_cached(
+            "SELECT tier, start_utc_ns, covered_ns, weighted_sum, minimum, maximum, \
+             sample_count, total FROM tier_buckets WHERE series_id = ?1 \
+             ORDER BY tier, start_utc_ns",
+        )
+        .map_err(&failed)?;
+    let stored = statement
+        .query_map(params![series_id], bucket_of)
+        .map_err(&failed)?
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(&failed)?;
+    stored
+        .into_iter()
+        .map(|(code, bucket)| {
+            let tier = Tier::from_code(code).ok_or_else(|| DatabaseFailure::Row {
+                operation: "history_tiers.buckets",
+                detail: format!("series {series_id} holds a bucket of unknown size {code}"),
+            })?;
+            Ok((tier, bucket))
+        })
+        .collect()
+}
+
+/// A stored bucket with its size's code.
+fn bucket_of(row: &Row<'_>) -> rusqlite::Result<(i64, OverviewBucket)> {
+    let tier: i64 = row.get(0)?;
+    let covered: i64 = row.get(2)?;
+    let minimum: Option<f64> = row.get(4)?;
+    let maximum: Option<f64> = row.get(5)?;
+    let total: Option<String> = row.get(7)?;
+    let exact_total = total.as_deref().and_then(|text| text.parse::<u64>().ok());
+    let bucket = OverviewBucket {
+        start_utc_ns: row.get(1)?,
+        covered_ns: u64::try_from(covered).unwrap_or(0),
+        weighted_sum: row.get(3)?,
+        minimum: minimum.unwrap_or(f64::INFINITY),
+        maximum: maximum.unwrap_or(f64::NEG_INFINITY),
+        samples: row.get(6)?,
+        total: exact_total.unwrap_or(0),
+        total_exact: exact_total.is_some(),
+    };
+    Ok((tier, bucket))
+}

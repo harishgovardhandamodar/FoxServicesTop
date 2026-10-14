@@ -1,0 +1,29 @@
+[package]
+name = "fox-services-top-manager"
+description = "fox-services-top manager: scheduling, catalog, policy, ingestion, history, configuration, process actions, presentation and sessions"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[features]
+# Inert ports (`fox_services_top_manager::testing`) for the suites that assemble a
+# Manager.
+test-support = ["fox-services-top-core/test-support"]
+
+[dependencies]
+fox-services-top-core.workspace = true
+crossbeam-channel.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+fox-services-top-core = { workspace = true, features = ["test-support"] }
+# Its own integration tests use the inert ports too.
+fox-services-top-manager = { path = ".", features = ["test-support"] }
+
+[lints]
+workspace = true

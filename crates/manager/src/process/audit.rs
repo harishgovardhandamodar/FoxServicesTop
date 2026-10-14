@@ -1,0 +1,204 @@
+//! Audit plumbing of the ProcessService: recovery of intents without
+//! outcome, audit health, the audit's age expiry (decided here, D-96),
+//! attempt records (best effort) and outcome records (never dropped
+//! silently: an ordered, bounded backlog absorbs a busy worker).
+
+use fox_services_top_core::action::AuditExpiryReport;
+use fox_services_top_core::clock::format_utc_rfc3339;
+
+use super::*;
+
+/// Shortest boot time between two audit expiry requests.
+pub(super) const AUDIT_EXPIRY_INTERVAL_NS: u64 = 3600 * NANOS_PER_SECOND;
+const NANOS_PER_DAY: u64 = 86_400 * NANOS_PER_SECOND;
+
+/// How long the audit keeps its rows (`store.audit_retention_days`) and
+/// when the next expiry is due. The audit store deletes only what this
+/// asks for (D-96). The first request follows the startup recovery, so an
+/// old intent without outcome is first marked unknown (and reported), then
+/// lives as long as that recovery event.
+#[derive(Debug)]
+pub(super) struct AuditExpirySchedule {
+    keep_ns: u64,
+    next_due_ns: u64,
+}
+
+impl AuditExpirySchedule {
+    pub(super) fn new(retention_days: u32) -> Self {
+        Self {
+            keep_ns: u64::from(retention_days).saturating_mul(NANOS_PER_DAY),
+            next_due_ns: 0,
+        }
+    }
+
+    /// The cutoff to ask for at `now`, if an expiry is due: rows whose
+    /// stamp is before it go.
+    pub(super) fn cutoff_if_due(&self, now: Now) -> Option<String> {
+        (now.boot_ns >= self.next_due_ns)
+            .then(|| format_utc_rfc3339(now.utc_ns.saturating_sub(i128::from(self.keep_ns))))
+    }
+
+    pub(super) fn requested(&mut self, now: Now) {
+        self.next_due_ns = now.boot_ns.saturating_add(AUDIT_EXPIRY_INTERVAL_NS);
+    }
+}
+
+/// Facts of one attempt record.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct AttemptFacts<'a> {
+    pub(super) request_id: Uuid,
+    pub(super) payload_sha256: &'a str,
+    pub(super) session_digest: &'a str,
+    pub(super) code: &'a str,
+    pub(super) detail: &'a str,
+}
+
+impl ProcessService {
+    pub(super) fn on_recovered(
+        &mut self,
+        result: Result<Vec<RecoveredIntent>, AuditFailure>,
+        now: Now,
+    ) {
+        let intents = match result {
+            Ok(intents) => intents,
+            Err(failure) => {
+                self.recovery_requested = false;
+                self.note_audit_failure(&failure, now);
+                return;
+            }
+        };
+        self.recovered = true;
+        let count = u32::try_from(intents.len()).unwrap_or(u32::MAX);
+        self.unknown_outcomes = self.unknown_outcomes.saturating_add(count);
+    }
+    pub(super) fn note_audit_failure(&mut self, failure: &AuditFailure, now: Now) {
+        self.audit_status = Some(PersistenceStatus {
+            state: PersistenceState::Failed,
+            detail: Some(sanitize_message(&failure.message)),
+            ..PersistenceStatus::healthy(PersistenceKind::Audit)
+        });
+        self.next_status_ns = now.boot_ns.saturating_add(AUDIT_FAILURE_RECHECK_NS);
+    }
+    pub(super) fn request_recovery(&mut self, now: Now) {
+        let op = AuditOp::RecoverUnknown {
+            now_boot_ns: now.boot_ns,
+            now_utc: crate::time_format::format_utc(now.utc_ns),
+        };
+        self.recovery_requested = self.audit.try_dispatch(op).is_ok();
+    }
+    /// Asks the audit to expire its old rows once recovery is done and an
+    /// expiry is due; a busy worker is asked again at the next tick.
+    pub(super) fn request_expiry(&mut self, now: Now) {
+        if !self.recovered {
+            return;
+        }
+        let Some(before_utc) = self.audit_expiry.cutoff_if_due(now) else {
+            return;
+        };
+        if self
+            .audit
+            .try_dispatch(AuditOp::Expire { before_utc })
+            .is_ok()
+        {
+            self.audit_expiry.requested(now);
+        }
+    }
+    /// A failed expiry leaves the rows for the next request; the audit's
+    /// status, asked for again now, shows the failure. Recording keeps
+    /// working.
+    pub(super) fn on_expired(&mut self, result: Result<AuditExpiryReport, AuditFailure>, now: Now) {
+        if result.is_err() {
+            self.request_status(now);
+        }
+    }
+    pub(super) fn request_status(&mut self, now: Now) {
+        // A refused status request is simply retried at the next refresh.
+        let _ = self.audit.try_dispatch(AuditOp::Status);
+        self.next_status_ns = now.boot_ns.saturating_add(AUDIT_STATUS_REFRESH_NS);
+    }
+    pub(super) fn append_attempt(&mut self, facts: AttemptFacts<'_>, now: Now) {
+        let attempt = ActionAttempt {
+            request_id: facts.request_id,
+            payload_sha256: facts.payload_sha256.to_owned(),
+            session_digest: facts.session_digest.to_owned(),
+            result_code: facts.code.to_owned(),
+            detail: sanitize_message(facts.detail),
+            occurred_utc: crate::time_format::format_utc(now.utc_ns),
+        };
+        // Attempts never produced an intent: best effort, never backlogged.
+        if self
+            .audit
+            .try_dispatch(AuditOp::AppendAttempt(attempt))
+            .is_ok()
+        {
+            self.audit_outstanding = self.audit_outstanding.saturating_add(1);
+        }
+    }
+    /// Appends the outcome that closes a dispatched intent (never dropped
+    /// silently: a busy worker gets a bounded, ordered backlog).
+    pub(super) fn append_outcome(
+        &mut self,
+        index: usize,
+        state: ActionState,
+        code: &str,
+        detail: &str,
+        now: Now,
+    ) {
+        let Some(confirm) = self
+            .records
+            .get(index)
+            .and_then(|record| record.confirm.clone())
+            .filter(|confirm| confirm.intent_dispatched)
+        else {
+            return;
+        };
+        let op = AuditOp::AppendOutcome(ActionOutcomeRecord {
+            event_id: Uuid::new_v4(),
+            request_id: confirm.request_id,
+            intent_id: confirm.intent_id,
+            state,
+            result_code: code.to_owned(),
+            detail: sanitize_message(detail),
+            occurred_boot_ns: now.boot_ns,
+            occurred_utc: crate::time_format::format_utc(now.utc_ns),
+        });
+        if self.audit_backlog.is_empty() {
+            match self.audit.try_dispatch(op.clone()) {
+                Ok(()) => {
+                    self.audit_outstanding = self.audit_outstanding.saturating_add(1);
+                    return;
+                }
+                Err(DispatchError::Closed) => {
+                    self.note_audit_failure(
+                        &AuditFailure {
+                            code: ErrorCode::Unavailable,
+                            message: "audit worker stopped".to_owned(),
+                            commit_uncertain: false,
+                        },
+                        now,
+                    );
+                    return;
+                }
+                Err(_) => {}
+            }
+        }
+        if self.audit_backlog.len() >= AUDIT_BACKLOG_LIMIT {
+            self.audit_backlog.pop_front();
+        }
+        self.audit_backlog.push_back(op);
+        self.audit_retry_ns = now.boot_ns.saturating_add(AUDIT_RETRY_NS);
+    }
+    pub(super) fn retry_audit_backlog(&mut self, now: Now) {
+        if self.audit_backlog.is_empty() || now.boot_ns < self.audit_retry_ns {
+            return;
+        }
+        while let Some(op) = self.audit_backlog.front().cloned() {
+            if self.audit.try_dispatch(op).is_err() {
+                self.audit_retry_ns = now.boot_ns.saturating_add(AUDIT_RETRY_NS);
+                break;
+            }
+            self.audit_backlog.pop_front();
+            self.audit_outstanding = self.audit_outstanding.saturating_add(1);
+        }
+    }
+}

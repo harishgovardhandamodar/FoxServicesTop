@@ -1,0 +1,46 @@
+//! History settings derived from the validated configuration.
+
+use fox_services_top_core::config::StoreConfig;
+use fox_services_top_core::sampling::SamplingTiming;
+
+use crate::state::HistorySettings;
+
+fn to_usize(value: u32) -> usize {
+    usize::try_from(value).unwrap_or(usize::MAX)
+}
+
+/// Retention and admission of the in-memory history; `archive_enabled`
+/// makes finalization queue finished rows for the archive.
+pub(crate) fn history_settings(
+    store: &StoreConfig,
+    timing: &SamplingTiming,
+    archive_enabled: bool,
+) -> HistorySettings {
+    HistorySettings {
+        raw_history_ns: store.raw_history_ns(),
+        gap_retention_ns: store.aggregate_retention_ns(),
+        max_series: to_usize(store.max_series.max(1)),
+        finalize_grace_ns: timing.finalize_grace_ns,
+        gap_merge_tolerance_ns: timing.fast_period_ns,
+        archive_enabled,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use fox_services_top_core::clock::NANOS_PER_SECOND;
+    use fox_services_top_core::config::Config;
+
+    #[test]
+    fn defaults_keep_five_minutes_raw_and_a_day_of_gaps() {
+        let config = Config::defaults().unwrap();
+        let timing = SamplingTiming::from_sampling(&config.sampling);
+        let settings = history_settings(&config.store, &timing, false);
+        assert_eq!(settings.raw_history_ns, 300 * NANOS_PER_SECOND);
+        assert_eq!(settings.gap_retention_ns, 24 * 3600 * NANOS_PER_SECOND);
+        assert_eq!(settings.max_series, 512);
+        assert_eq!(settings.finalize_grace_ns, timing.finalize_grace_ns);
+        assert_eq!(settings.gap_merge_tolerance_ns, timing.fast_period_ns);
+    }
+}

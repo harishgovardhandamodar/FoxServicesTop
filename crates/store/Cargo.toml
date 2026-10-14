@@ -1,0 +1,31 @@
+[package]
+name = "fox-services-top-store"
+description = "fox-services-top storage: SQLite and file I/O only (archive, history tiers, audit, process history, config file, instance lock, state paths)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[features]
+# Test aids: reading audit records back and the fail-point file system.
+test-support = []
+
+[dependencies]
+fox-services-top-core.workspace = true
+libc.workspace = true
+nix.workspace = true
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+fox-services-top-core = { workspace = true, features = ["test-support"] }
+# The crate's own integration tests use its test aids.
+fox-services-top-store = { path = ".", features = ["test-support"] }
+
+[lints]
+workspace = true

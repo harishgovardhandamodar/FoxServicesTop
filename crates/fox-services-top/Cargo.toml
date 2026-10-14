@@ -1,0 +1,129 @@
+[package]
+name = "fox-services-top"
+description = "Terminal GPU monitor for NVIDIA DGX Spark and Linux machines with NVIDIA GPUs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+build = "build.rs"
+autotests = false
+autobenches = false
+
+[lib]
+name = "fox_services_top"
+path = "src/lib.rs"
+
+[[bin]]
+name = "fox-services-top"
+path = "src/main.rs"
+
+[features]
+# The benchmark harness (`fox_services_top::perf`); the benches require it.
+bench-support = ["fox-services-top-core/test-support"]
+
+[dependencies]
+fox-services-top-core.workspace = true
+fox-services-top-runtime.workspace = true
+fox-services-top-adapters.workspace = true
+fox-services-top-collectors.workspace = true
+fox-services-top-state.workspace = true
+fox-services-top-history.workspace = true
+fox-services-top-store.workspace = true
+fox-services-top-manager.workspace = true
+fox-services-top-ui.workspace = true
+clap.workspace = true
+crossbeam-channel.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+fox-services-top-core = { workspace = true, features = ["test-support"] }
+fox-services-top-store = { workspace = true, features = ["test-support"] }
+fox-services-top-manager = { workspace = true, features = ["test-support"] }
+jsonschema.workspace = true
+nix.workspace = true
+libc.workspace = true
+proptest.workspace = true
+
+# Integration suites live at the repository root;
+# the composition root owns them so they may assemble several concrete crates
+# without adding production dependency edges.
+[[test]]
+name = "contracts"
+path = "../../tests/contracts/main.rs"
+
+[[test]]
+name = "cli"
+path = "../../tests/cli/main.rs"
+
+[[test]]
+name = "replay"
+path = "../../tests/replay/main.rs"
+
+[[test]]
+name = "pty"
+path = "../../tests/pty/main.rs"
+
+[[test]]
+name = "action_disposable"
+path = "../../tests/action_disposable/main.rs"
+
+[[test]]
+name = "fault_injection"
+path = "../../tests/fault_injection/main.rs"
+
+[[test]]
+name = "hardware"
+path = "../../tests/hardware/main.rs"
+
+# The live store: state and history wired together (D-79).
+[[test]]
+name = "store_hot_commit"
+path = "../../tests/live_store/store_hot_commit.rs"
+
+[[test]]
+name = "store_hot_history"
+path = "../../tests/live_store/store_hot_history.rs"
+
+[[test]]
+name = "store_hot_memory"
+path = "../../tests/live_store/store_hot_memory.rs"
+
+[[test]]
+name = "store_hot_properties"
+path = "../../tests/live_store/store_hot_properties.rs"
+
+[[test]]
+name = "store_hot_query_limits"
+path = "../../tests/live_store/store_hot_query_limits.rs"
+
+[[bench]]
+name = "ref"
+path = "../../benches/ref/main.rs"
+harness = false
+required-features = ["bench-support"]
+
+[[bench]]
+name = "history"
+path = "../../benches/history/main.rs"
+harness = false
+required-features = ["bench-support"]
+
+[[bench]]
+name = "arbitration"
+path = "../../benches/arbitration/main.rs"
+harness = false
+required-features = ["bench-support"]
+
+[[bench]]
+name = "projection"
+path = "../../benches/projection/main.rs"
+harness = false
+required-features = ["bench-support"]
+
+[lints]
+workspace = true

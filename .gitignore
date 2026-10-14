@@ -1,0 +1,15 @@
+/target
+*.swp
+*.swo
+.env
+*.log
+__pycache__/
+# Local tool state (Serena's language-server cache and project file).
+.serena/
+# Validation evidence is part of the repository.
+!docs/validation/evidence/*.log
+# Claude Code agent worktrees.
+.claude/worktrees/
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+graft/

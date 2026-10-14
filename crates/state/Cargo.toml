@@ -1,0 +1,19 @@
+[package]
+name = "fox-services-top-state"
+description = "fox-services-top in-memory live state: the committed snapshot and collector state; cleared on restart"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+fox-services-top-core.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+fox-services-top-core = { workspace = true, features = ["test-support"] }
+
+[lints]
+workspace = true

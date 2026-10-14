@@ -1,0 +1,31 @@
+[package]
+name = "fox-services-top-adapters"
+description = "fox-services-top read-only telemetry adapters (procfs, hwmon, thermal, powercap, NVML, network, filesystem, replay) and the process action adapter"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[features]
+# Test aids: the read-counting file system and catalog bookkeeping sizes.
+test-support = []
+
+[dependencies]
+fox-services-top-core.workspace = true
+libc.workspace = true
+nix.workspace = true
+nvml-wrapper.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+fox-services-top-core = { workspace = true, features = ["test-support"] }
+# The crate's own integration tests use its test aids.
+fox-services-top-adapters = { path = ".", features = ["test-support"] }
+
+[lints]
+workspace = true

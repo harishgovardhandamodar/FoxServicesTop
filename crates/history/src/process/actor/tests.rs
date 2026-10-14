@@ -1,0 +1,387 @@
+use std::sync::Arc;
+
+use fox_services_top_core::action::Signal;
+use fox_services_top_core::canonical::{CatalogSnapshot, ProcessRow, ProcessTable};
+use fox_services_top_core::errors::InfraError;
+use fox_services_top_core::identity::EntityId;
+use fox_services_top_core::naming::{attributes, entity};
+use fox_services_top_core::observation::EntityKind;
+use fox_services_top_core::ports::{ProcessHistoryCompletion, ProcessHistoryReader, ProcessMemoryReader};
+use fox_services_top_core::process_history::{
+    EndCause, ProcessHistoryLoad, RunDetails, RunEnd, RunInfo, RunMetric, StoreUsage,
+};
+use fox_services_top_core::process_model::RunRequest;
+use fox_services_top_core::process_probe::{ProbeLiveness, ProbeReading, ProbeReport};
+use fox_services_top_core::testing::{
+    CapturingDispatch, FakeClock, IdleProbeDeriver, MemoryLogger, boot_id, catalog_of,
+    entity_record, gpu_process, process_table, table_sample, test_process_key,
+};
+use fox_services_top_core::tiers::BarSize;
+
+use super::*;
+
+const SECOND: u64 = 1_000_000_000;
+const GIB: u64 = 1 << 30;
+const GPU: &str = "gpu:GPU-aaaa";
+
+struct Rig {
+    actor: ProcessHistory,
+    published: PublishedProcessHistory,
+    clock: Arc<FakeClock>,
+    probe: CapturingDispatch<ProcessProbeJob>,
+    store: CapturingDispatch<ProcessHistoryJob>,
+}
+
+fn rig() -> Rig {
+    let clock = FakeClock::new(0);
+    let probe = CapturingDispatch::new();
+    let store = CapturingDispatch::new();
+    let (actor, published) = ProcessHistory::new(
+        ProcessHistorySettings {
+            boot_id: boot_id("boot-test"),
+            utc_offset_s: 0,
+        },
+        ProcessHistoryPorts {
+            probe: Some(Box::new(probe.clone())),
+            probe_deriver: Arc::new(IdleProbeDeriver),
+            store: Some(Box::new(store.clone())),
+            clock: Arc::clone(&clock) as Arc<dyn TimeProvider>,
+            logger: Arc::new(MemoryLogger::default()),
+        },
+    );
+    Rig {
+        actor,
+        published,
+        clock,
+        probe,
+        store,
+    }
+}
+
+fn row(pid: i64, gpu_bytes: u64) -> ProcessRow {
+    let mut row = gpu_process(pid, "acme_llm.train", &[(GPU, Some(gpu_bytes))]);
+    row.cpu_percent = Some(50.0);
+    row
+}
+
+fn table_at(second: u64, rows: Vec<ProcessRow>) -> ProcessTable {
+    process_table(second, second * SECOND, rows)
+}
+
+/// The host's clock at 100 ticks a second and `GPU` as NVML's GPU 0.
+fn catalog() -> CatalogSnapshot {
+    catalog_of(vec![
+        entity_record(
+            entity::HOST,
+            EntityKind::Host,
+            "host",
+            &[(attributes::CLK_TCK, "100")],
+        ),
+        entity_record(
+            GPU,
+            EntityKind::Gpu,
+            "NVIDIA GB10",
+            &[(attributes::NVML_INDEX, "0")],
+        ),
+    ])
+}
+
+/// The clock moves to `second` and the table read then is handed over.
+fn table(rig: &mut Rig, second: u64, rows: Vec<ProcessRow>) {
+    let ahead = (second * SECOND).saturating_sub(rig.clock.now_boot_ns());
+    rig.clock.advance_ns(ahead);
+    rig.actor
+        .handle(ProcessHistoryInput::Table(Box::new(table_sample(
+            table_at(second, rows),
+            catalog(),
+            1_000,
+        ))));
+}
+
+fn loaded(rig: &mut Rig, load: ProcessHistoryLoad) {
+    rig.actor.handle(ProcessHistoryInput::Store(
+        ProcessHistoryCompletion::Loaded(Ok(load)),
+    ));
+}
+
+/// The first input asks the stores for what they kept; the tables become
+/// runs with their figures and the processes holding memory get colors.
+#[test]
+fn tables_become_runs_and_colors_in_the_published_model() {
+    let mut rig = rig();
+    assert_eq!(rig.published.latest().revision, 1, "an empty model at once");
+    table(&mut rig, 1, vec![row(9, 4 * GIB)]);
+    assert!(matches!(rig.store.take()[..], [ProcessHistoryJob::Load(_)]));
+    for second in 2..10 {
+        table(&mut rig, second, vec![row(9, 4 * GIB)]);
+    }
+    let model = rig.published.latest();
+    assert_eq!(model.runs.len(), 1);
+    let run = &model.runs[0];
+    assert!(run.live);
+    assert_eq!(run.gpus, vec!["GPU 0".to_owned()]);
+    assert_eq!(run.whole.value(RunMetric::Cpu).count, 9);
+    assert_eq!(run.whole.value(RunMetric::Cpu).mean(), Some(50.0));
+    assert!(model.kept_on_disk);
+    assert_eq!(model.tracked.len(), 1);
+    assert_eq!(
+        model.slot_of(&test_process_key(9)),
+        Some(model.tracked[0].slot)
+    );
+    assert_eq!(model.tracked[0].current.len(), 1);
+}
+
+/// The same table handed again (a cycle's later commits carry the
+/// snapshot's table) is taken once by the runs and the memory record: it
+/// counts as a commit without a table, so a finished probe is still
+/// followed by the next.
+#[test]
+fn a_table_handed_again_is_taken_once() {
+    let mut rig = rig();
+    table(&mut rig, 1, vec![row(9, 4 * GIB)]);
+    assert_eq!(rig.probe.take().len(), 1);
+    let revision = rig.published.latest().revision;
+    rig.actor
+        .handle(ProcessHistoryInput::Probe(ProbeReport::default()));
+    let after_probe = rig.published.latest().revision;
+    assert!(after_probe > revision);
+    for _ in 0..3 {
+        table(&mut rig, 1, vec![row(9, 4 * GIB)]);
+    }
+    let model = rig.published.latest();
+    assert_eq!(model.revision, after_probe, "nothing new to show");
+    assert_eq!(model.runs[0].whole.value(RunMetric::Cpu).count, 1);
+    assert_eq!(rig.probe.take().len(), 1, "the next probe left");
+    table(&mut rig, 2, vec![row(9, 4 * GIB)]);
+    let model = rig.published.latest();
+    assert_eq!(model.runs[0].whole.value(RunMetric::Cpu).count, 2);
+    assert!(model.revision > after_probe);
+}
+
+/// A tick changes nothing shown, so nothing is published again.
+#[test]
+fn an_input_that_changes_nothing_publishes_nothing() {
+    let mut rig = rig();
+    table(&mut rig, 1, vec![row(9, GIB)]);
+    let revision = rig.published.latest().revision;
+    rig.probe.take();
+    rig.actor.handle(ProcessHistoryInput::Tick);
+    assert_eq!(rig.published.latest().revision, revision);
+}
+
+/// One probe at a time, here too: a tick lets the next one leave once the
+/// report came back.
+#[test]
+fn probes_follow_their_reports() {
+    let mut rig = rig();
+    table(&mut rig, 1, vec![row(9, GIB)]);
+    assert_eq!(rig.probe.take().len(), 1);
+    rig.actor.handle(ProcessHistoryInput::Tick);
+    assert!(rig.probe.is_empty(), "the first is in flight");
+    rig.actor
+        .handle(ProcessHistoryInput::Probe(ProbeReport::default()));
+    rig.actor.handle(ProcessHistoryInput::Tick);
+    assert_eq!(rig.probe.take().len(), 1);
+}
+
+/// fox-services-top's signal explains the end the probe finds.
+#[test]
+fn a_noted_signal_explains_the_end() {
+    let mut rig = rig();
+    table(&mut rig, 1, vec![row(9, GIB)]);
+    rig.actor.handle(ProcessHistoryInput::Signal {
+        key: test_process_key(9),
+        signal: Signal::Sigterm,
+    });
+    rig.actor.handle(ProcessHistoryInput::Probe(ProbeReport {
+        readings: vec![ProbeReading {
+            liveness: ProbeLiveness::Gone,
+            ..ProbeReading::gone(test_process_key(9))
+        }],
+        oom_kills: None,
+        read_boot_ns: 2 * SECOND,
+    }));
+    let model = rig.published.latest();
+    assert_eq!(
+        model.runs[0].end.map(|end| end.cause),
+        Some(EndCause::SignaledByFoxServicesTop(Signal::Sigterm))
+    );
+}
+
+/// A shown run gets its detail with bars of the size asked for; a run
+/// whose buckets are not held is read from the store once and loading
+/// until they come.
+#[test]
+fn shown_runs_get_their_details_and_ended_ones_are_read_once() {
+    let mut rig = rig();
+    for second in 1..40 {
+        table(&mut rig, second, vec![row(9, 4 * GIB)]);
+    }
+    let asked = RunRequest {
+        key: test_process_key(9),
+        bar: BarSize::OneMinute,
+        columns: 30,
+    };
+    rig.actor.handle(ProcessHistoryInput::Show(asked.clone()));
+    let model = rig.published.latest();
+    let detail = model.detail_for(&asked).unwrap();
+    assert!(model.answers(&asked));
+    let bars = detail.bars.as_ref().unwrap();
+    assert_eq!(bars.bar, BarSize::OneMinute);
+    assert_eq!(bars.window.1 - bars.window.0, 30 * 60 * 1_000_000_000);
+    assert!(!detail.loading);
+    // An ended run of an earlier start, restored without its buckets.
+    let mut info = detail.info.clone();
+    info.key = test_process_key(5);
+    info.end = Some(RunEnd {
+        utc_ns: info.last_seen_utc_ns,
+        cause: EndCause::Exit(0),
+    });
+    loaded(
+        &mut rig,
+        ProcessHistoryLoad {
+            runs: vec![info],
+            ..ProcessHistoryLoad::default()
+        },
+    );
+    rig.store.take();
+    let ended = RunRequest {
+        key: test_process_key(5),
+        ..asked
+    };
+    rig.actor.handle(ProcessHistoryInput::Show(ended.clone()));
+    rig.actor.handle(ProcessHistoryInput::Show(ended.clone()));
+    let reads = rig.store.take();
+    assert_eq!(reads.len(), 1, "read once: {reads:?}");
+    assert!(matches!(reads[0], ProcessHistoryJob::ReadRun { .. }));
+    assert!(rig.published.latest().detail_for(&ended).unwrap().loading);
+}
+
+/// The flush sends the journal and the short-term file; the model says
+/// when both were answered.
+#[test]
+fn a_flush_is_settled_once_its_writes_are_answered() {
+    let mut rig = rig();
+    table(&mut rig, 1, vec![row(9, GIB)]);
+    loaded(&mut rig, ProcessHistoryLoad::default());
+    rig.store.take();
+    rig.actor.handle(ProcessHistoryInput::Flush);
+    let jobs = rig.store.take();
+    assert!(matches!(
+        jobs[..],
+        [
+            ProcessHistoryJob::Append(_),
+            ProcessHistoryJob::SaveRecent(_)
+        ]
+    ));
+    let writes = rig.published.latest().writes;
+    assert_eq!((writes.flushes, writes.pending), (1, 2));
+    assert!(!writes.settled_after(1));
+    for answer in [
+        ProcessHistoryCompletion::Appended(Ok(StoreUsage::default())),
+        ProcessHistoryCompletion::Saved(Ok(())),
+    ] {
+        rig.actor.handle(ProcessHistoryInput::Store(answer));
+    }
+    assert!(rig.published.latest().writes.settled_after(1));
+}
+
+/// The memory record answers a chart's parts for the exact window asked,
+/// on the wall clock: each table's read time is placed by the clock's
+/// offset when it was taken.
+#[test]
+fn the_memory_record_answers_the_parts_of_a_window() {
+    let mut rig = rig();
+    for second in [10, 15, 20] {
+        table(&mut rig, second, vec![row(9, 2 * GIB)]);
+    }
+    let offset = u64::try_from(rig.clock.now_utc_ns()).unwrap() - rig.clock.now_boot_ns();
+    let window = (offset + 10 * SECOND, offset + 20 * SECOND);
+    let gpus = std::collections::BTreeSet::from([EntityId::new(GPU).unwrap()]);
+    let parts = rig.published.parts(&gpus, window, 2);
+    assert_eq!(parts.len(), 1);
+    #[allow(clippy::cast_precision_loss)]
+    let held = (2 * GIB) as f64;
+    assert_eq!(parts[0].means, vec![Some(held), Some(held)]);
+    let other = std::collections::BTreeSet::from([EntityId::new("gpu:GPU-bbbb").unwrap()]);
+    assert!(rig.published.parts(&other, window, 2).is_empty());
+    assert!(
+        rig.published
+            .parts(&gpus, (10 * SECOND, 20 * SECOND), 2)
+            .is_empty(),
+        "the boot clock's times are not the window's"
+    );
+}
+
+/// What the stores kept of an ended run: its row, without buckets.
+fn ended_info(pid: i64) -> RunInfo {
+    RunInfo {
+        key: test_process_key(pid),
+        name: "acme_llm.eval".to_owned(),
+        command: String::new(),
+        cwd: String::new(),
+        uid: None,
+        gpus: vec!["GPU 0".to_owned()],
+        details: RunDetails::default(),
+        started_utc_ns: 1_789_999_000_000_000_000,
+        last_seen_utc_ns: 1_789_999_600_000_000_000,
+        end: Some(RunEnd {
+            utc_ns: 1_789_999_600_000_000_000,
+            cause: EndCause::Exit(0),
+        }),
+    }
+}
+
+/// An ended run restored without its buckets, opened in the tab.
+fn opened_ended_run(rig: &mut Rig) -> RunRequest {
+    table(rig, 1, vec![row(9, GIB)]);
+    loaded(
+        rig,
+        ProcessHistoryLoad {
+            runs: vec![ended_info(5)],
+            ..ProcessHistoryLoad::default()
+        },
+    );
+    rig.store.take();
+    let request = RunRequest {
+        key: test_process_key(5),
+        bar: BarSize::OneMinute,
+        columns: 30,
+    };
+    rig.actor.handle(ProcessHistoryInput::Show(request.clone()));
+    request
+}
+
+/// A run the store holds no buckets of (it gave way, or its writes were
+/// lost) is no longer loading once the read answered: its detail shows
+/// it has no bars instead of waiting for good.
+#[test]
+fn an_empty_read_answer_ends_the_loading() {
+    let mut rig = rig();
+    let request = opened_ended_run(&mut rig);
+    assert!(rig.published.latest().detail_for(&request).unwrap().loading);
+    rig.actor.handle(ProcessHistoryInput::Store(
+        ProcessHistoryCompletion::RunRead {
+            key: test_process_key(5),
+            result: Ok(Vec::new()),
+        },
+    ));
+    let model = rig.published.latest();
+    let detail = model.detail_for(&request).unwrap();
+    assert!(!detail.loading, "answered: nothing to wait for");
+    assert!(detail.bars.is_none());
+}
+
+/// A failed read ends the loading too (the failure is logged).
+#[test]
+fn a_failed_read_answer_ends_the_loading() {
+    let mut rig = rig();
+    let request = opened_ended_run(&mut rig);
+    rig.actor.handle(ProcessHistoryInput::Store(
+        ProcessHistoryCompletion::RunRead {
+            key: test_process_key(5),
+            result: Err(InfraError::Unavailable("acme".to_owned())),
+        },
+    ));
+    assert!(!rig.published.latest().detail_for(&request).unwrap().loading);
+}

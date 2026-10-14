@@ -1,0 +1,21 @@
+# evidence: gate-check-gb10
+# command: cargo check --workspace --all-targets --all-features --locked
+# started_utc: 2026-10-10T14:03:40Z
+# git_commit: d662f0abd751ca56ac8902805bdda61137f9023c (working tree modified)
+# host: Linux 6.17.0-1014-nvidia aarch64
+# cpu: 
+# rustc: rustc 1.92.0 (ded5c06cf 2025-12-08)
+# ---- output ----
+    Checking fox-services-top-core v0.2.0 (/home/harishgovardhandamodar-dgx/Code/Github/fox-services-top/crates/core)
+    Checking fox-services-top-adapters v0.2.0 (/home/harishgovardhandamodar-dgx/Code/Github/fox-services-top/crates/adapters)
+    Checking fox-services-top-store v0.2.0 (/home/harishgovardhandamodar-dgx/Code/Github/fox-services-top/crates/store)
+    Checking fox-services-top-runtime v0.2.0 (/home/harishgovardhandamodar-dgx/Code/Github/fox-services-top/crates/runtime)
+    Checking fox-services-top-manager v0.2.0 (/home/harishgovardhandamodar-dgx/Code/Github/fox-services-top/crates/manager)
+    Checking fox-services-top-collectors v0.2.0 (/home/harishgovardhandamodar-dgx/Code/Github/fox-services-top/crates/collectors)
+    Checking fox-services-top-ui v0.2.0 (/home/harishgovardhandamodar-dgx/Code/Github/fox-services-top/crates/ui)
+    Checking fox-services-top v0.2.0 (/home/harishgovardhandamodar-dgx/Code/Github/fox-services-top/crates/fox-services-top)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.84s
+# ---- end ----
+# finished_utc: 2026-10-10T14:03:46Z
+# exit_code: 0
+# redacted: GPU UUIDs and hardware serial numbers

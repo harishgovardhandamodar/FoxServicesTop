@@ -1,0 +1,280 @@
+//! Command routing (CommandPort). Semantic validation lives in the owning
+//! services; this module checks idempotency, records the result route and
+//! maps the typed command to its service. Every accepted command gets
+//! exactly one result.
+
+use fox_services_top_core::action::Signal;
+use fox_services_top_core::commands::{CommandBody, CommandEnvelope, CommandResult};
+use fox_services_top_core::errors::ErrorCode;
+use fox_services_top_core::identity::{ProcessKey, SessionId};
+use fox_services_top_core::tiers::BarSize;
+use uuid::Uuid;
+
+use super::ControlCore;
+use crate::config::{ConfigDecision, ConfigRequest};
+use crate::effects::Effects;
+use crate::process::{Now, PrepareRequest, TokenCommand};
+use crate::results::CacheLookup;
+use crate::session::QueuedCommand;
+use crate::views::{ViewContext, ViewUpdate};
+
+/// Why `ReplaceConfig` is refused (D-91): settings change one field at a
+/// time through their own commands.
+pub(crate) const REPLACE_CONFIG_REFUSED: &str = "ReplaceConfig is not supported (D-91); change \
+     settings with SetSamplingInterval or SetModuleEnabled";
+
+impl ControlCore {
+    pub(crate) fn on_command(&mut self, queued: QueuedCommand) {
+        let QueuedCommand { envelope, _permit } = queued;
+        if !self.is_running() {
+            self.reject_for_shutdown(&envelope);
+            return;
+        }
+        if !self.sessions.contains(&envelope.session_id) {
+            // The session closed while the command was queued: its authority
+            // ended with it, so nothing takes effect.
+            let result = CommandResult::rejected(
+                envelope.request_id,
+                ErrorCode::Unavailable,
+                "session closed",
+            );
+            self.deliver(&envelope.session_id, result);
+            return;
+        }
+        let now = self.now();
+        let request_id = envelope.request_id;
+        let digest = envelope.payload_digest();
+        match self.results.lookup(request_id, &digest, now.boot_ns) {
+            CacheLookup::Miss => {}
+            CacheLookup::Completed(result) => {
+                self.deliver(&envelope.session_id, result);
+                return;
+            }
+            CacheLookup::InProgress => {
+                let result = CommandResult::in_progress(request_id, "request already in progress");
+                self.deliver(&envelope.session_id, result);
+                return;
+            }
+            CacheLookup::Conflict => {
+                let result = CommandResult::rejected(
+                    request_id,
+                    ErrorCode::Conflict,
+                    "request_id reused with a different payload",
+                );
+                self.deliver(&envelope.session_id, result);
+                return;
+            }
+        }
+        self.results.begin(request_id, digest.clone());
+        self.routes.insert(request_id, envelope.session_id.clone());
+        self.dispatch_command(envelope, digest, now);
+    }
+
+    /// Answers a command accepted before shutdown started.
+    pub(super) fn reject_for_shutdown(&mut self, envelope: &CommandEnvelope) {
+        let result = CommandResult::rejected(
+            envelope.request_id,
+            ErrorCode::Unavailable,
+            "fox-services-top is shutting down",
+        );
+        self.deliver(&envelope.session_id, result);
+    }
+
+    fn dispatch_command(&mut self, envelope: CommandEnvelope, digest: String, now: Now) {
+        let request_id = envelope.request_id;
+        let session_id = envelope.session_id;
+        match envelope.body {
+            CommandBody::SetSamplingInterval {
+                interval_ms,
+                expected_config_revision,
+            } => self.submit_config(
+                request_id,
+                ConfigRequest::SetInterval {
+                    interval_ms,
+                    expected_revision: expected_config_revision,
+                },
+                now,
+            ),
+            // The wire keeps the command (command.schema.json); no frontend
+            // sends it, so it is refused before validating any candidate.
+            CommandBody::ReplaceConfig { .. } => self.finish(CommandResult::rejected(
+                request_id,
+                ErrorCode::Unsupported,
+                REPLACE_CONFIG_REFUSED,
+            )),
+            CommandBody::SetModuleEnabled {
+                module_id,
+                enabled,
+                expected_config_revision,
+            } => self.submit_config(
+                request_id,
+                ConfigRequest::SetModule {
+                    module_id,
+                    enabled,
+                    expected_revision: expected_config_revision,
+                },
+                now,
+            ),
+            CommandBody::UpdateViewSession {
+                view,
+                selected_entity_id,
+                selected_process,
+                filter,
+                sort,
+                ascending,
+                frame_revision,
+                overview_bar,
+                process_bar,
+            } => self.update_view(
+                request_id,
+                &session_id,
+                ViewUpdate {
+                    view,
+                    selected_entity_id,
+                    selected_process,
+                    filter,
+                    sort,
+                    ascending,
+                    frame_revision,
+                    overview_bar: overview_bar.unwrap_or(BarSize::overview_default()),
+                    process_bar: process_bar.unwrap_or_default(),
+                },
+                now,
+            ),
+            CommandBody::PrepareSignal { target, signal } => {
+                self.prepare_signal(request_id, &session_id, target, signal, digest, now);
+            }
+            CommandBody::ConfirmSignal { confirmation_token } => {
+                let mut fx = Effects::default();
+                self.process.confirm(
+                    TokenCommand {
+                        request_id,
+                        session_id: &session_id,
+                        token: &confirmation_token,
+                        payload_sha256: digest,
+                    },
+                    now,
+                    &mut fx,
+                );
+                self.apply(fx);
+            }
+            CommandBody::CancelSignal { confirmation_token } => {
+                let mut fx = Effects::default();
+                self.process.cancel(
+                    TokenCommand {
+                        request_id,
+                        session_id: &session_id,
+                        token: &confirmation_token,
+                        payload_sha256: digest,
+                    },
+                    now,
+                    &mut fx,
+                );
+                self.apply(fx);
+            }
+            // The session refuses it before the queue (D-93); kept total.
+            CommandBody::Shutdown { .. } => self.finish(CommandResult::rejected(
+                request_id,
+                ErrorCode::Unsupported,
+                "Shutdown is not a queued command; quit through request_shutdown",
+            )),
+        }
+    }
+
+    fn submit_config(&mut self, request_id: Uuid, request: ConfigRequest, now: Now) {
+        let catalog = self.catalog.snapshot();
+        match self
+            .config
+            .submit(request_id, request, &catalog, now.boot_ns)
+        {
+            ConfigDecision::Reply(result) => self.finish(result),
+            // The settings view shows the pending change until the receipt.
+            ConfigDecision::Pending => self.sessions.mark_all_dirty(),
+        }
+    }
+
+    fn update_view(
+        &mut self,
+        request_id: Uuid,
+        session_id: &SessionId,
+        update: ViewUpdate,
+        now: Now,
+    ) {
+        let snapshot = self.ingestion.snapshots().latest();
+        let catalog = self.catalog.snapshot();
+        let context = ViewContext {
+            host_id: &self.host_id,
+            boot_id: &self.boot_id,
+            table: &snapshot.process_table,
+            catalog: &catalog,
+        };
+        match self.sessions.update(session_id, update, &context) {
+            Ok(changed) => {
+                // The run the Process History tab opened is asked of the
+                // process actor with the session's next frame (D-76).
+                if changed {
+                    self.sync_history(session_id, now.boot_ns);
+                }
+                self.finish(CommandResult::completed(request_id, "view updated"));
+            }
+            Err(detail) => self.finish(CommandResult::from_error(request_id, &detail)),
+        }
+    }
+
+    /// Re-derives the history selection of a session (view, selector,
+    /// window, viewport columns).
+    pub(super) fn sync_history(&mut self, session_id: &SessionId, now_ns: u64) {
+        let (Some(state), Some(shared)) = (
+            self.sessions.state(session_id),
+            self.sessions.shared(session_id),
+        ) else {
+            return;
+        };
+        let columns = shared.viewport().0;
+        if self
+            .history
+            .sync_session(session_id, state, columns, now_ns)
+        {
+            self.sessions.mark_dirty(session_id);
+        }
+    }
+
+    fn prepare_signal(
+        &mut self,
+        request_id: Uuid,
+        session_id: &SessionId,
+        target: ProcessKey,
+        signal: Signal,
+        digest: String,
+        now: Now,
+    ) {
+        let snapshot = self.ingestion.snapshots().latest();
+        let row =
+            match self
+                .sessions
+                .check_signal_target(session_id, &target, &snapshot.process_table)
+            {
+                Ok(row) => row,
+                Err(detail) => {
+                    self.finish(CommandResult::from_error(request_id, &detail));
+                    return;
+                }
+            };
+        let protected = self.hosts.protected_pids();
+        let mut fx = Effects::default();
+        self.process.prepare(
+            PrepareRequest {
+                request_id,
+                session_id,
+                target,
+                signal,
+                payload_sha256: digest,
+                row: Some(row),
+                protected_pids: &protected,
+            },
+            now,
+            &mut fx,
+        );
+        self.apply(fx);
+    }
+}

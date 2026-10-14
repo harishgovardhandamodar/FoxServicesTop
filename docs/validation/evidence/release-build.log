@@ -1,0 +1,14 @@
+# evidence: release-build
+# command: cargo build --release --locked
+# started_utc: 2026-10-10T14:33:09Z
+# git_commit: 32037716aca2cd1fd195baaf7e23b439916dd79c (working tree modified)
+# host: Linux 6.12.111+deb13-amd64 x86_64
+# cpu: 13th Gen Intel(R) Core(TM) i9-13900K
+# rustc: rustc 1.92.0 (ded5c06cf 2025-12-08)
+# ---- output ----
+   Compiling fox-services-top v0.2.0 (/mnt/harishgovardhandamodar_SSD/Code/Github/fox-services-top/crates/fox-services-top)
+    Finished `release` profile [optimized] target(s) in 40.85s
+# ---- end ----
+# finished_utc: 2026-10-10T14:33:50Z
+# exit_code: 0
+# redacted: GPU UUIDs and hardware serial numbers
