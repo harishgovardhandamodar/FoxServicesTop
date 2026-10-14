@@ -50,8 +50,8 @@ use fox_services_top_core::naming::{adapters, entity};
 use fox_services_top_core::ports::TrendReader;
 use fox_services_top_core::process_model::ProcessHistoryModel;
 use fox_services_top_core::view::{
-    ActionsView, GpuView, HeaderView, HistoryView, HostStatus, IntervalView, ModuleViews,
-    OverloadState, SessionState, ViewModel,
+    ActionsView, ClusterSnapshot, ClusterView, DockerView, GpuView, HeaderView, HistoryView,
+    HostStatus, IntervalView, ModuleViews, OverloadState, SessionState, ViewModel,
 };
 
 use banners::BannerFacts;
@@ -107,6 +107,9 @@ pub struct PresentationContext<'a> {
     pub history: Arc<HistoryView>,
     /// The state's short trends (D-99).
     pub trends: &'a dyn TrendReader,
+    /// The cluster monitor's latest snapshot (Nodes and Docker tabs); `None`
+    /// without a source: the tabs explain themselves.
+    pub cluster: Option<Arc<ClusterSnapshot>>,
     /// The GPU process runs and colors the history's process actor
     /// published (D-64, D-76, D-79).
     pub processes: &'a ProcessHistoryModel,
@@ -285,6 +288,18 @@ fn build_modules(
                 hosts: context.hosts,
             },
         )));
+    }
+    if plan.shows(plan::CLUSTER) {
+        modules.cluster = Some(match &context.cluster {
+            Some(snapshot) => Arc::clone(&snapshot.cluster),
+            None => Arc::new(ClusterView::disabled()),
+        });
+    }
+    if plan.shows(plan::DOCKER) {
+        modules.docker = Some(match &context.cluster {
+            Some(snapshot) => Arc::clone(&snapshot.docker),
+            None => Arc::new(DockerView::disabled()),
+        });
     }
     // The process actions' state is the session's, not a module's: every
     // projection carries it, so a pending confirmation is a banner in

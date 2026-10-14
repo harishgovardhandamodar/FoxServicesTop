@@ -435,6 +435,7 @@ impl Fixture {
             actions: Arc::clone(&self.actions),
             history: Arc::clone(&self.history),
             trends: &self.trends,
+            cluster: None,
             processes: &self.processes,
             facts: &self.facts,
             enabled_modules: &self.enabled_modules,

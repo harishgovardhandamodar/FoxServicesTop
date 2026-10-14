@@ -17,8 +17,8 @@ use fox_services_top_core::config::{Config, ValueOrigin};
 use fox_services_top_core::identity::{BootId, HostId, PidNamespace};
 use fox_services_top_core::observation::AdapterManifest;
 use fox_services_top_core::ports::{
-    AdapterJob, Collector, ConfigJob, ControlCompletion, Dispatch, HistoryJob, IngestionCompletion,
-    Logger, SnapshotReader, StateJob, TrendReader,
+    AdapterJob, ClusterSource, Collector, ConfigJob, ControlCompletion, Dispatch, HistoryJob,
+    IngestionCompletion, Logger, SnapshotReader, StateJob, TrendReader,
 };
 use fox_services_top_core::quality::Namespace;
 
@@ -55,6 +55,9 @@ pub struct ManagerPorts {
     /// The history's process actor (D-76, D-79): the GPU process runs and
     /// colors; `None` without one (tests and tools).
     pub process_history: Option<ProcessHistoryHandles>,
+    /// The cluster monitor's latest snapshot (Nodes and Docker tabs);
+    /// `None` without one (tests and tools): the tabs explain themselves.
+    pub cluster: Option<Arc<dyn ClusterSource>>,
     pub logger: Arc<dyn Logger>,
     pub ledger: ByteLedger,
     /// Ingress admission gate shared with the runtime (observed for overload).

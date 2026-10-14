@@ -12,6 +12,8 @@ pub(crate) const NETWORK: &str = "network";
 pub(crate) const PROCESSES: &str = "processes";
 pub(crate) const HISTORY: &str = "history";
 pub(crate) const SETTINGS: &str = "settings";
+pub(crate) const CLUSTER: &str = "cluster";
+pub(crate) const DOCKER: &str = "docker";
 
 /// Viewport assumed until the session reports its terminal size.
 const DEFAULT_VIEWPORT: (u16, u16) = (80, 24);
@@ -28,6 +30,8 @@ pub fn visible_modules(view: ViewKind) -> &'static [&'static str] {
         ViewKind::GpuDetail => &[GPU],
         ViewKind::History => &[HISTORY],
         ViewKind::Settings => &[SETTINGS],
+        ViewKind::Nodes => &[CLUSTER],
+        ViewKind::Docker => &[DOCKER],
         // Retired views: the wire keeps their values, nothing is shown (D-91).
         ViewKind::Processes | ViewKind::Sources | ViewKind::Actions => &[],
     }

@@ -37,6 +37,7 @@ pub fn inert_ports(
         audit: Box::new(CapturingDispatch::<AuditOp>::new()),
         actions: Box::new(CapturingDispatch::<ActionOp>::new()),
         process_history: None,
+        cluster: None,
         logger: Arc::new(MemoryLogger::default()),
         ledger: ledger.clone(),
         ingress,

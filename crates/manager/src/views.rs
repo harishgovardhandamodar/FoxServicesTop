@@ -367,6 +367,9 @@ fn validate_view(
             Ok(())
         }
         ViewKind::Settings => Ok(()),
+        // The Nodes and Docker tabs show polled snapshots: no selection or
+        // series to validate, and the filter narrows their tables.
+        ViewKind::Nodes | ViewKind::Docker => Ok(()),
         ViewKind::Processes | ViewKind::Sources | ViewKind::Actions => Err(ErrorDetail::new(
             ErrorCode::Unsupported,
             format!(

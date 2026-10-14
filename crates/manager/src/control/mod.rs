@@ -21,7 +21,7 @@ use fox_services_top_core::clock::{TimeProvider, ms_to_ns};
 use fox_services_top_core::commands::CommandResult;
 use fox_services_top_core::identity::{BootId, HostId, SessionId};
 use fox_services_top_core::naming::{self, adapters, groups};
-use fox_services_top_core::ports::{LogLevel, Logger, TrendReader};
+use fox_services_top_core::ports::{ClusterSource, LogLevel, Logger, TrendReader};
 use uuid::Uuid;
 
 use crate::archive::ArchiveTracker;
@@ -94,6 +94,9 @@ pub(crate) struct ControlCore {
     ingestion: IngestionService,
     /// The state's short trends (D-99): read, never recorded here.
     trends: Arc<dyn TrendReader>,
+    /// The cluster monitor's latest snapshot (Nodes and Docker tabs): read,
+    /// never polled here.
+    cluster: Option<Arc<dyn ClusterSource>>,
     /// How often the process table is read (its memory values hold a few
     /// such periods, D-64).
     process_period_ms: u64,
@@ -190,6 +193,7 @@ impl ControlCore {
         Self {
             hosts: HostTable::new(&setup.adapters),
             trends: ports.trends,
+            cluster: ports.cluster,
             process_period_ms: process_ms,
             process_history,
             sessions: ViewSessionService::new(effective.viewer.max_sessions),

@@ -400,6 +400,7 @@ impl RefComposition {
                 inputs: Box::new(process_history),
                 runs: Arc::clone(&published) as Arc<dyn ProcessHistoryReader>,
             }),
+            cluster: None,
             logger: Arc::clone(&product_logger),
             ledger: ledger.clone(),
             ingress,

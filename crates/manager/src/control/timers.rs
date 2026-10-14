@@ -299,6 +299,7 @@ impl ControlCore {
             actions: self.process.view_for(session_id, now_ns),
             history: self.history.view(session_id),
             trends: self.trends.as_ref(),
+            cluster: self.cluster.as_ref().and_then(|source| source.latest()),
             processes: &inputs.processes,
             facts: &self.facts,
             enabled_modules: &inputs.enabled_modules,
