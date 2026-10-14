@@ -19,8 +19,13 @@ use super::common::{
     draw_table_header, draw_table_row, fit_columns, message, no_data, panel_with_keys,
     render_chart,
 };
-use crate::format::{clean, format_energy, format_value};
+use crate::format::{clean, format_energy, format_span_ns, format_value};
 use crate::registry::{DisplayContext, DisplayModule, DisplayModuleManifest, RenderOutput, Slot};
+
+use super::history::{
+    FULL_COVERAGE, history_nanos_to_seconds as nanos_to_seconds,
+    history_recorded_text as recorded_text, why_partly,
+};
 
 /// The keys acting on the view, at the right of its title.
 const POWER_KEYS: &str = "w/W timescale · / filter";
@@ -192,12 +197,30 @@ fn render_chart_block(
                     context.theme.muted_style(),
                 ),
             ]),
-            Some("w/W timescale"),
+            recorded_note(power).as_deref(),
             context,
         );
     }
     let Some(area) = chart_rows else { return };
     render_chart(frame, area, &power.timeline, None, context);
+}
+
+/// What of the timeline window the local database holds, and why the rest
+/// is missing: `recorded 55m of 1h · only while fox-services-top runs`.
+/// `None` while the window is fully covered.
+fn recorded_note(power: &PowerView) -> Option<String> {
+    let recorded = power.rows.iter().filter_map(|row| row.covered_ns).max()?;
+    if nanos_to_seconds(recorded) >= nanos_to_seconds(power.requested_span_ns) * FULL_COVERAGE {
+        return None;
+    }
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let held = (recorded / 1_000_000_000).max(1);
+    Some(format!(
+        "recorded {} of {} · {}",
+        recorded_text(held),
+        format_span_ns(power.requested_span_ns),
+        why_partly(&power.disk),
+    ))
 }
 
 fn peak_of(power: &PowerView) -> Option<f64> {
@@ -414,5 +437,33 @@ mod tests {
         model.modules.power = None;
         let text = test_fixtures::render_text(&PowerModule::new().unwrap(), &model, (120, 20));
         assert!(text.contains("no power data"), "{text}");
+    }
+
+    /// A partly recorded window names what the local database holds and
+    /// why the rest is missing; a full window shows no note.
+    #[test]
+    fn a_partly_recorded_window_names_its_database_coverage() {
+        use fox_services_top_core::view::DiskHistory;
+
+        let mut full = test_fixtures::power_view();
+        assert_eq!(recorded_note(&full), None);
+        for row in &mut full.rows {
+            row.covered_ns = Some(1_800_000_000_000);
+        }
+        assert_eq!(
+            recorded_note(&full).as_deref(),
+            Some("recorded 30m of 1h · only while fox-services-top runs")
+        );
+        full.disk = DiskHistory::Failed("locked".into());
+        assert_eq!(
+            recorded_note(&full).as_deref(),
+            Some("recorded 30m of 1h · disk history unavailable")
+        );
+
+        let mut model = test_fixtures::view_model(ViewKind::Power, 1);
+        model.modules.power = Some(std::sync::Arc::new(full));
+        let text = test_fixtures::render_text(&PowerModule::new().unwrap(), &model, (160, 24));
+        assert!(text.contains("recorded 30m of 1h"), "{text}");
+        assert!(text.contains("disk history unavailable"), "{text}");
     }
 }

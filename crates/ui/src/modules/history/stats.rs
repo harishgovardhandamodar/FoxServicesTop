@@ -124,7 +124,7 @@ fn adding_windows<'a>(block: &GpuStats<'a>) -> Vec<&'a str> {
 }
 
 /// Seconds of `nanos`.
-pub(super) fn nanos_to_seconds(nanos: u64) -> f64 {
+pub(crate) fn nanos_to_seconds(nanos: u64) -> f64 {
     #[allow(clippy::cast_precision_loss)]
     let nanos = nanos as f64;
     nanos / 1e9
@@ -445,7 +445,7 @@ fn window_text(block: &GpuStats<'_>, window: &str) -> String {
 
 /// `1h 12m`, `45m`, `2h`, `30s`: recorded time, in whole minutes past the
 /// first.
-pub(super) fn recorded_text(seconds: u64) -> String {
+pub(crate) fn recorded_text(seconds: u64) -> String {
     if seconds < 60 {
         return format!("{seconds}s");
     }

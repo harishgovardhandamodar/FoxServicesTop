@@ -992,6 +992,7 @@ pub(crate) fn power_view() -> PowerView {
                 150.0,
             ),
         ],
+        disk: DiskHistory::On,
     }
 }
 

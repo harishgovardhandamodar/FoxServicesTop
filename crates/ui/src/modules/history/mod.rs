@@ -34,6 +34,9 @@ use self::runs::render_runs;
 use self::stats::{
     GpuStats, gpu_stats, nanos_to_seconds, recorded_text, render_gpu_stats, stats_labels,
 };
+pub(crate) use self::stats::{
+    nanos_to_seconds as history_nanos_to_seconds, recorded_text as history_recorded_text,
+};
 use self::strip::{Window, plot_width, render_strip, strip_text, tallest_column};
 use super::ModuleBuildError;
 use super::common::{
@@ -49,7 +52,7 @@ use crate::registry::{DisplayContext, DisplayModule, DisplayModuleManifest, Rend
 pub const HISTORY_MODULE_ID: &str = "history";
 
 /// Share of the window below which the bar says how much is recorded.
-const FULL_COVERAGE: f64 = 0.99;
+pub(crate) const FULL_COVERAGE: f64 = 0.99;
 
 pub struct HistoryModule {
     manifest: DisplayModuleManifest,
@@ -402,7 +405,7 @@ fn render_bar_size_row(
 /// Why a window is only partly recorded (D-51): without the archive the
 /// history starts with fox-services-top; with it, it is recorded while fox-services-top runs;
 /// an archive that cannot be read is said so.
-fn why_partly(disk: &DiskHistory) -> &'static str {
+pub(crate) fn why_partly(disk: &DiskHistory) -> &'static str {
     match disk {
         DiskHistory::Off => "history starts with fox-services-top",
         DiskHistory::On => "only while fox-services-top runs",

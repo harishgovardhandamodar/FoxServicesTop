@@ -684,9 +684,10 @@ pub struct RunChartView {
 }
 
 /// Where the history before this run comes from (D-51, D-82).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum DiskHistory {
     /// No archive: the history starts with fox-services-top.
+    #[default]
     Off,
     /// Earlier runs and boots are kept on disk in every bar size.
     On,
@@ -1220,6 +1221,9 @@ pub struct PowerView {
     pub rows: Vec<PowerRowView>,
     /// One entry per power series and statistics window.
     pub windows: Vec<PowerWindowView>,
+    /// Whether earlier windows are kept in the local database: the
+    /// timeline stays viewable across restarts while it is `On`.
+    pub disk: DiskHistory,
 }
 
 /// The latest polled snapshot of the whole cluster: what the Manager reads

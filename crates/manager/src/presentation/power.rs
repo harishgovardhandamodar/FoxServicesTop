@@ -99,6 +99,7 @@ pub(crate) fn build_power_view(
         timeline,
         rows,
         windows,
+        disk: history.disk.clone(),
     })
 }
 
@@ -241,6 +242,20 @@ mod tests {
         assert_eq!(view.rows[0].energy_joules, Some(720_000.0));
         assert_eq!(view.windows.len(), 1);
         assert_eq!(view.windows[0].energy_joules, Some(720_000.0));
+        assert_eq!(
+            view.disk,
+            fox_services_top_core::view::DiskHistory::Off,
+            "the view carries where its timeline is kept"
+        );
+    }
+
+    #[test]
+    fn the_view_marks_timelines_kept_in_the_local_database() {
+        let (fixture, mut history) = history_with_power();
+        history.disk = fox_services_top_core::view::DiskHistory::On;
+        let reader = MetricReader::new(&fixture.snapshot, &fixture.catalog, NOW);
+        let view = build_power_view(&reader, &history).expect("power charts fill the view");
+        assert_eq!(view.disk, fox_services_top_core::view::DiskHistory::On);
     }
 
     #[test]
