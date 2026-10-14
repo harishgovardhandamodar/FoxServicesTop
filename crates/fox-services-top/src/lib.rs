@@ -15,6 +15,7 @@ pub mod host_mode;
 pub mod live_store;
 pub mod modes;
 pub mod monitor;
+pub mod remote;
 #[cfg(any(test, feature = "bench-support"))]
 pub mod perf;
 #[cfg(test)]
