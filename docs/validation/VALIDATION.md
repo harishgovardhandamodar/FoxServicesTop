@@ -83,37 +83,37 @@ GPU UUIDs and serial numbers are masked before the file is hashed.
 | Evidence | Command | Exit | SHA-256 |
 |---|---|---|---|
 | `gate-fmt` | `cargo fmt --all -- --check` | 0 | `f04c7f8a7881870114b88bfdca27ef55dbd1c329159281d131c00a56cf1b195d` |
-| `gate-check` | `cargo check --workspace --all-targets --all-features --locked` | 0 | `ebc8ee3d70de1fa2b53d8c8007c46c8e594fbd658d435959182f0b80e1ef6063` |
-| `gate-clippy` | `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` | 0 | `62cdd382fa5cafed0f8364d2d59d935e8b39d8f44bbe71eff08d66a4c20deeb7` |
-| `gate-test` | `cargo test --workspace --all-features --locked --no-fail-fast` | 0 | `12817eb932a4763017cb4af75e77300326f8c954bfd2ac498095e681662b51dd` |
-| `gate-boundaries` | `bash -c mkdir -p target && cargo metadata --format-version 1 --locked > target/metadata.json && python3 spe…` | 0 | `47973e6e0c76e4fca5a508378eb48c1a2743c9d4b3599477c01f1076a6f5c3d4` |
+| `gate-check` | `cargo check --workspace --all-targets --all-features --locked` | 0 | `fcba5251c0f50756e559de4c1d6993a0cf7c8efc12a469b130b567171c5b2c8d` |
+| `gate-clippy` | `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` | 0 | `c9c64986c50f92a2bebb65687bd71fc94767bec98448c3d233e53463cd714887` |
+| `gate-test` | `cargo test --workspace --all-features --locked --no-fail-fast` | 0 | `27352ad0b33a44af531628481fc2f141bbb5b6ee86e0a44cb8728319f1d214d6` |
+| `gate-boundaries` | `bash -c mkdir -p target && cargo metadata --format-version 1 --locked > target/metadata.json && python3 spe…` | 0 | `31c7a5bc72d9a701584f52be748d35f68dade634e6140bd13a1bfcd0edb40d64` |
 | `gate-scripts` | `env PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p test_*.py -v` | 0 | `26922695ceda2c650f1c1f2f649548303935132d67859d059d7741b199cb7c88` |
 | `rules-preserved` | `bash -c git ls-files --error-unmatch CLAUDE.md && git diff --exit-code HEAD -- CLAUDE.md && echo "CLAUDE.md…` | 0 | `10d20c4b02eeb02c3626e428cda14d58bee135961263e944fac01811cc5a5b5d` |
-| `hardware-suites` | `cargo test --workspace --all-features --locked -- --ignored hardware_ --test-threads=1` | 0 | `b3ca9c8fede1cf34e8e1e303cd8bf2f2a631b77e2cdb0739d3b4abac6f38edbd` |
-| `spec-package-validation` | `/tmp/claude-1000/-mnt-harishgovardhandamodar-SSD-Code-Github-fox-services-top/32efa81a-0f25-482f-b209-eb95f51fb786/scratchpad/run_…` | 0 | `d28c5098c16fe2aa732aa9c1f556b2be374a1e6604997f65d14c33e61f00d817` |
-| `spec-copy-verification` | `python3 scripts/verify_spec_copy.py fox-services-top-spec-v2.zip spec/fox-services-top-v2` | 0 | `5eadbf5e336d3d815a750f0773d3bf11d8059aaa2536f0fe852d5a4292bdb372` |
-| `bench-ref-smoke-60s` | `env FOX_SERVICES_TOP_BENCH_SMOKE_SECONDS=60 cargo bench -p fox-services-top --locked --offline --bench ref -- --smoke` | 0 | `143f3c76df9e0bb87417d7dc2328148f5542ef76ec22708f6398337c520d24f8` |
-| `bench-projection-smoke` | `cargo bench -p fox-services-top --locked --offline --bench projection -- --smoke` | 0 | `6ab122ad7947c1456c8c4c38b870fcaa8e3b4937099a38ba303f0e5d379af276` |
-| `bench-history-smoke` | `cargo bench -p fox-services-top --locked --offline --bench history -- --smoke` | 0 | `2a00d13024a416b9a27091f74c540f4f7b07d372ba05239d7dea27881f71aefd` |
-| `bench-arbitration-smoke` | `cargo bench -p fox-services-top --locked --offline --bench arbitration -- --smoke` | 0 | `72fde55c2f27d1f865a7c50addf7cacf87c8fded76ce414137f4706887779ad0` |
-| `release-build` | `cargo build --release --locked` | 0 | `3d2341bc73f4fdbd0f37653b1af3e3e7a7d876ad7a9824b4b616588a8e824371` |
-| `release-version-verbose` | `target/release/fox-services-top --version --verbose` | 0 | `735abf29f3dcdac25aa2a0f565f9e50fc782458823092bfc2f8b4f2530b4a111` |
+| `hardware-suites` | `cargo test --workspace --all-features --locked -- --ignored hardware_ --test-threads=1` | 0 | `6cb15738f57173fdfeb894bc760b1fdff3c1af5c756bd44ae23e7bd8c616a5f8` |
+| `spec-package-validation` | `/tmp/claude-1000/-mnt-harishgovardhandamodar-SSD-Code-Github-fox-services-top/32efa81a-0f25-482f-b209-eb95f51fb786/scratchpad/run_…` | 0 | `81d9b25c9b3cd04b7b034df1cd98db30d32a3a0648ca52d7418e0a83104807f0` |
+| `spec-copy-verification` | `python3 scripts/verify_spec_copy.py fox-services-top-spec-v2.zip spec/fox-services-top-v2` | 0 | `b7a98165c982d4eab34a4044647683b3279410ee2b78080bc4e6a40d3df0e42c` |
+| `bench-ref-smoke-60s` | `env FOX_SERVICES_TOP_BENCH_SMOKE_SECONDS=60 cargo bench -p fox-services-top --locked --offline --bench ref -- --smoke` | 0 | `8e30302e6a9886fae3ba88fd554d3b94c992a5bb00b4d1a577cf52d0dcd27a7e` |
+| `bench-projection-smoke` | `cargo bench -p fox-services-top --locked --offline --bench projection -- --smoke` | 0 | `b8307d0f66fcc0fcf18d37a052b2509890f477b7d21dddaf0d7795a5c9605e23` |
+| `bench-history-smoke` | `cargo bench -p fox-services-top --locked --offline --bench history -- --smoke` | 0 | `4e7bcf21f8b0ccf722cb7aff3ed25655bf12ed1733540c90649bb557e45e568b` |
+| `bench-arbitration-smoke` | `cargo bench -p fox-services-top --locked --offline --bench arbitration -- --smoke` | 0 | `6e72a678a58703236aebc90616a48d4a01f6a17d557e6de6e28ce9a312d873ab` |
+| `release-build` | `cargo build --release --locked` | 0 | `231afa6dd9aa4c9d1a40bb67bd4346526d76a80388772172ea20215b3360df66` |
+| `release-version-verbose` | `target/release/fox-services-top --version --verbose` | 0 | `1b895a2a1d0ae9109bb4030aff16762450e03bccbf314027aef18f98b0e115b0` |
 | `gate-fmt-gb10` | `cargo fmt --all -- --check` | 0 | `5f569412cb303198e81f4207e2dd2868bc36118665dff64ecae4c8fb8aecb7cb` |
-| `gate-check-gb10` | `cargo check --workspace --all-targets --all-features --locked` | 0 | `54754b35c5a2076ac4f2ba19ccdd6710291d1907601c4454a648ef5075b86fe7` |
+| `gate-check-gb10` | `cargo check --workspace --all-targets --all-features --locked` | 0 | `d862c1fd93302b72af70de9b32bbaeee8ff01f39624ab438e04563142a324368` |
 | `gate-clippy-gb10` | `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` | 0 | `2fc1582d50e36e760184001d1431c768c12484ad3c6df93830192ba892223ee4` |
-| `gate-test-gb10` | `cargo test --workspace --all-features --locked --no-fail-fast` | 0 | `9ad8192d6dc334a813b0967bec0e96438479b9da0608c812226b6773a1c40067` |
-| `gate-boundaries-gb10` | `bash -c mkdir -p target && cargo metadata --format-version 1 --locked > target/metadata.json && python3 spe…` | 0 | `9ff7f26c3a8adfbdd1c4b721dee1ba83056dd6f192f35aaa646d13e70fb368b2` |
+| `gate-test-gb10` | `cargo test --workspace --all-features --locked --no-fail-fast` | 0 | `eac45b7d97aff7f8d737aeff11d4fc7c9d47bb7b131a7267a5d925e7311821f2` |
+| `gate-boundaries-gb10` | `bash -c mkdir -p target && cargo metadata --format-version 1 --locked > target/metadata.json && python3 spe…` | 0 | `7f147eb59cc97c2236b0f82bded666c6fcebfb171144a33009423b7f7d9920f9` |
 | `gate-scripts-gb10` | `env PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p test_*.py -v` | 0 | `42a9f92b49f4ba016cd96b2c2348748e97ba7aa340d1709fdefb86a36215bd24` |
 | `rules-preserved-gb10` | `bash -c git ls-files --error-unmatch CLAUDE.md && git diff --exit-code HEAD -- CLAUDE.md && echo "CLAUDE.md…` | 0 | `e298f794eef3f2ebe9c35c74be0dc12138eeddcadd1f69bc3a8fe0e98e7ffd6b` |
-| `spec-copy-verification-gb10` | `python3 scripts/verify_spec_copy.py fox-services-top-spec-v2.zip spec/fox-services-top-v2` | 0 | `ae8fe867a1d521670e581ca26056a474a18cb0ad9243988a8cebe4e52e5e18e7` |
-| `hardware-suites-gb10` | `cargo test --workspace --all-features --locked -- --ignored hardware_ --test-threads=1` | 0 | `7fdce046c815034f4f7ab5e9c5d5aecd9a856e45398253e0b86d0884fd6aabc0` |
+| `spec-copy-verification-gb10` | `python3 scripts/verify_spec_copy.py fox-services-top-spec-v2.zip spec/fox-services-top-v2` | 0 | `ef4b85296465176ae09e813bb4bc6865692593ab8e6a6b9cbc4276dc15a6cbb0` |
+| `hardware-suites-gb10` | `cargo test --workspace --all-features --locked -- --ignored hardware_ --test-threads=1` | 0 | `c44db6fdb02c932e193b15e7c7cd1424026e374c43f6496d867fc5dd7222481c` |
 | `release-build-gb10` | `cargo build --release --locked` | 0 | `c11483ac1e9ae85c67aa6888bdf1fc810aced7adaa43ee3f7fb847777283a1e9` |
-| `release-version-verbose-gb10` | `target/release/fox-services-top --version --verbose` | 0 | `36fc2e78e3506c7b4164bb548e889ac0e46a7b0e05650828d92e301ffabcd292` |
+| `release-version-verbose-gb10` | `target/release/fox-services-top --version --verbose` | 0 | `7d09685378c189e8fefc1515d8ba3bdc006ad0d961bcaa85edf5bb36ad55c176` |
 | `gpm-probe-gb10` | `nvidia-smi dmon --gpm-metrics 1,2,3,10 -c 3` | 0 | `42f3a548c475373840b015cc361181a7ab69be8b4c10e4ccf7d2f3d1ef1470b6` |
 | `hwmon-probe-gb10` | `bash -c for h in /sys/class/hwmon/hwmon*; do echo "$h name=$(cat $h/name)"; ls $h \| grep -E "^(power\|ener…` | 0 | `37720f845629dcc81b42e2add2216f2d4fae55f02443f7247302f9598f50077d` |
-| `release-v2.0.0` | `bash -c set -o pipefail; gh run view 38110420112 -R harishgovardhandamodar/fox-services-top --log \| python3 scripts/format_run_log.py` | 0 | `0d00732c69182168292790af4bb7d18b959edb8722ce52849cd5ac5d4e62ffa8` |
+| `release-v2.0.0` | `bash -c set -o pipefail; gh run view 38110420112 -R harishgovardhandamodar/fox-services-top --log \| python3 scripts/format_run_log.py` | 0 | `3f43ce754c5a0453a3920ee9c675f231c6f203c670300241ab50bf7d80081974` |
 | `lockfile-tracked` | `bash -c git ls-files --error-unmatch Cargo.lock && git log -1 --format="%h %s" -- Cargo.lock` | 0 | `bcc3ed9381dec3eba7ef3fa2f1dedd4b8e82fd08124727c4410474db750f4fa5` |
-| `missing-lockfile-refused` | `bash -c w="$(mktemp -d)" && git clone --quiet --no-local . "$w/fox-services-top" && rm "$w/fox-services-top/Cargo.lock" && if cargo metadata …` | 0 | `badd82b6cef356eb73f40a09620bb99cd7555981d206decd8fe5a5605ec53a8b` |
+| `missing-lockfile-refused` | `bash -c w="$(mktemp -d)" && git clone --quiet --no-local . "$w/fox-services-top" && rm "$w/fox-services-top/Cargo.lock" && if cargo metadata …` | 0 | `c83f0be98bcaa00f7e9357a6990515b9b23f368e9ce0277e5d26ad3d756a99f9` |
 
 ## Acceptance status
 
