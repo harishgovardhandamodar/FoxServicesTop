@@ -422,6 +422,8 @@ mod tests {
             "KWH",
             "COVER",
             "total",
+            "CPU 0",
+            "CPU platform",
             "GPU 0",
             "1H",
             "24H",

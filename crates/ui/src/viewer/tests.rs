@@ -760,7 +760,15 @@ fn the_overview_power_sub_tab_summarizes_watts_and_kwh() {
 #[test]
 fn the_power_tab_charts_watts_and_lists_kwh_per_query() {
     let rendered = render(&model(ViewKind::Power), (160, 40));
-    for text in ["Power · 1h", "watts", "SERIES", "KWH", "1H", "24H"] {
+    for text in [
+        "Power · 1h",
+        "watts",
+        "SERIES",
+        "KWH",
+        "1H",
+        "24H",
+        "CPU platform",
+    ] {
         assert!(
             rendered.contains(text),
             "missing {text:?}\n{}",

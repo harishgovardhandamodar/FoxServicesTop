@@ -60,10 +60,11 @@ const RESULT_GRACE_NS: u64 = 100 * NANOS_PER_MILLI;
 /// merges them into its columns).
 pub(crate) const MIN_DISPLAY_POINTS: u32 = 60;
 /// Charts one session queries; the presentation picks at most this many:
-/// the host's nine (D-50, D-106) and four for each of eight GPUs.
-pub(crate) const MAX_CHARTS: usize = 41;
-/// Series one session summarizes: four for each of eight GPUs.
-pub(crate) const MAX_STAT_SERIES: usize = 32;
+/// the host's ten (D-50, D-106) and four for each of eight GPUs.
+pub(crate) const MAX_CHARTS: usize = 42;
+/// Series one session summarizes: the host's power (total, packages,
+/// platform) and four for each of eight GPUs.
+pub(crate) const MAX_STAT_SERIES: usize = 36;
 /// Windows of the statistics (D-48).
 const STAT_WINDOWS: [HistoryWindow; 4] = [
     HistoryWindow::OneHour,

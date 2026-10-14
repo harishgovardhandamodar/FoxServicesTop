@@ -73,11 +73,23 @@ impl GpuStats<'_> {
     }
 }
 
+/// Whether a summary belongs to a GPU block of the long-term table, as
+/// opposed to the host's power (total, packages, platform), which the
+/// Power tab shows.
+fn is_gpu_series(kind: HistoryChartKind) -> bool {
+    SERIES.contains(&kind)
+}
+
 /// The summaries grouped by GPU, in the order they are listed, each with
-/// the windows that hold more than the window before them.
+/// the windows that hold more than the window before them. Host power
+/// summaries (total, packages, platform) have their own tab and never
+/// form a GPU block.
 pub(super) fn gpu_stats(summaries: &[HistoryWindowSummary]) -> Vec<GpuStats<'_>> {
     let mut blocks: Vec<GpuStats<'_>> = Vec::new();
     for summary in summaries {
+        if !is_gpu_series(summary.kind) {
+            continue;
+        }
         let position = blocks
             .iter()
             .position(|block| block.subject == summary.subject)
@@ -592,5 +604,37 @@ mod tests {
         let rows = draw(&summaries, 140);
         assert!(!rows[0].contains("power"), "{rows:#?}");
         assert!(!rows[0].contains("energy"), "{rows:#?}");
+    }
+
+    /// Host power summaries (total, packages, platform) never form a GPU
+    /// block: the Power tab shows them.
+    #[test]
+    fn host_power_summaries_form_no_gpu_block() {
+        use fox_services_top_core::metric::CanonicalUnit;
+
+        let host = |kind, subject: &str| HistoryWindowSummary {
+            kind,
+            subject: subject.to_owned(),
+            window_label: "1h".to_owned(),
+            span_ns: 3_600_000_000_000,
+            unit: CanonicalUnit::Watts,
+            mean: Some(100.0),
+            peak: Some(120.0),
+            covered_ns: Some(3_600_000_000_000),
+            integral: Some(360_000.0),
+            pending: false,
+        };
+        let mut summaries = vec![
+            host(HistoryChartKind::TotalPower, "total"),
+            host(HistoryChartKind::CpuPower, "CPU 0"),
+            host(HistoryChartKind::CpuPower, "CPU platform"),
+        ];
+        summaries.extend(gpu_window_stats());
+        let blocks = gpu_stats(&summaries);
+        assert!(
+            blocks.iter().all(|block| block.subject.contains("GPU")),
+            "{blocks:#?}"
+        );
+        assert_eq!(blocks.len(), 2);
     }
 }

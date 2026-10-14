@@ -27,11 +27,12 @@ const NANOS_PER_SECOND_F64: f64 = 1e9;
 
 /// The metrics the Overview History charts or summarizes (D-46, D-48,
 /// D-50, D-106): the only series the history keeps in every bar size.
-pub const OVERVIEW_METRICS: [&str; 13] = [
+pub const OVERVIEW_METRICS: [&str; 14] = [
     ids::CPU_UTILIZATION_TOTAL,
     ids::MEMORY_USED,
     ids::HOST_POWER_TOTAL,
     ids::CPU_POWER_PACKAGE,
+    ids::CPU_POWER_PLATFORM,
     ids::GPU_UTILIZATION_COMPUTE,
     ids::GPU_MEMORY_FB_USED,
     ids::GPU_MEMORY_PROCESS_ALLOCATED,
@@ -399,9 +400,11 @@ mod tests {
             "cpu.core.3"
         ));
         assert!(is_overview_series(ids::GPU_POWER_DRAW, "gpu:GPU-1"));
-        // The host's total and each CPU package's power (D-106).
+        // The host's total, each CPU package's and the CPU platform's
+        // power (D-106).
         assert!(is_overview_series(ids::HOST_POWER_TOTAL, entity::HOST));
         assert!(is_overview_series(ids::CPU_POWER_PACKAGE, "cpu.package.0"));
+        assert!(is_overview_series(ids::CPU_POWER_PLATFORM, entity::HOST));
         assert!(!is_overview_metric(ids::CPU_POWER_CLUSTER));
     }
 }

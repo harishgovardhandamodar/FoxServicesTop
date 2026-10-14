@@ -959,6 +959,8 @@ pub(crate) fn power_view() -> PowerView {
         timeline: vec![Some(250.0), Some(300.0), None, Some(280.0)],
         rows: vec![
             row(HistoryChartKind::TotalPower, "total", 300.0, 280.0, 340.0),
+            row(HistoryChartKind::CpuPower, "CPU 0", 45.0, 40.0, 50.0),
+            row(HistoryChartKind::CpuPower, "CPU platform", 60.0, 55.0, 70.0),
             row(
                 HistoryChartKind::GpuPower,
                 "GPU 0 · NVIDIA GB10",
@@ -977,6 +979,16 @@ pub(crate) fn power_view() -> PowerView {
         windows: vec![
             window(HistoryChartKind::TotalPower, "total", "1h", 1.0, 280.0),
             window(HistoryChartKind::TotalPower, "total", "24h", 24.0, 200.0),
+            window(HistoryChartKind::CpuPower, "CPU 0", "1h", 1.0, 40.0),
+            window(HistoryChartKind::CpuPower, "CPU 0", "24h", 24.0, 35.0),
+            window(HistoryChartKind::CpuPower, "CPU platform", "1h", 1.0, 55.0),
+            window(
+                HistoryChartKind::CpuPower,
+                "CPU platform",
+                "24h",
+                24.0,
+                50.0,
+            ),
             window(
                 HistoryChartKind::GpuPower,
                 "GPU 0 · NVIDIA GB10",

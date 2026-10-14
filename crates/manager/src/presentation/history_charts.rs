@@ -1,13 +1,13 @@
 //! Series the HistoryService queries for a session on the history view.
 //! The charts (D-46, D-50) are the overview's series over a longer window:
 //! the CPU total against 100 %, the RAM in use against the RAM total, the
-//! host's total power and each CPU package's power against their peaks
-//! (D-106), each GPU's utilization, memory in use, temperature and power
-//! against their scales ([`gpu_series`]), and the read/write and
-//! receive/transmit rates of one disk and one interface. The disk and the interface are the busiest
+//! host's total power, each CPU package's power and the CPU platform's power
+//! against their peaks (D-106), each GPU's utilization, memory in use,
+//! temperature and power against their scales ([`gpu_series`]), and the
+//! read/write and receive/transmit rates of one disk and one interface. The disk and the interface are the busiest
 //! when the view opens and stay while they report, so the charts never jump
 //! between devices. The statistics (D-48) summarize the same four GPU
-//! series over 1 h to 24 h. A memory chart names the GPUs whose tracked
+//! series over 1 h to 24 h, plus the platform's power. A memory chart names the GPUs whose tracked
 //! processes' parts it stacks (D-64): a GPU's memory its GPU, the RAM used
 //! the GPUs that share the RAM; the history joins them (D-99).
 
@@ -23,19 +23,25 @@ use super::gpu::gpu_name;
 use super::gpu_directory::{GpuDirectory, GpuIdentity};
 use super::network::ranked_interfaces;
 use super::reader::MetricReader;
-use crate::history::{ChartRequest, HistoryChartSpec, HistoryPicks, MAX_CHARTS, MAX_STAT_SERIES};
+use crate::history::{ChartRequest, HistoryChartSpec, HistoryPicks, MAX_CHARTS};
 
 /// CPU packages whose power is charted, the first ones by number: a host
 /// has one or two.
 const CPU_POWER_CHARTS: usize = 2;
+/// Host power series summarized for kWh windows: the total, the first
+/// packages and the platform.
+const HOST_STAT_SERIES: usize = 1 + CPU_POWER_CHARTS + 1;
 /// Charts besides the GPUs: CPU, memory, the total power, the CPU
-/// packages' power and two rates each of a disk and an interface; the GPUs
-/// get the rest of [`MAX_CHARTS`].
-const HOST_CHARTS: usize = 7 + CPU_POWER_CHARTS;
+/// packages' and platform's power and two rates each of a disk and an
+/// interface; the GPUs get the rest of [`MAX_CHARTS`].
+const HOST_CHARTS: usize = 8 + CPU_POWER_CHARTS;
 const PERCENT_SCALE: f64 = 100.0;
 
 /// Statistics series of one GPU: utilization, memory, temperature, power.
 const SERIES_PER_GPU: usize = 4;
+/// GPUs summarized in statistics; the host's power series have their own
+/// budget beside these.
+const MAX_STAT_GPUS: usize = 8;
 
 /// The series for a session's request.
 pub(crate) fn history_charts(
@@ -45,9 +51,15 @@ pub(crate) fn history_charts(
     request: &ChartRequest<'_>,
 ) -> HistoryPicks {
     let reader = MetricReader::new(snapshot, catalog, now_boot_ns);
+    let mut stats = host_power_specs(&reader);
+    stats.extend(gpu_stats(&reader, catalog));
+    debug_assert!(
+        stats.len() <= HOST_STAT_SERIES + MAX_STAT_GPUS * SERIES_PER_GPU,
+        "the stats budget covers every pick"
+    );
     HistoryPicks {
         charts: dashboard(&reader, catalog, request.shown),
-        stats: gpu_stats(&reader, catalog),
+        stats,
     }
 }
 
@@ -127,19 +139,15 @@ fn dashboard(
     charts.specs
 }
 
-/// Each GPU's statistics series (D-48), the four of [`gpu_series`], for as
-/// many GPUs as [`MAX_STAT_SERIES`] allows.
+/// Each GPU's statistics series (D-48), the four of [`gpu_series`], for at
+/// most [`MAX_STAT_GPUS`] GPUs.
 fn gpu_stats(reader: &MetricReader<'_>, catalog: &CatalogSnapshot) -> Vec<HistoryChartSpec> {
     let directory = GpuDirectory::new(catalog, reader.index());
     let mut charts = Charts {
         reader,
         specs: Vec::new(),
     };
-    for gpu in directory
-        .gpus()
-        .iter()
-        .take(MAX_STAT_SERIES / SERIES_PER_GPU)
-    {
+    for gpu in directory.gpus().iter().take(MAX_STAT_GPUS) {
         charts.add_gpu(gpu);
     }
     charts.specs
@@ -208,6 +216,72 @@ pub(crate) fn gpu_memory_scale(reader: &MetricReader<'_>, gpu: &GpuIdentity<'_>)
     }
 }
 
+/// The CPU platform's power series (the SoC draw beside the packages')
+/// when reported, first by entity for a stable pick.
+fn platform_spec(reader: &MetricReader<'_>) -> Option<HistoryChartSpec> {
+    let mut keys: Vec<_> = reader
+        .index()
+        .entries_of_metric(ids::CPU_POWER_PLATFORM)
+        .map(|entry| entry.sample.key.clone())
+        .collect();
+    keys.sort_by_key(|key| (key.entity_id.to_string(), key.scope.to_string()));
+    keys.into_iter().next().map(|key| HistoryChartSpec {
+        kind: HistoryChartKind::CpuPower,
+        subject: "CPU platform".to_owned(),
+        key,
+        scale_max: None,
+        parts_of: BTreeSet::new(),
+    })
+}
+
+/// The host's power series in order — total, first packages by number,
+/// platform — each only while reported. Charts and statistics share the
+/// pick so the Power tab's timeline and kWh agree.
+fn host_power_specs(reader: &MetricReader<'_>) -> Vec<HistoryChartSpec> {
+    let mut specs = Vec::new();
+    let mut push = |kind, subject: String, metric: &str, entity: &str, scope: &str| {
+        if let Some(entry) = reader.index().find(metric, entity, scope) {
+            specs.push(HistoryChartSpec {
+                kind,
+                subject,
+                key: entry.sample.key.clone(),
+                scale_max: None,
+                parts_of: BTreeSet::new(),
+            });
+        }
+    };
+    push(
+        HistoryChartKind::TotalPower,
+        String::new(),
+        ids::HOST_POWER_TOTAL,
+        entity::HOST,
+        entity::SCOPE_HOST,
+    );
+    let mut packages: Vec<(u32, String, String)> = reader
+        .index()
+        .entries_of_metric(ids::CPU_POWER_PACKAGE)
+        .filter_map(|entry| {
+            let key = &entry.sample.key;
+            let number = package_number(key.entity_id.as_str())?;
+            Some((number, key.entity_id.to_string(), key.scope.to_string()))
+        })
+        .collect();
+    packages.sort();
+    for (number, entity_id, scope) in packages.into_iter().take(CPU_POWER_CHARTS) {
+        push(
+            HistoryChartKind::CpuPower,
+            format!("CPU {number}"),
+            ids::CPU_POWER_PACKAGE,
+            &entity_id,
+            &scope,
+        );
+    }
+    if let Some(platform) = platform_spec(reader) {
+        specs.push(platform);
+    }
+    specs
+}
+
 /// `N` of a `cpu.package.N` entity.
 fn package_number(entity_id: &str) -> Option<u32> {
     entity_id.strip_prefix("cpu.package.")?.parse().ok()
@@ -220,34 +294,11 @@ struct Charts<'r, 'a> {
 }
 
 impl Charts<'_, '_> {
-    /// Adds the host's total power and the power of its first CPU packages
-    /// (D-106), each scaled to its peak: neither has a limit to scale to.
+    /// Adds the host's total power, the CPU platform's power and the power
+    /// of its first CPU packages (D-106), each scaled to its peak: none
+    /// has a limit to scale to.
     fn add_power(&mut self) {
-        self.add(
-            HistoryChartKind::TotalPower,
-            "",
-            (ids::HOST_POWER_TOTAL, entity::HOST, entity::SCOPE_HOST),
-            None,
-        );
-        let mut packages: Vec<(u32, String, String)> = self
-            .reader
-            .index()
-            .entries_of_metric(ids::CPU_POWER_PACKAGE)
-            .filter_map(|entry| {
-                let key = &entry.sample.key;
-                let number = package_number(key.entity_id.as_str())?;
-                Some((number, key.entity_id.to_string(), key.scope.to_string()))
-            })
-            .collect();
-        packages.sort();
-        for (number, entity_id, scope) in packages.into_iter().take(CPU_POWER_CHARTS) {
-            self.add(
-                HistoryChartKind::CpuPower,
-                &format!("CPU {number}"),
-                (ids::CPU_POWER_PACKAGE, &entity_id, &scope),
-                None,
-            );
-        }
+        self.specs.extend(host_power_specs(self.reader));
     }
 
     /// Adds the series of `gpu` it reports ([`gpu_series`]).
@@ -456,6 +507,7 @@ mod tests {
             ids::GPU_POWER_DRAW,
             ids::HOST_POWER_TOTAL,
             ids::CPU_POWER_PACKAGE,
+            ids::CPU_POWER_PLATFORM,
             ids::DISK_READ_BPS,
             ids::DISK_WRITE_BPS,
             ids::NET_RX_BPS,
@@ -472,6 +524,10 @@ mod tests {
             "cpu",
             sample(ids::CPU_POWER_PACKAGE, "cpu.package.0", "package:0").f64(25.0),
         );
+        fixture.add(
+            "cpu",
+            sample(ids::CPU_POWER_PLATFORM, "host", "platform").f64(60.0),
+        );
         let picked = pick(&fixture, &[]);
         for spec in picked.charts.iter().chain(&picked.stats) {
             assert!(
@@ -480,11 +536,25 @@ mod tests {
                 spec.key.metric_id
             );
         }
+        assert!(
+            picked
+                .charts
+                .iter()
+                .any(|spec| spec.subject == "CPU platform"),
+            "the platform is charted"
+        );
+        assert!(
+            picked
+                .stats
+                .iter()
+                .any(|spec| spec.subject == "CPU platform"),
+            "the platform is summarized"
+        );
     }
 
-    /// The host's total power and each CPU package's power follow the
-    /// memory (D-106), scaled to their peaks; a host whose CPU power cannot
-    /// be read has neither.
+    /// The host's total power, each CPU package's power and the CPU
+    /// platform's power follow the memory (D-106), scaled to their peaks;
+    /// a host whose CPU power cannot be read has none.
     #[test]
     fn the_total_and_the_cpu_packages_power_are_charted() {
         let mut fixture = host();
@@ -493,6 +563,10 @@ mod tests {
         fixture.add(
             "cpu",
             sample(ids::HOST_POWER_TOTAL, "host", "host").f64(152.0),
+        );
+        fixture.add(
+            "cpu",
+            sample(ids::CPU_POWER_PLATFORM, "host", "platform").f64(60.0),
         );
         for package in [2_u32, 0, 1] {
             fixture.add(
@@ -524,8 +598,9 @@ mod tests {
                 (HistoryChartKind::TotalPower, "", "host", None),
                 (HistoryChartKind::CpuPower, "CPU 0", "cpu.package.0", None),
                 (HistoryChartKind::CpuPower, "CPU 1", "cpu.package.1", None),
+                (HistoryChartKind::CpuPower, "CPU platform", "host", None),
             ],
-            "the first two packages"
+            "the first two packages, then the platform"
         );
         assert_eq!(
             kinds(&charts)[..3],
@@ -536,6 +611,51 @@ mod tests {
             ]
         );
         assert_eq!(MAX_CHARTS, HOST_CHARTS + SERIES_PER_GPU * 8);
+        assert_eq!(
+            crate::history::MAX_STAT_SERIES,
+            HOST_STAT_SERIES + SERIES_PER_GPU * 8
+        );
+    }
+
+    /// The host's power is summarized for the kWh windows in the same
+    /// order it is charted: total, packages, platform.
+    #[test]
+    fn host_power_is_summarized_for_kwh_windows() {
+        let mut fixture = host();
+        fixture.add(
+            "cpu",
+            sample(ids::HOST_POWER_TOTAL, "host", "host").f64(152.0),
+        );
+        for package in [1_u32, 0] {
+            fixture.add(
+                "cpu",
+                sample(
+                    ids::CPU_POWER_PACKAGE,
+                    &format!("cpu.package.{package}"),
+                    &format!("package:{package}"),
+                )
+                .f64(20.0),
+            );
+        }
+        fixture.add(
+            "cpu",
+            sample(ids::CPU_POWER_PLATFORM, "host", "platform").f64(60.0),
+        );
+        let stats = pick(&fixture, &[]).stats;
+        let host: Vec<(&str, &str)> = stats
+            .iter()
+            .take(4)
+            .map(|spec| (spec.subject.as_str(), spec.key.metric_id.as_str()))
+            .collect();
+        assert_eq!(
+            host,
+            vec![
+                ("", "host.power.total"),
+                ("CPU 0", "cpu.power.package"),
+                ("CPU 1", "cpu.power.package"),
+                ("CPU platform", "cpu.power.platform"),
+            ]
+        );
     }
 
     #[test]

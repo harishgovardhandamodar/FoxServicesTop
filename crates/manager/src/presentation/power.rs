@@ -158,7 +158,10 @@ mod tests {
                 chart(HistoryChartKind::TotalPower, "", 200.0),
                 chart(HistoryChartKind::CpuPower, "CPU 0", 50.0),
             ],
-            summaries: vec![summary()],
+            summaries: vec![
+                summary(),
+                window_summary(HistoryChartKind::CpuPower, "CPU 0", "1h", 50.0, 180_000.0),
+            ],
             disk: fox_services_top_core::view::DiskHistory::Off,
             error: None,
         };
@@ -171,8 +174,9 @@ mod tests {
         mean: f64,
     ) -> fox_services_top_core::view::HistoryChartView {
         use fox_services_top_core::metric::CanonicalUnit;
-        let (metric, entity, scope) = match kind {
-            HistoryChartKind::TotalPower => (ids::HOST_POWER_TOTAL, "host", "host"),
+        let (metric, entity, scope) = match (kind, subject) {
+            (HistoryChartKind::TotalPower, _) => (ids::HOST_POWER_TOTAL, "host", "host"),
+            (_, "CPU platform") => (ids::CPU_POWER_PLATFORM, "host", "platform"),
             _ => (ids::CPU_POWER_PACKAGE, "cpu.package.0", "package:0"),
         };
         HistoryChartView {
@@ -213,17 +217,27 @@ mod tests {
     }
 
     fn summary() -> fox_services_top_core::view::HistoryWindowSummary {
+        window_summary(HistoryChartKind::TotalPower, "", "1h", 200.0, 720_000.0)
+    }
+
+    fn window_summary(
+        kind: HistoryChartKind,
+        subject: &str,
+        label: &str,
+        mean: f64,
+        integral: f64,
+    ) -> fox_services_top_core::view::HistoryWindowSummary {
         use fox_services_top_core::metric::CanonicalUnit;
         fox_services_top_core::view::HistoryWindowSummary {
-            kind: HistoryChartKind::TotalPower,
-            subject: String::new(),
-            window_label: "1h".to_owned(),
+            kind,
+            subject: subject.to_owned(),
+            window_label: label.to_owned(),
             span_ns: 3_600_000_000_000,
             unit: CanonicalUnit::Watts,
-            mean: Some(200.0),
-            peak: Some(240.0),
+            mean: Some(mean),
+            peak: Some(mean * 1.2),
             covered_ns: Some(3_600_000_000_000),
-            integral: Some(720_000.0),
+            integral: Some(integral),
             pending: false,
         }
     }
@@ -240,13 +254,36 @@ mod tests {
         assert_eq!(view.rows.len(), 2);
         assert_eq!(view.rows[0].subject, "total");
         assert_eq!(view.rows[0].energy_joules, Some(720_000.0));
-        assert_eq!(view.windows.len(), 1);
+        assert_eq!(view.windows.len(), 2);
         assert_eq!(view.windows[0].energy_joules, Some(720_000.0));
+        assert_eq!(view.windows[1].subject, "CPU 0");
+        assert_eq!(view.windows[1].energy_joules, Some(180_000.0));
         assert_eq!(
             view.disk,
             fox_services_top_core::view::DiskHistory::Off,
             "the view carries where its timeline is kept"
         );
+    }
+
+    #[test]
+    fn the_cpu_platform_power_is_listed_with_the_packages() {
+        let (mut fixture, mut history) = history_with_power();
+        fixture.add(
+            "cpu",
+            sample(ids::CPU_POWER_PLATFORM, "host", "platform").f64(60.0),
+        );
+        history
+            .charts
+            .push(chart(HistoryChartKind::CpuPower, "CPU platform", 60.0));
+        let reader = MetricReader::new(&fixture.snapshot, &fixture.catalog, NOW);
+        let view = build_power_view(&reader, &history).expect("power charts fill the view");
+        let platform = view
+            .rows
+            .iter()
+            .find(|row| row.subject == "CPU platform")
+            .expect("platform row");
+        assert_eq!(platform.current_w, Some(60.0));
+        assert_eq!(platform.energy_joules, Some(60.0 * 3_600.0));
     }
 
     #[test]
