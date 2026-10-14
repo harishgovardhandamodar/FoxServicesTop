@@ -656,7 +656,9 @@
                 "history",
                 "sources",
                 "settings",
-                "actions"
+                "actions",
+                "nodes",
+                "docker"
               ]
             },
             "selected_entity_id": {

@@ -884,6 +884,138 @@ pub struct SessionState {
     pub process_bar: BarSize,
 }
 
+/// One fox-services node as the Nodes tab shows it: the latest polled
+/// hardware snapshot of its `/api/hardware/status`, or the error when the
+/// node did not answer. Every field is optional because a node may answer
+/// only part of the API (older versions) or nothing at all.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct ClusterNodeView {
+    /// Name from the static node list (`axiom`, `axiom-dgx`, ...).
+    pub name: String,
+    pub base_url: String,
+    pub node_id: Option<String>,
+    pub machine: Option<String>,
+    pub online: bool,
+    /// Why the node is offline (timeout, refused, bad status, ...).
+    pub error: Option<String>,
+    pub uptime_s: Option<u64>,
+    pub cpu_busy_pct: Option<f64>,
+    pub cpu_cores: Option<u32>,
+    pub memory_used_bytes: Option<u64>,
+    pub memory_total_bytes: Option<u64>,
+    pub memory_busy_pct: Option<f64>,
+    /// Accelerator kind (`cuda`, `mlx`, `cpu`).
+    pub gpu_kind: Option<String>,
+    /// Highest utilization across the node's GPUs.
+    pub gpu_util_pct: Option<f64>,
+    pub gpu_mem_used_bytes: Option<u64>,
+    pub gpu_mem_total_bytes: Option<u64>,
+    pub net_rx_bytes_s: Option<u64>,
+    pub net_tx_bytes_s: Option<u64>,
+    pub tokens_per_sec: Option<f64>,
+    pub projects_running: Option<u32>,
+    pub projects_total: Option<u32>,
+    pub containers_running: Option<u32>,
+    pub containers_total: Option<u32>,
+}
+
+/// A Fox Mesh peer discovered through a polled node's `/api/mesh/peers`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MeshPeerView {
+    pub node_id: String,
+    pub name: Option<String>,
+    pub machine: Option<String>,
+    pub online: bool,
+    /// The configured node whose peer table reported it.
+    pub via: String,
+}
+
+/// The Nodes tab: one row per configured node plus mesh-discovered peers.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct ClusterView {
+    /// False when remote monitoring is disabled: the tab explains itself.
+    pub enabled: bool,
+    pub nodes: Vec<ClusterNodeView>,
+    pub peers: Vec<MeshPeerView>,
+}
+
+impl ClusterView {
+    /// What a projection carries without a cluster source.
+    pub fn disabled() -> Self {
+        Self {
+            enabled: false,
+            nodes: Vec::new(),
+            peers: Vec::new(),
+        }
+    }
+}
+
+/// One container of a Docker project as the Docker tab shows it.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct DockerContainerView {
+    pub name: String,
+    /// Raw status text (`Up 3 hours`, `Exited (0) 2 days ago`, ...).
+    pub status: String,
+    pub running: bool,
+    pub image: String,
+    pub ports: String,
+    pub cpu_pct: Option<f64>,
+    pub mem_pct: Option<f64>,
+    pub mem_used_mib: Option<f64>,
+}
+
+/// One compose project of one node as the Docker tab shows it.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct DockerProjectView {
+    /// Name of the configured node hosting the project.
+    pub node: String,
+    pub project: String,
+    /// `running`, `stopped` or `not-deployed`.
+    pub status: String,
+    pub running: u32,
+    pub total: u32,
+    pub containers: Vec<DockerContainerView>,
+}
+
+/// Tailed log lines of one container (read-only; refreshed by polling).
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct DockerLogView {
+    /// Name of the configured node hosting the container.
+    pub node: String,
+    pub container: String,
+    pub lines: Vec<String>,
+}
+
+/// The Docker tab: every node's projects plus tailed container logs.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct DockerView {
+    /// False when remote monitoring is disabled: the tab explains itself.
+    pub enabled: bool,
+    pub projects: Vec<DockerProjectView>,
+    pub logs: Vec<DockerLogView>,
+}
+
+impl DockerView {
+    /// What a projection carries without a cluster source.
+    pub fn disabled() -> Self {
+        Self {
+            enabled: false,
+            projects: Vec::new(),
+            logs: Vec::new(),
+        }
+    }
+}
+
+/// The latest polled snapshot of the whole cluster: what the Manager reads
+/// from its [`crate::ports::ClusterSource`] every frame. Bounded (the
+/// poller caps nodes, projects, containers, log lines and line lengths), so
+/// a projection carrying it stays within `runtime.max_projection_bytes`.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct ClusterSnapshot {
+    pub cluster: std::sync::Arc<ClusterView>,
+    pub docker: std::sync::Arc<DockerView>,
+}
+
 /// Module-level sub-projections (only subscribed/visible topics are filled).
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct ModuleViews {
@@ -898,6 +1030,10 @@ pub struct ModuleViews {
     pub process_history: Option<Arc<ProcessHistoryView>>,
     pub settings: Option<Arc<SettingsView>>,
     pub actions: Option<Arc<ActionsView>>,
+    /// Built from the cluster snapshot, for the Nodes tab.
+    pub cluster: Option<Arc<ClusterView>>,
+    /// Built from the cluster snapshot, for the Docker tab.
+    pub docker: Option<Arc<DockerView>>,
 }
 
 /// One immutable projection for one session.

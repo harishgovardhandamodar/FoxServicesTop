@@ -68,7 +68,7 @@ use crate::process_history::{
 };
 use crate::process_model::{MemoryPart, ProcessHistoryModel, ProcessTableSample, RunRequest};
 use crate::process_probe::{ProbeReading, ProbeReport, ProbeState, ProbeTarget};
-use crate::view::{HostStatus, Trend, ViewModel};
+use crate::view::{ClusterSnapshot, HostStatus, Trend, ViewModel};
 
 /// Read-only telemetry adapter. Owns its driver handles; returns native values
 /// with provenance; never writes stores, never renders, never signals.
@@ -143,6 +143,16 @@ pub trait TrendReader: Send + Sync {
 #[derive(Clone, Default)]
 pub struct CancelFlag(Arc<AtomicBool>);
 
+/// Latest polled fox-services cluster snapshot (Nodes and Docker tabs).
+/// Implemented by the composition root's cluster monitor, which polls the
+/// configured nodes' HTTP APIs on its own thread; the Manager only reads
+/// the latest snapshot and never touches the network.
+pub trait ClusterSource: Send + Sync {
+    /// The latest snapshot, or `None` before the first poll finished.
+    /// `None` also when remote monitoring is disabled (the tabs then
+    /// explain themselves).
+    fn latest(&self) -> Option<Arc<ClusterSnapshot>>;
+}
 impl CancelFlag {
     pub fn new() -> Self {
         Self::default()

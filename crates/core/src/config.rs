@@ -32,7 +32,7 @@ pub const MAX_COMMAND_BYTES: u64 = 64 * 1024;
 pub const MIN_COMMAND_BYTES: u64 = 8 * 1024;
 
 /// The built-in display modules, in registration order.
-pub const BUILTIN_MODULES: [&str; 8] = [
+pub const BUILTIN_MODULES: [&str; 10] = [
     "cpu",
     "gpu",
     "memory",
@@ -41,6 +41,8 @@ pub const BUILTIN_MODULES: [&str; 8] = [
     "processes",
     "history",
     "settings",
+    "cluster",
+    "docker",
 ];
 
 /// A configuration key an earlier version wrote that this one ignores,
@@ -145,6 +147,64 @@ pub struct Config {
     pub queues: QueuesConfig,
     pub privacy: PrivacyConfig,
     pub runtime: RuntimeConfig,
+    /// Fox-services nodes polled for the Nodes and Docker tabs. Documents
+    /// written before it default to polling the example nodes, so old
+    /// files keep loading; the section is only written back once set.
+    #[serde(default = "RemoteConfig::default", skip_serializing_if = "RemoteConfig::is_default")]
+    pub remote: RemoteConfig,
+}
+
+/// One statically configured fox-services node: polled over HTTP for the
+/// Nodes and Docker tabs (`/api/hardware/status`, `/api/docker/projects`,
+/// `/api/docker/stats`, `/api/mesh/peers`, ...).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RemoteNodeConfig {
+    /// Display name (`axiom`, `axiom-dgx`, ...).
+    pub name: String,
+    /// Base URL of its fox-services API (`http://192.168.1.63:8210`).
+    pub base_url: String,
+}
+
+/// Remote fox-services monitoring (the Nodes and Docker tabs).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RemoteConfig {
+    pub enabled: bool,
+    /// Milliseconds between polls of every node.
+    pub poll_interval_ms: u32,
+    /// Milliseconds a single HTTP request may take.
+    pub timeout_ms: u32,
+    /// Also list Fox Mesh peers a polled node reports (`/api/mesh/peers`).
+    pub discover_mesh: bool,
+    /// Statically configured nodes, polled in order.
+    pub nodes: Vec<RemoteNodeConfig>,
+}
+
+impl RemoteConfig {
+    /// The example cluster: `axiom` and `axiom-dgx`, polled every 5 s.
+    pub fn default() -> Self {
+        Self {
+            enabled: true,
+            poll_interval_ms: 5000,
+            timeout_ms: 4000,
+            discover_mesh: true,
+            nodes: vec![
+                RemoteNodeConfig {
+                    name: "axiom".to_owned(),
+                    base_url: "http://192.168.1.63:8210".to_owned(),
+                },
+                RemoteNodeConfig {
+                    name: "axiom-dgx".to_owned(),
+                    base_url: "http://192.168.1.200:8210".to_owned(),
+                },
+            ],
+        }
+    }
+
+    fn is_default(&self) -> bool {
+        self == &Self::default()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -387,6 +447,12 @@ impl Config {
         let mut config = Self::reference()?;
         config.store.archive_enabled = true;
         config.actions.allow_force = true;
+        // The Nodes and Docker tabs are built-in: on unless turned off.
+        for module in ["cluster", "docker"] {
+            if !config.viewer.enabled_modules.iter().any(|entry| entry == module) {
+                config.viewer.enabled_modules.push(module.to_owned());
+            }
+        }
         config.validate().map_err(ConfigError::Invalid)?;
         Ok(config)
     }
@@ -673,6 +739,45 @@ impl Config {
             "must be 1..=20",
         );
 
+        let remote = &self.remote;
+        check(
+            range(remote.poll_interval_ms, 1000, 120_000),
+            "remote.poll_interval_ms",
+            "must be 1000..=120000",
+        );
+        check(
+            range(remote.timeout_ms, 500, 30_000),
+            "remote.timeout_ms",
+            "must be 500..=30000",
+        );
+        check(
+            remote.nodes.len() <= 16,
+            "remote.nodes",
+            "at most 16 entries",
+        );
+        let mut node_names = std::collections::BTreeSet::new();
+        for (index, node) in remote.nodes.iter().enumerate() {
+            let path = format!("remote.nodes[{index}]");
+            check(
+                !node.name.is_empty() && node.name.len() <= 64,
+                &format!("{path}.name"),
+                "must be 1..=64 bytes",
+            );
+            check(
+                node_names.insert(node.name.as_str()),
+                &format!("{path}.name"),
+                "duplicate node",
+            );
+            check(
+                !node.base_url.is_empty()
+                    && node.base_url.len() <= 256
+                    && (node.base_url.starts_with("http://")
+                        || node.base_url.starts_with("https://")),
+                &format!("{path}.base_url"),
+                "must be an http(s) URL of at most 256 bytes",
+            );
+        }
+
         let queues = &self.queues;
         check(
             range(queues.commands, 8, 128),
@@ -890,6 +995,10 @@ impl Config {
         if store.0.process_history_on_disk() != store.1.process_history_on_disk() {
             changed.push("store.process_history_enabled");
         }
+        // The cluster monitor starts once with its nodes and timings.
+        if self.remote != candidate.remote {
+            changed.push("remote");
+        }
         changed
     }
 
@@ -944,6 +1053,10 @@ pub struct CliOverrides {
     pub theme: Option<Theme>,
     pub network_max_visible: Option<u32>,
     pub read_only: Option<bool>,
+    /// `--no-remote`: remote monitoring off for this run.
+    pub remote_enabled: Option<bool>,
+    /// `--remote-node NAME=URL` (repeatable): the polled nodes for this run.
+    pub remote_nodes: Option<Vec<RemoteNodeConfig>>,
 }
 
 impl CliOverrides {
@@ -969,6 +1082,14 @@ impl CliOverrides {
         if let Some(read_only) = self.read_only {
             config.actions.read_only = read_only;
             applied.push("actions.read_only");
+        }
+        if let Some(enabled) = self.remote_enabled {
+            config.remote.enabled = enabled;
+            applied.push("remote.enabled");
+        }
+        if let Some(nodes) = &self.remote_nodes {
+            config.remote.nodes.clone_from(nodes);
+            applied.push("remote.nodes");
         }
         applied
     }
@@ -1382,6 +1503,10 @@ mod tests {
         let mut only_the_owners = defaults.clone();
         only_the_owners.store.archive_enabled = false;
         only_the_owners.actions.allow_force = false;
+        only_the_owners
+            .viewer
+            .enabled_modules
+            .retain(|module| module != "cluster" && module != "docker");
         assert_eq!(only_the_owners, reference, "nothing else differs");
         assert!(defaults.validate().is_ok());
     }

@@ -28,10 +28,15 @@ pub enum ViewKind {
     Sources,
     Settings,
     Actions,
+    /// Fox-services cluster: every configured node (axiom, axiom-dgx, ...)
+    /// polled over its HTTP API, plus mesh-discovered peers.
+    Nodes,
+    /// Docker services of every configured node (read-only monitor + logs).
+    Docker,
 }
 
 impl ViewKind {
-    pub const ALL: [ViewKind; 7] = [
+    pub const ALL: [ViewKind; 9] = [
         ViewKind::Overview,
         ViewKind::GpuDetail,
         ViewKind::Processes,
@@ -39,6 +44,8 @@ impl ViewKind {
         ViewKind::Sources,
         ViewKind::Settings,
         ViewKind::Actions,
+        ViewKind::Nodes,
+        ViewKind::Docker,
     ];
 
     pub const fn title(self) -> &'static str {
@@ -50,6 +57,8 @@ impl ViewKind {
             Self::Sources => "Sources",
             Self::Settings => "Settings",
             Self::Actions => "Actions",
+            Self::Nodes => "Nodes",
+            Self::Docker => "Docker",
         }
     }
 
