@@ -109,5 +109,5 @@
     "expires_boot_ns"
   ],
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "命令回覆 v2"
+  "title": "Command result v2"
 }

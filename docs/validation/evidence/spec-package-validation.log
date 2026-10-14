@@ -14,15 +14,15 @@ Ran 83 tests in 0.015s
 OK
 {
   "status": "PASS",
-  "scope": "規格／契約／封裝，不是Rust軟體驗收",
+  "scope": "Spec/contract/packaging scope, not Rust software acceptance",
   "checks": [
-    "必備檔案與非空內容",
-    "40需求／15任務／40驗收映射",
-    "13份JSON Schema／13份範例／配額語意",
-    "SQLite DDL語法與schema_version（非production SQLite版本認證）",
-    "Markdown相對連結／薄CLAUDE匯入",
-    "HTML語言、ID、錨點、4幅SVG、無外部依賴",
-    "MANIFEST逐檔size／SHA256"
+    "Required files with non-empty content",
+    "40 requirements / 15 tasks / 40 acceptance mappings",
+    "13 JSON Schemas / 13 examples / quota semantics",
+    "SQLite DDL syntax and schema_version (not a production SQLite version certification)",
+    "Markdown relative links / thin CLAUDE import",
+    "HTML language, IDs, anchors, 4 SVGs, no external dependencies",
+    "MANIFEST per-file size / SHA256"
   ]
 }
 # ---- end ----

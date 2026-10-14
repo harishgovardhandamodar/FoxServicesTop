@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "label": "設計驗收門檻，非實測",
+  "label": "Design acceptance thresholds, not live measurements",
   "profile": "REF",
   "limits": {
     "cpu_mean_one_core_percent": {

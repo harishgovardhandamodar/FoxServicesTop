@@ -1,4 +1,4 @@
--- 僅 audit.sqlite3。連線時還需驗SQLite版本、WAL、synchronous=FULL；本DDL不改journal_mode。
+-- audit.sqlite3 only. Connections still verify the SQLite version, WAL and synchronous=FULL; this DDL never changes journal_mode.
 PRAGMA foreign_keys = ON;
 BEGIN IMMEDIATE;
 CREATE TABLE IF NOT EXISTS action_intents (
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS action_events (
  result_code TEXT NOT NULL,
  detail_json TEXT NOT NULL CHECK(length(detail_json)<=4096)
 );
--- 尚未產生intent的拒絕／prepare／取消記錄；不能假設每次denied都有intent FK。
+-- Records of refused/prepare/cancelled actions without an intent yet; never assume every denied row has an intent FK.
 CREATE TABLE IF NOT EXISTS action_attempts (
  request_id TEXT PRIMARY KEY,
  payload_sha256 TEXT NOT NULL CHECK(length(payload_sha256)=64),

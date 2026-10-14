@@ -86,11 +86,11 @@ GPU UUIDs and serial numbers are masked before the file is hashed.
 | `gate-check` | `cargo check --workspace --all-targets --all-features --locked` | 0 | `fcba5251c0f50756e559de4c1d6993a0cf7c8efc12a469b130b567171c5b2c8d` |
 | `gate-clippy` | `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` | 0 | `c9c64986c50f92a2bebb65687bd71fc94767bec98448c3d233e53463cd714887` |
 | `gate-test` | `cargo test --workspace --all-features --locked --no-fail-fast` | 0 | `27352ad0b33a44af531628481fc2f141bbb5b6ee86e0a44cb8728319f1d214d6` |
-| `gate-boundaries` | `bash -c mkdir -p target && cargo metadata --format-version 1 --locked > target/metadata.json && python3 spe…` | 0 | `31c7a5bc72d9a701584f52be748d35f68dade634e6140bd13a1bfcd0edb40d64` |
+| `gate-boundaries` | `bash -c mkdir -p target && cargo metadata --format-version 1 --locked > target/metadata.json && python3 spe…` | 0 | `e6fdaf6ba3ba2e22649ec160c1948d80713018b66c76c0d3a5601a9a882a1e95` |
 | `gate-scripts` | `env PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p test_*.py -v` | 0 | `26922695ceda2c650f1c1f2f649548303935132d67859d059d7741b199cb7c88` |
 | `rules-preserved` | `bash -c git ls-files --error-unmatch CLAUDE.md && git diff --exit-code HEAD -- CLAUDE.md && echo "CLAUDE.md…` | 0 | `10d20c4b02eeb02c3626e428cda14d58bee135961263e944fac01811cc5a5b5d` |
 | `hardware-suites` | `cargo test --workspace --all-features --locked -- --ignored hardware_ --test-threads=1` | 0 | `6cb15738f57173fdfeb894bc760b1fdff3c1af5c756bd44ae23e7bd8c616a5f8` |
-| `spec-package-validation` | `/tmp/claude-1000/-mnt-harishgovardhandamodar-SSD-Code-Github-fox-services-top/32efa81a-0f25-482f-b209-eb95f51fb786/scratchpad/run_…` | 0 | `81d9b25c9b3cd04b7b034df1cd98db30d32a3a0648ca52d7418e0a83104807f0` |
+| `spec-package-validation` | `/tmp/claude-1000/-mnt-harishgovardhandamodar-SSD-Code-Github-fox-services-top/32efa81a-0f25-482f-b209-eb95f51fb786/scratchpad/run_…` | 0 | `bae016e5e19ba4b97ebb2aeba6d95a5fe4fb7a940fd8dc62ad48253633ecab4c` |
 | `spec-copy-verification` | `python3 scripts/verify_spec_copy.py fox-services-top-spec-v2.zip spec/fox-services-top-v2` | 0 | `b7a98165c982d4eab34a4044647683b3279410ee2b78080bc4e6a40d3df0e42c` |
 | `bench-ref-smoke-60s` | `env FOX_SERVICES_TOP_BENCH_SMOKE_SECONDS=60 cargo bench -p fox-services-top --locked --offline --bench ref -- --smoke` | 0 | `8e30302e6a9886fae3ba88fd554d3b94c992a5bb00b4d1a577cf52d0dcd27a7e` |
 | `bench-projection-smoke` | `cargo bench -p fox-services-top --locked --offline --bench projection -- --smoke` | 0 | `b8307d0f66fcc0fcf18d37a052b2509890f477b7d21dddaf0d7795a5c9605e23` |
@@ -102,7 +102,7 @@ GPU UUIDs and serial numbers are masked before the file is hashed.
 | `gate-check-gb10` | `cargo check --workspace --all-targets --all-features --locked` | 0 | `d862c1fd93302b72af70de9b32bbaeee8ff01f39624ab438e04563142a324368` |
 | `gate-clippy-gb10` | `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` | 0 | `2fc1582d50e36e760184001d1431c768c12484ad3c6df93830192ba892223ee4` |
 | `gate-test-gb10` | `cargo test --workspace --all-features --locked --no-fail-fast` | 0 | `eac45b7d97aff7f8d737aeff11d4fc7c9d47bb7b131a7267a5d925e7311821f2` |
-| `gate-boundaries-gb10` | `bash -c mkdir -p target && cargo metadata --format-version 1 --locked > target/metadata.json && python3 spe…` | 0 | `7f147eb59cc97c2236b0f82bded666c6fcebfb171144a33009423b7f7d9920f9` |
+| `gate-boundaries-gb10` | `bash -c mkdir -p target && cargo metadata --format-version 1 --locked > target/metadata.json && python3 spe…` | 0 | `08422426fcf07fd8fbd2c3551d5dd9114681c0f81357cc423da7dd93d9b9c460` |
 | `gate-scripts-gb10` | `env PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p test_*.py -v` | 0 | `42a9f92b49f4ba016cd96b2c2348748e97ba7aa340d1709fdefb86a36215bd24` |
 | `rules-preserved-gb10` | `bash -c git ls-files --error-unmatch CLAUDE.md && git diff --exit-code HEAD -- CLAUDE.md && echo "CLAUDE.md…` | 0 | `e298f794eef3f2ebe9c35c74be0dc12138eeddcadd1f69bc3a8fe0e98e7ffd6b` |
 | `spec-copy-verification-gb10` | `python3 scripts/verify_spec_copy.py fox-services-top-spec-v2.zip spec/fox-services-top-v2` | 0 | `ef4b85296465176ae09e813bb4bc6865692593ab8e6a6b9cbc4276dc15a6cbb0` |
@@ -111,7 +111,7 @@ GPU UUIDs and serial numbers are masked before the file is hashed.
 | `release-version-verbose-gb10` | `target/release/fox-services-top --version --verbose` | 0 | `7d09685378c189e8fefc1515d8ba3bdc006ad0d961bcaa85edf5bb36ad55c176` |
 | `gpm-probe-gb10` | `nvidia-smi dmon --gpm-metrics 1,2,3,10 -c 3` | 0 | `42f3a548c475373840b015cc361181a7ab69be8b4c10e4ccf7d2f3d1ef1470b6` |
 | `hwmon-probe-gb10` | `bash -c for h in /sys/class/hwmon/hwmon*; do echo "$h name=$(cat $h/name)"; ls $h \| grep -E "^(power\|ener…` | 0 | `37720f845629dcc81b42e2add2216f2d4fae55f02443f7247302f9598f50077d` |
-| `release-v2.0.0` | `bash -c set -o pipefail; gh run view 38110420112 -R harishgovardhandamodar/fox-services-top --log \| python3 scripts/format_run_log.py` | 0 | `3f43ce754c5a0453a3920ee9c675f231c6f203c670300241ab50bf7d80081974` |
+| `release-v2.0.0` | `bash -c set -o pipefail; gh run view 38110420112 -R harishgovardhandamodar/fox-services-top --log \| python3 scripts/format_run_log.py` | 0 | `2810b5f70f01affd4833c5fba0cfa811a0e36a5af1d7cc23b5e4cfc85eeb303c` |
 | `lockfile-tracked` | `bash -c git ls-files --error-unmatch Cargo.lock && git log -1 --format="%h %s" -- Cargo.lock` | 0 | `bcc3ed9381dec3eba7ef3fa2f1dedd4b8e82fd08124727c4410474db750f4fa5` |
 | `missing-lockfile-refused` | `bash -c w="$(mktemp -d)" && git clone --quiet --no-local . "$w/fox-services-top" && rm "$w/fox-services-top/Cargo.lock" && if cargo metadata …` | 0 | `c83f0be98bcaa00f7e9357a6990515b9b23f368e9ce0277e5d26ad3d756a99f9` |
 

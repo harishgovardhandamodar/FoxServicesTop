@@ -65,8 +65,8 @@ mod tests {
     fn truncation_respects_display_width() {
         assert_eq!(truncate_to_width("python3", 10), "python3");
         assert_eq!(truncate_to_width("python3-worker", 8), "python3…");
-        assert_eq!(truncate_to_width("溫度溫度", 5), "溫度…");
-        assert_eq!(display_width(&truncate_to_width("溫度溫度", 4)), 3);
+        assert_eq!(truncate_to_width("アアアア", 5), "アア…");
+        assert_eq!(display_width(&truncate_to_width("アアアア", 4)), 3);
         assert_eq!(truncate_to_width("abc", 0), "");
         assert_eq!(truncate_to_width("abc", 1), "…");
     }

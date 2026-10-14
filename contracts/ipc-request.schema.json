@@ -95,5 +95,5 @@
     }
   ],
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "唯讀 Adapter IPC 請求 v1"
+  "title": "Read-only adapter IPC request v1"
 }

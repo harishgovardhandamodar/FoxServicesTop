@@ -9,7 +9,7 @@
 {
   "status": "PASS",
   "errors": [],
-  "limitations": "只檢查直接production dependency，不代替Rust trait權限與非法std::fs/process程式碼審核"
+  "limitations": "Checks direct production dependencies only; never a substitute for Rust trait permission and illegal std::fs/process code review"
 }
 # ---- end ----
 # finished_utc: 2026-10-10T14:04:22Z

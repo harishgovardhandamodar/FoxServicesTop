@@ -1,7 +1,7 @@
 {
   "module_id": "cpu",
   "api_version": 1,
-  "title": "CPU 使用率與溫度",
+  "title": "CPU utilization and temperature",
   "topics": [
     "cpu",
     "sources",

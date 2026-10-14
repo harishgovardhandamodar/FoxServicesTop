@@ -7,7 +7,7 @@
 すべての GPU、ジョブごとのメモリ使用量、マシン全体を 1 画面で。<br>
 GPU ジョブは開始から終了まで、終わり方も含めて記録します。
 
-[English](../README.md) · [繁體中文](README.zh-TW.md) · [プロジェクトページ](https://harishgovardhandamodar.me/ja/projects/tools/fox-services-top/) · [仕組み](https://harishgovardhandamodar.me/ja/projects/tools/fox-services-top/#architecture)
+[English](../README.md) · [プロジェクトページ](https://harishgovardhandamodar.me/ja/projects/tools/fox-services-top/) · [仕組み](https://harishgovardhandamodar.me/ja/projects/tools/fox-services-top/#architecture)
 
 [![Release](https://img.shields.io/github/v/release/harishgovardhandamodar/fox-services-top)](https://github.com/harishgovardhandamodar/fox-services-top/releases/latest)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](../LICENSE)

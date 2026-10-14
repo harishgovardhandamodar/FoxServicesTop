@@ -7,7 +7,7 @@
 Every GPU, each job's share of its memory and the whole machine on one screen,<br>
 plus a record of every GPU job from start to end, including how it ended.
 
-[繁體中文](docs/README.zh-TW.md) · [日本語](docs/README.ja.md) · [Project page](https://harishgovardhandamodar.me/en/projects/tools/fox-services-top/) · [How it works](https://harishgovardhandamodar.me/en/projects/tools/fox-services-top/#architecture)
+[日本語](docs/README.ja.md) · [Project page](https://harishgovardhandamodar.me/en/projects/tools/fox-services-top/) · [How it works](https://harishgovardhandamodar.me/en/projects/tools/fox-services-top/#architecture)
 
 [![Release](https://img.shields.io/github/v/release/harishgovardhandamodar/fox-services-top)](https://github.com/harishgovardhandamodar/fox-services-top/releases/latest)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)

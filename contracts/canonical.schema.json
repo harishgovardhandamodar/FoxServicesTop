@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "權威候選與仲裁結果 v1",
+  "title": "Canonical candidates and arbitration v1",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -171,7 +171,7 @@
         "stale",
         "unknown"
       ],
-      "description": "最近成功讀取的新鮮度；不能等同硬體量測真的更新。"
+      "description": "Freshness of the last successful read; never a claim that the hardware measurement itself updated."
     },
     "observed_boot_ns": {
       "anyOf": [
@@ -183,7 +183,7 @@
           "type": "null"
         }
       ],
-      "description": "映射到本機 boot clock 的實際量測時間；未知或 conflict 無單一來源時為 null，不冒用讀取時間。"
+      "description": "Actual measurement time mapped to the local boot clock; null when unknown or conflicted with no single source, never the read time."
     },
     "committed_boot_ns": {
       "type": "string",
@@ -222,7 +222,7 @@
         "stale",
         "unknown"
       ],
-      "description": "由可驗證裝置時間戳記／更新證據判斷；沒有證據為 unknown。"
+      "description": "Judged from verifiable device timestamps or update evidence; unknown without evidence."
     },
     "read_finished_boot_ns": {
       "type": "string",

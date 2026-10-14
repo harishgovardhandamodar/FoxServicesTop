@@ -429,5 +429,5 @@
     "error_code"
   ],
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Adapter 觀測批次 v1"
+  "title": "Adapter observation batch v1"
 }

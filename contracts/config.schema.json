@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "完整設定 v2",
+  "title": "Complete configuration v2",
   "type": "object",
   "additionalProperties": false,
   "properties": {

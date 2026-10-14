@@ -1,4 +1,4 @@
--- 僅可選 history.sqlite3；採WAL/NORMAL與有界writer/reader；new DB使用本DDL。
+-- Optional history.sqlite3; WAL/NORMAL with a bounded writer/reader; new DBs use this DDL.
 PRAGMA foreign_keys = ON;
 BEGIN IMMEDIATE;
 CREATE TABLE IF NOT EXISTS history_segments (
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS history_buckets (
  PRIMARY KEY(segment_id,start_boot_ns),
  CHECK(start_boot_ns<end_boot_ns)
 );
--- 跨桶完整counter interval獨立保存，不同時算進兩個bucket total。
+-- A whole counter interval spanning buckets is stored once, never counted in two bucket totals.
 CREATE TABLE IF NOT EXISTS counter_bridges (
  segment_id TEXT NOT NULL REFERENCES history_segments(segment_id) ON DELETE CASCADE,
  start_boot_ns TEXT NOT NULL CHECK(length(start_boot_ns)=20 AND start_boot_ns NOT GLOB '*[^0-9]*' AND start_boot_ns<='18446744073709551615'),

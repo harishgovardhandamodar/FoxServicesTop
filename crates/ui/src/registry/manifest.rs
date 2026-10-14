@@ -154,7 +154,7 @@ mod tests {
         DisplayModuleManifest {
             module_id: ModuleId::new("cpu").unwrap(),
             api_version: 1,
-            title: "CPU 使用率與溫度".into(),
+            title: "CPU utilization and temperature".into(),
             min_columns: 36,
             min_rows: 8,
             priority: 80,

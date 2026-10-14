@@ -373,5 +373,5 @@
     "config_path"
   ],
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "效能驗收報告 v1（結果只能實測生成）"
+  "title": "Performance acceptance report v1 (results only from live runs)"
 }
