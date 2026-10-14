@@ -399,6 +399,14 @@ impl Controller {
                     self.scroll_module(memory, action == KeyAction::ScrollMemoryDown);
                 }
             }
+            KeyAction::ScrollDetailUp | KeyAction::ScrollDetailDown => {
+                let view = current_view(context);
+                if let Some(module) = crate::registry::detail_module_id(view)
+                    && let Ok(module) = ModuleId::new(module)
+                {
+                    self.scroll_module(module, action == KeyAction::ScrollDetailDown);
+                }
+            }
             KeyAction::HistoryDown | KeyAction::HistoryUp | KeyAction::HistoryOpen => {
                 self.navigate_history(action, context);
             }
@@ -510,9 +518,15 @@ impl Controller {
             ViewKind::Overview => self.navigate_processes(movement, context),
             ViewKind::GpuDetail => self.navigate_gpu(movement, context),
             ViewKind::Settings => self.navigate_modules(movement, context),
-            // The history view charts fixed series (D-46); nothing to
-            // pick, and the retired views are never shown (D-91).
-            ViewKind::History | ViewKind::Processes | ViewKind::Sources | ViewKind::Actions => {}
+            // The history view charts fixed series (D-46), the Nodes and
+            // Docker tabs scroll with `j`/`k`, and the retired views are
+            // never shown (D-91).
+            ViewKind::History
+            | ViewKind::Nodes
+            | ViewKind::Docker
+            | ViewKind::Processes
+            | ViewKind::Sources
+            | ViewKind::Actions => {}
         }
     }
 
@@ -623,7 +637,10 @@ impl Controller {
     }
 
     fn start_filter(&mut self, context: &ControllerContext<'_>) {
-        if current_view(context) != ViewKind::Overview {
+        if !matches!(
+            current_view(context),
+            ViewKind::Overview | ViewKind::Nodes | ViewKind::Docker
+        ) {
             return;
         }
         let initial = self

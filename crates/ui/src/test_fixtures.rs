@@ -900,6 +900,8 @@ pub(crate) fn full_modules(with_confirmation: bool) -> ModuleViews {
         process_history: Some(Arc::new(process_history_view())),
         settings: Some(Arc::new(settings_view())),
         actions: Some(Arc::new(actions_view(with_confirmation))),
+        cluster: None,
+        docker: None,
     }
 }
 

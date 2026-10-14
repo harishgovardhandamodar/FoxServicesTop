@@ -779,13 +779,19 @@ fn tab_clicks_and_keys_switch_views() {
         ViewKind::History,
         "bursts build on the staged view and skip hidden views"
     );
-    // The action record is not a view (D-44): 6 switches nothing, and Tab
-    // wraps from the last offered tab, Settings, to the overview (D-75).
+    // 8 is not a view key, and Tab wraps from the last offered tab,
+    // Docker, to the overview (D-75).
     let sent = harness.submitted().len();
+    harness.keys(&[key('8')]);
+    assert_eq!(harness.submitted().len(), sent, "8 is not a view key");
     harness.keys(&[key('6')]);
-    assert_eq!(harness.submitted().len(), sent, "6 is not a view key");
-    harness.keys(&[key('5'), code(KeyCode::Tab)]);
+    assert_eq!(harness.last_session().0, ViewKind::Nodes);
+    harness.keys(&[key('7')]);
+    assert_eq!(harness.last_session().0, ViewKind::Docker);
+    harness.keys(&[code(KeyCode::Tab)]);
     assert_eq!(harness.last_session().0, ViewKind::Overview, "Tab wraps");
+    harness.keys(&[key('5'), code(KeyCode::Tab)]);
+    assert_eq!(harness.last_session().0, ViewKind::Nodes);
     harness.keys(&[code(KeyCode::F(2))]);
     assert_eq!(harness.last_session().0, ViewKind::Settings);
 }

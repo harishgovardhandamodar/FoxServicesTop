@@ -2,8 +2,10 @@
 //! from the immutable projection; a missing topic renders "no data" text.
 
 mod common;
+mod cluster;
 mod cpu;
 mod disk;
+mod docker;
 mod gpu;
 mod history;
 mod host_status;
@@ -17,7 +19,9 @@ use fox_services_top_core::identity::IdentityError;
 use thiserror::Error;
 
 pub use cpu::{CPU_MODULE_ID, CpuModule};
+pub use cluster::ClusterModule;
 pub use disk::DiskModule;
+pub use docker::DockerModule;
 pub use gpu::GpuModule;
 pub use history::HISTORY_MODULE_ID;
 pub use history::HistoryModule;
@@ -53,5 +57,7 @@ pub fn builtin_modules() -> Vec<Result<Box<dyn DisplayModule>, ModuleBuildError>
         ProcessesModule::new().map(boxed),
         HistoryModule::new().map(boxed),
         SettingsModule::new().map(boxed),
+        ClusterModule::new().map(boxed),
+        DockerModule::new().map(boxed),
     ]
 }

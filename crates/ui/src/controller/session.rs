@@ -72,6 +72,8 @@ const fn memory_slot(view: ViewKind) -> Option<usize> {
         ViewKind::GpuDetail => Some(1),
         ViewKind::History => Some(2),
         ViewKind::Settings => Some(3),
+        ViewKind::Nodes => Some(4),
+        ViewKind::Docker => Some(5),
         ViewKind::Processes | ViewKind::Sources | ViewKind::Actions => None,
     }
 }
@@ -89,7 +91,7 @@ struct PendingDraft {
 pub struct SessionDrafts {
     staged: Option<SessionFields>,
     pending: Option<PendingDraft>,
-    memory: [Option<ViewMemory>; 4],
+    memory: [Option<ViewMemory>; 6],
 }
 
 impl SessionDrafts {

@@ -307,6 +307,8 @@ pub const fn detail_module_id(view: ViewKind) -> Option<&'static str> {
         ViewKind::GpuDetail => Some("gpu"),
         ViewKind::History => Some("history"),
         ViewKind::Settings => Some("settings"),
+        ViewKind::Nodes => Some("cluster"),
+        ViewKind::Docker => Some("docker"),
         ViewKind::Overview | ViewKind::Processes | ViewKind::Sources | ViewKind::Actions => None,
     }
 }

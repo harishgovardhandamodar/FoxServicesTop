@@ -154,7 +154,7 @@ fn row_index(rendered: &Rendered, needle: &str) -> usize {
 
 #[test]
 fn overview_follows_the_reference_layout_and_keeps_every_module_visible_when_wide() {
-    let rendered = render(&model(ViewKind::Overview), (160, 50));
+    let rendered = render(&model(ViewKind::Overview), (200, 50));
     for module in ["cpu", "gpu", "memory", "disk", "network", "processes"] {
         assert!(
             rendered
@@ -602,7 +602,7 @@ fn header_shows_the_host_and_warnings_and_the_footer_the_interval() {
     model.header.effective_interval_ms = 2000;
     model.header.overload = OverloadState::Throttled;
     model.header.read_only = true;
-    let rendered = render(&model, (200, 50));
+    let rendered = render(&model, (240, 50));
     let header = &rendered.rows[0];
     for text in [
         "FOX-SERVICES-TOP",

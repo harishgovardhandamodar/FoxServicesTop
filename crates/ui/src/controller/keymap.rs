@@ -39,6 +39,9 @@ pub enum KeyAction {
     ToggleCpuDetail,
     ScrollMemoryUp,
     ScrollMemoryDown,
+    /// Scrolls the current detail view (the Nodes and Docker tabs).
+    ScrollDetailUp,
+    ScrollDetailDown,
     HistoryDown,
     HistoryUp,
     HistoryOpen,
@@ -206,7 +209,9 @@ pub struct KeyBinding {
 const LIST_VIEWS: &[ViewKind] = &[ViewKind::Overview, ViewKind::GpuDetail, ViewKind::Settings];
 /// The process table, and so its keys, is on the Overview only (D-91).
 const PROCESS_VIEWS: &[ViewKind] = &[ViewKind::Overview];
-const FILTER_VIEWS: &[ViewKind] = PROCESS_VIEWS;
+const FILTER_VIEWS: &[ViewKind] = &[ViewKind::Overview, ViewKind::Nodes, ViewKind::Docker];
+/// The single-page polled views, scrolled with `j`/`k`.
+const SCROLL_VIEWS: &[ViewKind] = &[ViewKind::Nodes, ViewKind::Docker];
 
 /// Table-row constructor: positional arguments keep the table one line per binding.
 #[allow(clippy::too_many_arguments)]
@@ -248,6 +253,10 @@ pub static KEYMAP: &[KeyBinding] = &[
     binding("3", "Overview History", None, Section::Views, ModeSet::NORMAL, ViewScope::All, &[KeyPattern::char('3')], KeyAction::ShowTab(Tab::OverviewHistory)),
     binding("4", "Process History", None, Section::Views, ModeSet::NORMAL, ViewScope::All, &[KeyPattern::char('4')], KeyAction::ShowTab(Tab::ProcessHistory)),
     binding("5/F2", "Settings", None, Section::Views, ModeSet::NORMAL, ViewScope::All, &[KeyPattern::char('5'), KeyPattern::key(KeyCode::F(2))], KeyAction::ShowTab(Tab::Settings)),
+    binding("6", "Nodes (fox-services cluster)", None, Section::Views, ModeSet::NORMAL, ViewScope::All, &[KeyPattern::char('6')], KeyAction::ShowTab(Tab::Nodes)),
+    binding("7", "Docker services (all nodes)", None, Section::Views, ModeSet::NORMAL, ViewScope::All, &[KeyPattern::char('7')], KeyAction::ShowTab(Tab::Docker)),
+    binding("j/↓", "scroll down", None, Section::Views, ModeSet::NORMAL, ViewScope::Only(SCROLL_VIEWS), &[KeyPattern::char('j'), KeyPattern::key(KeyCode::Down)], KeyAction::ScrollDetailDown),
+    binding("k/↑", "scroll up", None, Section::Views, ModeSet::NORMAL, ViewScope::Only(SCROLL_VIEWS), &[KeyPattern::char('k'), KeyPattern::key(KeyCode::Up)], KeyAction::ScrollDetailUp),
     binding("j/↓", "select next", None, Section::Navigation, ModeSet::NORMAL, ViewScope::Only(LIST_VIEWS), &[KeyPattern::char('j'), KeyPattern::key(KeyCode::Down)], KeyAction::MoveDown),
     binding("k/↑", "select previous", None, Section::Navigation, ModeSet::NORMAL, ViewScope::Only(LIST_VIEWS), &[KeyPattern::char('k'), KeyPattern::key(KeyCode::Up)], KeyAction::MoveUp),
     binding("PgDn", "page down", None, Section::Navigation, ModeSet::NORMAL, ViewScope::Only(LIST_VIEWS), &[KeyPattern::key(KeyCode::PageDown)], KeyAction::PageDown),

@@ -7,7 +7,8 @@
 //!
 //! The view kinds are fixed by the command contract, so the two history
 //! tabs are one view, `History`, on two pages of its module: the overview's
-//! resources and the GPU processes (D-75).
+//! resources and the GPU processes (D-75). The Nodes and Docker tabs show
+//! the fox-services cluster (one view each, single page).
 
 use fox_services_top_core::commands::ViewKind;
 
@@ -19,15 +20,19 @@ pub enum Tab {
     OverviewHistory,
     ProcessHistory,
     Settings,
+    Nodes,
+    Docker,
 }
 
-/// Offered tabs in order; the digit keys 1–5 follow this order.
-pub const OFFERED_TABS: [Tab; 5] = [
+/// Offered tabs in order; the digit keys 1–7 follow this order.
+pub const OFFERED_TABS: [Tab; 7] = [
     Tab::Overview,
     Tab::Gpu,
     Tab::OverviewHistory,
     Tab::ProcessHistory,
     Tab::Settings,
+    Tab::Nodes,
+    Tab::Docker,
 ];
 
 /// Page of the history module the process history opens on (the list).
@@ -40,6 +45,8 @@ impl Tab {
             Self::Gpu => ViewKind::GpuDetail,
             Self::OverviewHistory | Self::ProcessHistory => ViewKind::History,
             Self::Settings => ViewKind::Settings,
+            Self::Nodes => ViewKind::Nodes,
+            Self::Docker => ViewKind::Docker,
         }
     }
 
@@ -50,6 +57,8 @@ impl Tab {
             Self::OverviewHistory => "Overview History",
             Self::ProcessHistory => "Process History",
             Self::Settings => "Settings",
+            Self::Nodes => "Nodes",
+            Self::Docker => "Docker",
         }
     }
 
@@ -61,6 +70,8 @@ impl Tab {
             Self::OverviewHistory => "tab.history",
             Self::ProcessHistory => "tab.process_history",
             Self::Settings => "tab.settings",
+            Self::Nodes => "tab.nodes",
+            Self::Docker => "tab.docker",
         }
     }
 
@@ -79,6 +90,8 @@ impl Tab {
             ViewKind::History if page == 0 => Some(Self::OverviewHistory),
             ViewKind::History => Some(Self::ProcessHistory),
             ViewKind::Settings => Some(Self::Settings),
+            ViewKind::Nodes => Some(Self::Nodes),
+            ViewKind::Docker => Some(Self::Docker),
             ViewKind::Processes | ViewKind::Sources | ViewKind::Actions => None,
         }
     }
@@ -117,6 +130,14 @@ mod tests {
         assert_eq!(Tab::of(ViewKind::Actions, 0), None);
         assert_eq!(Tab::Overview.number(), 1);
         assert_eq!(Tab::Settings.number(), 5);
+        assert_eq!(Tab::Nodes.number(), 6);
+        assert_eq!(Tab::Docker.number(), 7);
+        assert_eq!(Tab::of(ViewKind::Nodes, 0), Some(Tab::Nodes));
+        assert_eq!(Tab::of(ViewKind::Docker, 0), Some(Tab::Docker));
+        assert_eq!(Tab::Nodes.view(), ViewKind::Nodes);
+        assert_eq!(Tab::Docker.view(), ViewKind::Docker);
+        assert_eq!(next_tab(Some(Tab::Docker)), Tab::Overview);
+        assert_eq!(previous_tab(Some(Tab::Overview)), Tab::Docker);
     }
 
     /// The two history tabs are one view on two pages (D-75).
@@ -127,7 +148,7 @@ mod tests {
         assert_eq!(Tab::of(ViewKind::History, 2), Some(Tab::ProcessHistory));
         assert_eq!(Tab::ProcessHistory.view(), ViewKind::History);
         assert_eq!(next_tab(Some(Tab::OverviewHistory)), Tab::ProcessHistory);
-        assert_eq!(previous_tab(Some(Tab::Overview)), Tab::Settings);
+        assert_eq!(previous_tab(Some(Tab::Overview)), Tab::Docker);
         assert_eq!(next_tab(None), Tab::Overview);
         for tab in OFFERED_TABS {
             assert_eq!(Tab::for_control(tab.control_id()), Some(tab));
