@@ -11,6 +11,7 @@ mod history;
 mod host_status;
 mod memory;
 mod network;
+mod power;
 mod process_memory;
 mod processes;
 mod settings;
@@ -29,6 +30,7 @@ pub use history::HistoryModule;
 pub use memory::MEMORY_MODULE_ID;
 pub use memory::MemoryModule;
 pub use network::NetworkModule;
+pub use power::PowerModule;
 pub use processes::{PROCESSES_MODULE_ID, ProcessesModule};
 pub use settings::SettingsModule;
 pub use tokens::TokensModule;
@@ -62,5 +64,6 @@ pub fn builtin_modules() -> Vec<Result<Box<dyn DisplayModule>, ModuleBuildError>
         ClusterModule::new().map(boxed),
         DockerModule::new().map(boxed),
         TokensModule::new().map(boxed),
+        PowerModule::new().map(boxed),
     ]
 }

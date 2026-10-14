@@ -1168,6 +1168,60 @@ impl TokensView {
     }
 }
 
+/// One power series over the tab's window: total, a CPU package or a GPU.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PowerRowView {
+    pub kind: HistoryChartKind,
+    /// The device charted (`GPU 0 · NVIDIA GB10`, `CPU 0`); `total` for host.
+    pub subject: String,
+    /// Live watts now, when the snapshot reports the series.
+    pub current_w: Option<f64>,
+    /// Time-weighted mean watts over the covered part of the window.
+    pub mean_w: Option<f64>,
+    /// Largest value in the window.
+    pub peak_w: Option<f64>,
+    /// Time the history holds in the window.
+    pub covered_ns: Option<u64>,
+    /// Mean times covered time (joules); `None` while uncovered.
+    pub energy_joules: Option<f64>,
+}
+
+/// One power series over one statistics window (1 h to 24 h): the per-query
+/// kWh source.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PowerWindowView {
+    pub kind: HistoryChartKind,
+    pub subject: String,
+    pub window_label: String,
+    /// The window's length, so the Viewer never reads it from the label.
+    pub span_ns: u64,
+    pub mean_w: Option<f64>,
+    pub peak_w: Option<f64>,
+    pub covered_ns: Option<u64>,
+    /// Mean times covered time (joules); `None` while uncovered.
+    pub energy_joules: Option<f64>,
+}
+
+/// The Power tab: watts timeline and kWh per query window, built from the
+/// history's power charts and summaries plus the live snapshot.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct PowerView {
+    /// Bar size the timeline draws (`1m`, `1h`, ...): the session's
+    /// Overview History size, selectable with `w`/`W`.
+    pub window_label: String,
+    pub requested_span_ns: u64,
+    /// Live total watts now, when the snapshot reports it.
+    pub total_w: Option<f64>,
+    /// Total energy over the timeline window (joules).
+    pub total_joules: Option<f64>,
+    /// Total watts timeline, oldest bucket first (gaps are `None`).
+    pub timeline: Vec<Option<f64>>,
+    /// One row per power series of the window.
+    pub rows: Vec<PowerRowView>,
+    /// One entry per power series and statistics window.
+    pub windows: Vec<PowerWindowView>,
+}
+
 /// The latest polled snapshot of the whole cluster: what the Manager reads
 /// from its [`crate::ports::ClusterSource`] every frame. Bounded (the
 /// poller caps nodes, services, requests and prompt snippets), so
@@ -1199,6 +1253,8 @@ pub struct ModuleViews {
     pub docker: Option<Arc<ServicesView>>,
     /// Built from the cluster snapshot, for the Tokens tab.
     pub tokens: Option<Arc<TokensView>>,
+    /// Built from the history and the live snapshot, for the Power tab.
+    pub power: Option<Arc<PowerView>>,
 }
 
 /// One immutable projection for one session.

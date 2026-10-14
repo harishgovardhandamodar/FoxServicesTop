@@ -659,7 +659,8 @@
                 "actions",
                 "nodes",
                 "docker",
-                "tokens"
+                "tokens",
+                "power"
               ]
             },
             "selected_entity_id": {

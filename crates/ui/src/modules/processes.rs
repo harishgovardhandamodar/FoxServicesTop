@@ -10,19 +10,21 @@
 
 use fox_services_top_core::canonical::GpuUsageKind;
 use fox_services_top_core::identity::EntityId;
+use fox_services_top_core::metric::CanonicalUnit;
 use fox_services_top_core::view::{ProcessGpuView, ProcessRowView, ProcessesView, ViewModel};
 use ratatui::Frame;
 use ratatui::layout::Rect;
+use ratatui::text::{Line, Span};
 
 use super::ModuleBuildError;
 use super::common::{
     ColumnSpec, FittedColumn, ManifestSpec, Output, RowCursor, TableCell, build_manifest,
-    draw_column_separators, draw_table_header, draw_table_row, fit_separated_columns, message,
-    no_data, panel, panel_with_keys,
+    draw_column_separators, draw_line, draw_table_header, draw_table_row, fit_separated_columns,
+    message, no_data, panel, panel_with_keys,
 };
 use crate::format::{
-    NOT_AVAILABLE, clean, display_width, format_optional_bytes, format_optional_percent,
-    truncate_to_width,
+    NOT_AVAILABLE, clean, display_width, format_energy, format_optional_bytes,
+    format_optional_percent, format_value, truncate_to_width,
 };
 use crate::num::saturate_u16;
 use crate::registry::{
@@ -57,11 +59,11 @@ const COLUMNS: [ColumnSpec; 11] = [
 ];
 
 /// Module id of the process table; the Controller keeps its Overview
-/// sub-tab here (`0` GPU Processes, `1` Fox services).
+/// sub-tab here (`0` GPU Processes, `1` Fox services, `2` Power).
 pub const PROCESSES_MODULE_ID: &str = "processes";
 
 /// The Overview sub-tabs of the process panel, in order.
-const SUB_TABS: [&str; 2] = ["GPU Processes", "Fox services"];
+const SUB_TABS: [&str; 3] = ["GPU Processes", "Fox services", "Power"];
 
 pub struct ProcessesModule {
     manifest: DisplayModuleManifest,
@@ -122,17 +124,20 @@ impl DisplayModule for ProcessesModule {
             output.label("processes: no data");
             return output.finish();
         };
-        // The Overview panel carries a sub-tab: the process table, or the
-        // Fox-Services tables in the same area.
-        let services_tab = context.tab == 1;
-        let title = if services_tab {
-            services_title(model)
-        } else {
-            title_text(view)
+        // The Overview panel carries a sub-tab: the process table, the
+        // Fox-Services tables or the power summary in the same area.
+        let sub_tab = context.tab.min(2);
+        let title = match sub_tab {
+            1 => services_title(model),
+            2 => power_title(model),
+            _ => title_text(view),
         };
         // `j`/`k` still select processes on the Overview; the sub-tab
         // filters like its tab, and scrolls it there (key `7`).
-        let keys = if services_tab { "/ filter" } else { PROCESS_KEYS };
+        let keys = match sub_tab {
+            1 | 2 => "/ filter",
+            _ => PROCESS_KEYS,
+        };
         let inner = panel_with_keys(frame, area, &title, keys, context);
         output.label(format!(
             "processes: {} rows, sort {} {}",
@@ -148,8 +153,16 @@ impl DisplayModule for ProcessesModule {
             return output.finish();
         }
         let mut rows = RowCursor::new(inner);
-        render_sub_tabs(frame, &mut rows, services_tab, model, &self.manifest, context, &mut output);
-        if services_tab {
+        render_sub_tabs(
+            frame,
+            &mut rows,
+            sub_tab,
+            model,
+            &self.manifest,
+            context,
+            &mut output,
+        );
+        if sub_tab == 1 {
             let Some(services) = model.modules.docker.as_deref() else {
                 if let Some(area) = rows.rest() {
                     message(frame, area, &no_data("services"), context.theme.muted_style());
@@ -177,6 +190,17 @@ impl DisplayModule for ProcessesModule {
                 context,
                 &mut output,
                 true,
+            );
+            return output.finish();
+        }
+        if sub_tab == 2 {
+            render_power_content(
+                frame,
+                &mut rows,
+                model,
+                &model.session.filter.to_lowercase(),
+                context,
+                &mut output,
             );
             return output.finish();
         }
@@ -247,12 +271,12 @@ impl DisplayModule for ProcessesModule {
     }
 }
 
-/// The sub-tab strip at the top of the Overview panel: `GPU Processes`
-/// or `Fox services`, each clickable. The active tab reads selected.
+/// The sub-tab strip at the top of the Overview panel: `GPU Processes`,
+/// `Fox services` or `Power`, each clickable. The active tab reads selected.
 fn render_sub_tabs(
     frame: &mut Frame<'_>,
     rows: &mut RowCursor,
-    services_tab: bool,
+    active_tab: u8,
     model: &ViewModel,
     manifest: &DisplayModuleManifest,
     context: &DisplayContext,
@@ -261,7 +285,7 @@ fn render_sub_tabs(
     let Some(strip) = rows.next_row() else { return };
     let mut x = strip.x.saturating_add(1);
     for (index, label) in SUB_TABS.iter().enumerate() {
-        let active = (index == 1) == services_tab;
+        let active = index == usize::from(active_tab.min(2));
         let width = display_width(label).min(usize::from(strip.width.saturating_sub(x - strip.x)));
         if width == 0 {
             break;
@@ -279,10 +303,10 @@ fn render_sub_tabs(
                 context.theme.muted_style()
             },
         );
-        let control = if index == 0 {
-            controls::OVERVIEW_SUB_PROCESSES
-        } else {
-            controls::OVERVIEW_SUB_SERVICES
+        let control = match index {
+            1 => controls::OVERVIEW_SUB_SERVICES,
+            2 => controls::OVERVIEW_SUB_POWER,
+            _ => controls::OVERVIEW_SUB_PROCESSES,
         };
         output.target(model, manifest, control, rect);
         output.label(format!("overview sub-tab {label}"));
@@ -299,6 +323,95 @@ fn services_title(model: &ViewModel) -> String {
             if services.stale { " · last read" } else { "" }
         ),
         None => "Fox services".to_owned(),
+    }
+}
+
+/// Panel title on the Power sub-tab.
+fn power_title(model: &ViewModel) -> String {
+    match model.modules.power.as_deref() {
+        Some(power) => {
+            let window = if power.window_label.is_empty() {
+                String::new()
+            } else {
+                format!(" · {}", power.window_label)
+            };
+            format!("Power{window}")
+        }
+        None => "Power".to_owned(),
+    }
+}
+
+/// The Power sub-tab: total watts and kWh plus the busiest series, in the
+/// process panel's area.
+fn render_power_content(
+    frame: &mut Frame<'_>,
+    rows: &mut RowCursor,
+    model: &ViewModel,
+    filter: &str,
+    context: &DisplayContext,
+    output: &mut Output,
+) {
+    let Some(power) = model.modules.power.as_deref() else {
+        if let Some(area) = rows.rest() {
+            message(frame, area, &no_data("power"), context.theme.muted_style());
+        }
+        output.label("power: no data");
+        return;
+    };
+    if power.rows.is_empty() {
+        if let Some(area) = rows.rest() {
+            message(
+                frame,
+                area,
+                "no power data in this window",
+                context.theme.muted_style(),
+            );
+        }
+        output.label("power: idle");
+        return;
+    }
+    let total = format!(
+        "{} · {}",
+        power.total_w.map_or_else(
+            || "n/a".to_owned(),
+            |watts| format_value(watts, CanonicalUnit::Watts)
+        ),
+        power
+            .total_joules
+            .map_or_else(|| "n/a".to_owned(), format_energy),
+    );
+    if let Some(row) = rows.next_row() {
+        draw_line(
+            frame.buffer_mut(),
+            row,
+            &Line::from(vec![
+                Span::styled("total ", context.theme.label_style()),
+                Span::styled(total, context.theme.text_style()),
+            ]),
+        );
+    }
+    for row in power
+        .rows
+        .iter()
+        .filter(|row| filter.is_empty() || row.subject.to_lowercase().contains(filter))
+    {
+        let Some(area) = rows.next_row() else { break };
+        let line = format!(
+            "{} · {} · {}",
+            clean(&row.subject),
+            row.current_w.map_or_else(
+                || "n/a".to_owned(),
+                |watts| format_value(watts, CanonicalUnit::Watts)
+            ),
+            row.energy_joules
+                .map_or_else(|| "n/a".to_owned(), format_energy),
+        );
+        draw_line(
+            frame.buffer_mut(),
+            area,
+            &Line::from(Span::styled(line, context.theme.text_style())),
+        );
+        output.label(format!("power {}", clean(&row.subject)));
     }
 }
 

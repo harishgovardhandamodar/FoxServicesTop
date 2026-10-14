@@ -202,6 +202,7 @@ fn filled(model: &ViewModel) -> Vec<&'static str> {
         ("cluster", modules.cluster.is_some()),
         ("docker", modules.docker.is_some()),
         ("tokens", modules.tokens.is_some()),
+        ("power", modules.power.is_some()),
         ("actions", modules.actions.is_some()),
     ]
     .into_iter()
@@ -255,6 +256,9 @@ fn each_view_fills_only_its_visible_topics() {
         // The process actions' state rides on every view (D-91).
         let mut expected = visible_modules(view).to_vec();
         expected.push("actions");
+        // Power fills only while the history carries power series; the
+        // plain fixture's history has none.
+        expected.retain(|module| *module != "power");
         assert_eq!(filled(&model), expected, "{view:?}");
     }
     let model = build_view_model_measured(&fixture_base.context()).0;
@@ -391,6 +395,62 @@ fn a_projection_inside_the_budget_is_accounted_at_its_bound() {
     assert_eq!(measured, model.bytes_bound());
     assert!(measured >= exact);
     assert!(measured <= exact * 2, "{measured} vs {exact}");
+}
+
+/// The Power tab and the Overview fill power while the history carries
+/// power series, and stay empty otherwise.
+#[test]
+fn power_fills_only_with_power_series() {
+    use super::power::build_power_view;
+    use crate::presentation::reader::MetricReader;
+
+    let plain = Fixture::new();
+    let reader = MetricReader::new(&plain.snapshot, &plain.catalog, NOW);
+    assert!(build_power_view(&reader, &plain.history).is_none());
+    for view in [ViewKind::Power, ViewKind::Overview] {
+        let mut fixture = Fixture::new();
+        fixture.session.view = view;
+        let model = build_view_model_measured(&fixture.context()).0;
+        assert!(model.modules.power.is_none(), "{view:?}");
+    }
+
+    let mut fixture = Fixture::new();
+    fixture.add(
+        "cpu",
+        sample(ids::HOST_POWER_TOTAL, "host", "host").f64(152.5),
+    );
+    let history = HistoryView {
+        charts: vec![fox_services_top_core::view::HistoryChartView {
+            kind: fox_services_top_core::view::HistoryChartKind::TotalPower,
+            subject: String::new(),
+            series: metric_key("host", ids::HOST_POWER_TOTAL, "host"),
+            unit: CanonicalUnit::Watts,
+            scale_max: None,
+            points: vec![HistoryPointView {
+                start_utc_ns: 0,
+                end_utc_ns: 60_000_000_000,
+                mean: Some(152.5),
+                min: None,
+                max: Some(160.0),
+            }],
+            mean: Some(152.5),
+            peak: Some(160.0),
+            covered_ns: Some(60_000_000_000),
+            display_downsampled: false,
+            pending: false,
+            error: None,
+            parts: Vec::new(),
+        }],
+        ..(*fixture.history).clone()
+    };
+    fixture.history = Arc::new(history);
+    for view in [ViewKind::Power, ViewKind::Overview] {
+        fixture.session.view = view;
+        let model = build_view_model_measured(&fixture.context()).0;
+        let power = model.modules.power.as_ref().expect("{view:?}");
+        assert_eq!(power.total_w, Some(152.5));
+        assert!(!power.rows.is_empty());
+    }
 }
 
 #[test]

@@ -153,6 +153,16 @@ fn services_sub_tab() -> UiState {
     ui
 }
 
+/// Overview with the process panel's Power sub-tab selected.
+fn power_sub_tab() -> UiState {
+    let mut ui = UiState::default();
+    ui.tabs.insert(
+        ModuleId::new(crate::modules::PROCESSES_MODULE_ID).unwrap(),
+        2,
+    );
+    ui
+}
+
 /// Row index of the first line containing `needle`.
 fn row_index(rendered: &Rendered, needle: &str) -> usize {
     rendered
@@ -722,6 +732,42 @@ fn the_overview_fox_services_sub_tab_shows_the_services_tables() {
     let map = &rendered.report.hit_map;
     assert_eq!(map.count(controls::OVERVIEW_SUB_PROCESSES), 1);
     assert_eq!(map.count(controls::OVERVIEW_SUB_SERVICES), 1);
+    assert_eq!(map.count(controls::OVERVIEW_SUB_POWER), 1);
+}
+
+#[test]
+fn the_overview_power_sub_tab_summarizes_watts_and_kwh() {
+    let fixture = model(ViewKind::Overview);
+    let rendered = render_with(
+        &Viewer::builtin(),
+        Some(&fixture),
+        &power_sub_tab(),
+        (200, 60),
+    );
+    for text in ["Power", "total", "GPU 0"] {
+        assert!(
+            rendered.contains(text),
+            "missing {text:?}\n{}",
+            rendered.text()
+        );
+    }
+    let map = &rendered.report.hit_map;
+    assert_eq!(map.count(controls::OVERVIEW_SUB_PROCESSES), 1);
+    assert_eq!(map.count(controls::OVERVIEW_SUB_SERVICES), 1);
+    assert_eq!(map.count(controls::OVERVIEW_SUB_POWER), 1);
+}
+
+#[test]
+fn the_power_tab_charts_watts_and_lists_kwh_per_query() {
+    let rendered = render(&model(ViewKind::Power), (160, 40));
+    for text in ["Power · 1h", "watts", "SERIES", "KWH", "1H", "24H"] {
+        assert!(
+            rendered.contains(text),
+            "missing {text:?}\n{}",
+            rendered.text()
+        );
+    }
+    assert!(rendered.report.module_errors.is_empty());
 }
 
 #[test]

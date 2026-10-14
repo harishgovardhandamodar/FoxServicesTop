@@ -209,10 +209,22 @@ pub struct KeyBinding {
 const LIST_VIEWS: &[ViewKind] = &[ViewKind::Overview, ViewKind::GpuDetail, ViewKind::Settings];
 /// The process table, and so its keys, is on the Overview only (D-91).
 const PROCESS_VIEWS: &[ViewKind] = &[ViewKind::Overview];
-const FILTER_VIEWS: &[ViewKind] =
-    &[ViewKind::Overview, ViewKind::Nodes, ViewKind::Docker, ViewKind::Tokens];
+const FILTER_VIEWS: &[ViewKind] = &[
+    ViewKind::Overview,
+    ViewKind::Nodes,
+    ViewKind::Docker,
+    ViewKind::Tokens,
+    ViewKind::Power,
+];
 /// The single-page polled views, scrolled with `j`/`k`.
-const SCROLL_VIEWS: &[ViewKind] = &[ViewKind::Nodes, ViewKind::Docker, ViewKind::Tokens];
+const SCROLL_VIEWS: &[ViewKind] = &[
+    ViewKind::Nodes,
+    ViewKind::Docker,
+    ViewKind::Tokens,
+    ViewKind::Power,
+];
+/// Views whose charts follow the history bar sizes (`w`/`W`).
+const BAR_VIEWS: &[ViewKind] = &[ViewKind::History, ViewKind::Power];
 
 /// Table-row constructor: positional arguments keep the table one line per binding.
 #[allow(clippy::too_many_arguments)]
@@ -257,6 +269,7 @@ pub static KEYMAP: &[KeyBinding] = &[
     binding("6", "Nodes (fox-services cluster)", None, Section::Views, ModeSet::NORMAL, ViewScope::All, &[KeyPattern::char('6')], KeyAction::ShowTab(Tab::Nodes)),
     binding("7", "Fox-Services (all nodes)", None, Section::Views, ModeSet::NORMAL, ViewScope::All, &[KeyPattern::char('7')], KeyAction::ShowTab(Tab::Docker)),
     binding("8", "Tokens (ingress / egress by app and model)", None, Section::Views, ModeSet::NORMAL, ViewScope::All, &[KeyPattern::char('8')], KeyAction::ShowTab(Tab::Tokens)),
+    binding("9", "Power (watts timeline and kWh)", None, Section::Views, ModeSet::NORMAL, ViewScope::All, &[KeyPattern::char('9')], KeyAction::ShowTab(Tab::Power)),
     binding("j/↓", "scroll down", None, Section::Views, ModeSet::NORMAL, ViewScope::Only(SCROLL_VIEWS), &[KeyPattern::char('j'), KeyPattern::key(KeyCode::Down)], KeyAction::ScrollDetailDown),
     binding("k/↑", "scroll up", None, Section::Views, ModeSet::NORMAL, ViewScope::Only(SCROLL_VIEWS), &[KeyPattern::char('k'), KeyPattern::key(KeyCode::Up)], KeyAction::ScrollDetailUp),
     binding("j/↓", "select next", None, Section::Navigation, ModeSet::NORMAL, ViewScope::Only(LIST_VIEWS), &[KeyPattern::char('j'), KeyPattern::key(KeyCode::Down)], KeyAction::MoveDown),
@@ -281,8 +294,8 @@ pub static KEYMAP: &[KeyBinding] = &[
     binding("Enter", "open / close the selected run", None, Section::History, ModeSet::NORMAL, ViewScope::Only(&[ViewKind::History]), &[KeyPattern::key(KeyCode::Enter)], KeyAction::HistoryOpen),
     binding("e", "show the whole command line of the opened run / one line", None, Section::History, ModeSet::NORMAL, ViewScope::Only(&[ViewKind::History]), &[KeyPattern::char('e')], KeyAction::HistoryExpandCommand),
     binding("y", "copy the opened run's command line (OSC 52)", None, Section::History, ModeSet::NORMAL, ViewScope::Only(&[ViewKind::History]), &[KeyPattern::char('y')], KeyAction::HistoryCopyCommand),
-    binding("w/W/→/←", "next / previous bar size of the history charts (1m … 24h)", None, Section::History, ModeSet::NORMAL, ViewScope::Only(&[ViewKind::History]), &[KeyPattern::char('w'), KeyPattern::key(KeyCode::Right)], KeyAction::NextHistoryBarSize),
-    binding("W", "previous bar size of the history charts", None, Section::History, ModeSet::NORMAL, ViewScope::Only(&[ViewKind::History]), &[KeyPattern::char('W'), KeyPattern::key(KeyCode::Left)], KeyAction::PreviousHistoryBarSize),
+    binding("w/W/→/←", "next / previous bar size of the history charts (1m … 24h)", None, Section::History, ModeSet::NORMAL, ViewScope::Only(BAR_VIEWS), &[KeyPattern::char('w'), KeyPattern::key(KeyCode::Right)], KeyAction::NextHistoryBarSize),
+    binding("W", "previous bar size of the history charts", None, Section::History, ModeSet::NORMAL, ViewScope::Only(BAR_VIEWS), &[KeyPattern::char('W'), KeyPattern::key(KeyCode::Left)], KeyAction::PreviousHistoryBarSize),
     binding("Space", "enable / disable the selected module", None, Section::Settings, ModeSet::NORMAL, ViewScope::Only(&[ViewKind::Settings]), &[KeyPattern::char(' ')], KeyAction::ToggleModule),
     binding("Enter", "apply the filter", Some("apply"), Section::FilterMode, ModeSet::FILTER, ViewScope::All, &[KeyPattern::key(KeyCode::Enter)], KeyAction::FilterApply),
     binding("Esc", "clear the filter and leave input", Some("clear"), Section::FilterMode, ModeSet::FILTER, ViewScope::All, &[KeyPattern::key(KeyCode::Esc)], KeyAction::FilterClear),

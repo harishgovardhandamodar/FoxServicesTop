@@ -525,6 +525,7 @@ impl Controller {
             | ViewKind::Nodes
             | ViewKind::Docker
             | ViewKind::Tokens
+            | ViewKind::Power
             | ViewKind::Processes
             | ViewKind::Sources
             | ViewKind::Actions => {}
@@ -640,7 +641,11 @@ impl Controller {
     fn start_filter(&mut self, context: &ControllerContext<'_>) {
         if !matches!(
             current_view(context),
-            ViewKind::Overview | ViewKind::Nodes | ViewKind::Docker | ViewKind::Tokens
+            ViewKind::Overview
+                | ViewKind::Nodes
+                | ViewKind::Docker
+                | ViewKind::Tokens
+                | ViewKind::Power
         ) {
             return;
         }
@@ -859,9 +864,13 @@ impl Controller {
         }
         match target.control_id {
             controls::MODULE_TOGGLE => self.toggle_expanded(target.module_id),
-            controls::OVERVIEW_SUB_PROCESSES | controls::OVERVIEW_SUB_SERVICES => {
-                self.show_overview_sub_tab(target.control_id == controls::OVERVIEW_SUB_SERVICES)
-            }
+            controls::OVERVIEW_SUB_PROCESSES
+            | controls::OVERVIEW_SUB_SERVICES
+            | controls::OVERVIEW_SUB_POWER => self.show_overview_sub_tab(match target.control_id {
+                controls::OVERVIEW_SUB_SERVICES => 1,
+                controls::OVERVIEW_SUB_POWER => 2,
+                _ => 0,
+            }),
             controls::PROCESS_ROW | controls::PROCESS_ROW_SELECTED => {
                 if let Some(key) = target.process_key {
                     self.update_fields(context, |fields| fields.selected_process = Some(key));
@@ -890,14 +899,14 @@ impl Controller {
         }
     }
 
-    /// Shows the Overview process panel's sub-tab: the GPU process table
-    /// or the Fox-Services tables. A pure presentation toggle like the
-    /// history pages: nothing is sent to the Manager.
-    fn show_overview_sub_tab(&mut self, services: bool) {
+    /// Shows the Overview process panel's sub-tab: the GPU process table,
+    /// the Fox-Services tables or the power summary. A pure presentation
+    /// toggle like the history pages: nothing is sent to the Manager.
+    fn show_overview_sub_tab(&mut self, tab: u8) {
         let Ok(processes) = ModuleId::new(crate::modules::PROCESSES_MODULE_ID) else {
             return;
         };
-        self.tabs.insert(processes, u8::from(services));
+        self.tabs.insert(processes, tab.min(2));
         self.bump();
     }
 

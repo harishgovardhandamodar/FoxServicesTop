@@ -152,6 +152,8 @@ pub mod controls {
     pub const OVERVIEW_SUB_PROCESSES: &str = "overview.subtab.processes";
     /// The Overview's Fox services sub-tab: shows the Fox-Services tables.
     pub const OVERVIEW_SUB_SERVICES: &str = "overview.subtab.services";
+    /// The Overview's Power sub-tab: shows the power summary.
+    pub const OVERVIEW_SUB_POWER: &str = "overview.subtab.power";
 }
 
 /// Why a module was not registered.
@@ -314,6 +316,7 @@ pub const fn detail_module_id(view: ViewKind) -> Option<&'static str> {
         ViewKind::Nodes => Some("cluster"),
         ViewKind::Docker => Some("docker"),
         ViewKind::Tokens => Some("tokens"),
+        ViewKind::Power => Some("power"),
         ViewKind::Overview | ViewKind::Processes | ViewKind::Sources | ViewKind::Actions => None,
     }
 }

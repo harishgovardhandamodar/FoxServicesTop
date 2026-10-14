@@ -28,11 +28,12 @@ const MINIMAL_CORES: usize = 16;
 type TrimStep = fn(&mut ModuleViews, &BudgetHints) -> bool;
 
 /// Ordered from least to most information loss.
-const TRIM_STEPS: [TrimStep; 10] = [
+const TRIM_STEPS: [TrimStep; 11] = [
     halve_trends,
     halve_trends,
     drop_process_overscan,
     halve_history,
+    trim_power,
     shorten_lists,
     |modules, _| limit_cores(modules, REDUCED_CORES),
     clear_trends,
@@ -181,6 +182,26 @@ fn halve_history(modules: &mut ModuleViews, _: &BudgetHints) -> bool {
             }
         }
     }
+    changed
+}
+
+/// Halves the power timeline above the floor and keeps the first rows and
+/// windows: the kWh answer survives, oldest series first.
+fn trim_power(modules: &mut ModuleViews, _: &BudgetHints) -> bool {
+    const KEEP_ROWS: usize = 8;
+    const KEEP_WINDOWS: usize = 16;
+    let Some(power) = modules.power.as_mut() else {
+        return false;
+    };
+    let view = Arc::make_mut(power);
+    let mut changed = false;
+    if view.timeline.len() > MIN_HISTORY_POINTS {
+        let length = view.timeline.len();
+        view.timeline = halve_cells(&view.timeline);
+        changed |= view.timeline.len() < length;
+    }
+    changed |= truncate(&mut view.rows, KEEP_ROWS);
+    changed |= truncate(&mut view.windows, KEEP_WINDOWS);
     changed
 }
 

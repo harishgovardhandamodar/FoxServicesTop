@@ -19,9 +19,10 @@ use fox_services_top_core::view::{
     DiskHistory, DiskView, FilesystemView, FrequencyGroup, GpuCard, GpuDetails, GpuView,
     HeaderView, HistoryChartKind, HistoryChartView, HistoryPointView, HistoryView,
     HistoryWindowSummary, HostState, HostStatus, InterfaceView, LabeledCell, LastGoodView,
-    MemoryView, MetricCell, ModuleViews, NetworkView, OverloadState, ProcessGpuView,
-    ProcessRowView, ProcessesView, RecentRequestView, ServiceModelView, ServiceRowView,
-    ServicesView, SessionState, SettingField, SettingsView, Trend, ViewModel,
+    MemoryView, MetricCell, ModuleViews, NetworkView, OverloadState, PowerRowView, PowerView,
+    PowerWindowView, ProcessGpuView, ProcessRowView, ProcessesView, RecentRequestView,
+    ServiceModelView, ServiceRowView, ServicesView, SessionState, SettingField, SettingsView,
+    Trend, ViewModel,
 };
 
 /// Fox-Services rows: one live service with a model, one recent request.
@@ -928,6 +929,72 @@ pub(crate) fn header() -> HeaderView {
     }
 }
 
+/// Power tab fixture: total plus two GPUs over the 1 h window, with kWh
+/// over 1 h and 24 h.
+pub(crate) fn power_view() -> PowerView {
+    let row = |kind, subject: &str, current: f64, mean: f64, peak: f64| PowerRowView {
+        kind,
+        subject: subject.to_owned(),
+        current_w: Some(current),
+        mean_w: Some(mean),
+        peak_w: Some(peak),
+        covered_ns: Some(3_600_000_000_000),
+        energy_joules: Some(mean * 3_600.0),
+    };
+    let window = |kind, subject: &str, label: &str, hours: f64, mean: f64| PowerWindowView {
+        kind,
+        subject: subject.to_owned(),
+        window_label: label.to_owned(),
+        span_ns: seconds_to_ns(hours * 3600.0),
+        mean_w: Some(mean),
+        peak_w: Some(mean * 1.2),
+        covered_ns: Some(seconds_to_ns(hours * 3600.0)),
+        energy_joules: Some(mean * hours * 3600.0),
+    };
+    PowerView {
+        window_label: "1h".into(),
+        requested_span_ns: 3_600_000_000_000,
+        total_w: Some(300.0),
+        total_joules: Some(300.0 * 3_600.0),
+        timeline: vec![Some(250.0), Some(300.0), None, Some(280.0)],
+        rows: vec![
+            row(HistoryChartKind::TotalPower, "total", 300.0, 280.0, 340.0),
+            row(
+                HistoryChartKind::GpuPower,
+                "GPU 0 · NVIDIA GB10",
+                220.0,
+                200.0,
+                240.0,
+            ),
+            row(
+                HistoryChartKind::GpuPower,
+                "GPU 1 · NVIDIA GB10",
+                80.0,
+                80.0,
+                95.0,
+            ),
+        ],
+        windows: vec![
+            window(HistoryChartKind::TotalPower, "total", "1h", 1.0, 280.0),
+            window(HistoryChartKind::TotalPower, "total", "24h", 24.0, 200.0),
+            window(
+                HistoryChartKind::GpuPower,
+                "GPU 0 · NVIDIA GB10",
+                "1h",
+                1.0,
+                200.0,
+            ),
+            window(
+                HistoryChartKind::GpuPower,
+                "GPU 0 · NVIDIA GB10",
+                "24h",
+                24.0,
+                150.0,
+            ),
+        ],
+    }
+}
+
 pub(crate) fn full_modules(with_confirmation: bool) -> ModuleViews {
     ModuleViews {
         cpu: Some(Arc::new(cpu_view())),
@@ -943,6 +1010,7 @@ pub(crate) fn full_modules(with_confirmation: bool) -> ModuleViews {
         cluster: None,
         docker: None,
         tokens: None,
+        power: Some(Arc::new(power_view())),
     }
 }
 

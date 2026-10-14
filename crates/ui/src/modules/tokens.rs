@@ -17,13 +17,14 @@ use ratatui::text::{Line, Span};
 use super::ModuleBuildError;
 use super::common::{
     ColumnSpec, ManifestSpec, Output, RowCursor, TableCell, build_manifest, draw_caption,
-    draw_line, draw_table_header, draw_table_row, fit_columns, message, no_data, panel_with_keys,
+    draw_colored_header, draw_line, draw_table_row, fit_columns, message, no_data, panel_with_keys,
     render_chart_with_parts,
 };
 use crate::format::{clean, format_bytes, format_tps, pretty_model_name};
 use crate::registry::{
     DisplayContext, DisplayModule, DisplayModuleManifest, OverviewCell, RenderOutput, Slot,
 };
+use crate::theme::ThemePalette;
 
 /// The keys acting on the view, at the right of its title.
 const TOKENS_KEYS: &str = "j/k scroll · / filter";
@@ -209,6 +210,32 @@ fn total_of(model: &TokenModelView) -> f64 {
     model.ingress_tps + model.egress_tps
 }
 
+/// Ingress trend color: the chart's base (`sparkline`), so the IN TPS text
+/// reads as the same series.
+fn ingress_style(theme: &ThemePalette) -> Style {
+    Style::new().fg(theme.sparkline)
+}
+
+/// Egress trend color: the chart's foot part (`accent`), so the OUT TPS
+/// text reads as the same series.
+fn egress_style(theme: &ThemePalette) -> Style {
+    Style::new().fg(theme.accent)
+}
+
+fn has_tps(value: f64) -> bool {
+    value.is_finite() && value > 0.0
+}
+
+/// TPS text in its trend color; `n/a` stays muted so absence never reads
+/// as activity.
+fn tps_style(value: f64, trend: Style, theme: &ThemePalette) -> Style {
+    if has_tps(value) {
+        trend
+    } else {
+        theme.muted_style()
+    }
+}
+
 /// The tokens-per-second chart over the window, with its caption: both
 /// directions stacked per bucket, newest bucket at the right edge.
 fn render_chart(frame: &mut Frame<'_>, rows: &mut RowCursor, flow: &Flow, context: &DisplayContext) {
@@ -223,13 +250,19 @@ fn render_chart(frame: &mut Frame<'_>, rows: &mut RowCursor, flow: &Flow, contex
             row,
             &Line::from(vec![
                 Span::styled("tokens per second", context.theme.title_style()),
+                Span::styled(" · peak in ", context.theme.muted_style()),
                 Span::styled(
-                    format!(
-                        " · peak in {} / out {}",
-                        format_tps(flow.peak_ingress),
-                        format_tps(flow.peak_egress)
+                    format_tps(flow.peak_ingress),
+                    tps_style(
+                        flow.peak_ingress,
+                        ingress_style(&context.theme),
+                        &context.theme,
                     ),
-                    context.theme.muted_style(),
+                ),
+                Span::styled(" / out ", context.theme.muted_style()),
+                Span::styled(
+                    format_tps(flow.peak_egress),
+                    tps_style(flow.peak_egress, egress_style(&context.theme), &context.theme),
                 ),
             ]),
             Some("egress at the foot, ingress above"),
@@ -285,10 +318,7 @@ fn render_summary(
             draw_line(
                 frame.buffer_mut(),
                 row,
-                &Line::from(Span::styled(
-                    model_line(model),
-                    context.theme.text_style(),
-                )),
+                &model_line(model, context.theme.text_style(), &context.theme),
             );
             output.label(format!("tokens {}", clean(&model.model)));
         }
@@ -318,14 +348,22 @@ fn busiest_models<'a>(apps: &[&'a TokenAppView]) -> Vec<&'a TokenModelView> {
     models
 }
 
-fn model_line(model: &TokenModelView) -> String {
-    format!(
-        "{} · ingress {} TPS · egress {} TPS · {} reqs",
-        pretty_model_name(&model.model),
-        format_tps(model.ingress_tps),
-        format_tps(model.egress_tps),
-        model.requests
-    )
+fn model_line(model: &TokenModelView, base: Style, theme: &ThemePalette) -> Line<'static> {
+    Line::from(vec![
+        Span::styled(pretty_model_name(&model.model), base),
+        Span::styled(" · ingress ", base),
+        Span::styled(
+            format_tps(model.ingress_tps),
+            tps_style(model.ingress_tps, ingress_style(theme), theme),
+        ),
+        Span::styled(" TPS · egress ", base),
+        Span::styled(
+            format_tps(model.egress_tps),
+            tps_style(model.egress_tps, egress_style(theme), theme),
+        ),
+        Span::styled(" TPS · ", base),
+        Span::styled(format!("{} reqs", model.requests), base),
+    ])
 }
 
 fn engine_summary(engine: &TokenEngineView) -> String {
@@ -359,13 +397,13 @@ fn render_apps(
     let mut cursor = RowCursor::new(table);
     let Some(header) = cursor.next_row() else { return };
     let columns = fit_columns(&APP_COLUMNS, header.width);
-    draw_table_header(
-        frame.buffer_mut(),
-        header,
-        &APP_COLUMNS,
-        &columns,
-        context.theme.title_style(),
-    );
+    draw_colored_header(frame.buffer_mut(), header, &APP_COLUMNS, &columns, |spec| {
+        match spec {
+            4 => ingress_style(&context.theme),
+            5 => egress_style(&context.theme),
+            _ => context.theme.title_style(),
+        }
+    });
     for app in apps {
         if cursor.remaining() == 0 {
             break;
@@ -375,38 +413,40 @@ fn render_apps(
             frame.buffer_mut(),
             row,
             &columns,
-            &app_cells(app, context.theme.text_style()),
+            &app_cells(app, &context.theme),
             None,
         );
         output.label(format!("tokens {}", app.app));
         // One row per model the app used, with its rate.
         for model in app.models.iter().take(4) {
             let Some(row) = cursor.next_row() else { break };
-            draw_line(
-                frame.buffer_mut(),
-                row,
-                &Line::from(Span::styled(
-                    format!("  {}", model_line(model)),
-                    context.theme.muted_style(),
-                )),
-            );
+            let mut line = model_line(model, context.theme.muted_style(), &context.theme);
+            line.spans.insert(0, Span::styled("  ", context.theme.muted_style()));
+            draw_line(frame.buffer_mut(), row, &line);
         }
     }
 }
 
-fn app_cells(app: &TokenAppView, style: Style) -> Vec<TableCell> {
+fn app_cells(app: &TokenAppView, theme: &ThemePalette) -> Vec<TableCell> {
     let total = app.ingress_tokens.saturating_add(app.egress_tokens);
     let top = app
         .models
         .first()
         .map_or_else(|| "–".to_owned(), |model| clean(&model.model));
+    let style = theme.text_style();
     vec![
         TableCell::new(clean(&app.app), style),
         TableCell::new(app.requests.to_string(), style),
         TableCell::new(format_bytes(app.ingress_tokens), style),
         TableCell::new(format_bytes(app.egress_tokens), style),
-        TableCell::new(format_tps(app.ingress_tps), style),
-        TableCell::new(format_tps(app.egress_tps), style),
+        TableCell::new(
+            format_tps(app.ingress_tps),
+            tps_style(app.ingress_tps, ingress_style(theme), theme),
+        ),
+        TableCell::new(
+            format_tps(app.egress_tps),
+            tps_style(app.egress_tps, egress_style(theme), theme),
+        ),
         TableCell::new(
             app.avg_duration_ms
                 .map_or_else(|| "–".to_owned(), |ms| format!("{ms:.0} ms")),

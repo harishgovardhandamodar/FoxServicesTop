@@ -15,6 +15,7 @@ pub(crate) const SETTINGS: &str = "settings";
 pub(crate) const CLUSTER: &str = "cluster";
 pub(crate) const DOCKER: &str = "docker";
 pub(crate) const TOKENS: &str = "tokens";
+pub(crate) const POWER: &str = "power";
 
 /// Viewport assumed until the session reports its terminal size.
 const DEFAULT_VIEWPORT: (u16, u16) = (80, 24);
@@ -28,14 +29,18 @@ const GPU_OVERVIEW_POINT_BUDGET: usize = 2048;
 pub fn visible_modules(view: ViewKind) -> &'static [&'static str] {
     match view {
         // DOCKER rides the Overview too: the process panel's Fox services
-        // sub-tab shows its tables in place.
-        ViewKind::Overview => &[CPU, GPU, MEMORY, DISK, NETWORK, PROCESSES, DOCKER, TOKENS],
+        // sub-tab shows its tables in place. POWER rides it too: the
+        // process panel's Power sub-tab summarizes it in place.
+        ViewKind::Overview => &[
+            CPU, GPU, MEMORY, DISK, NETWORK, PROCESSES, DOCKER, TOKENS, POWER,
+        ],
         ViewKind::GpuDetail => &[GPU],
         ViewKind::History => &[HISTORY],
         ViewKind::Settings => &[SETTINGS],
         ViewKind::Nodes => &[CLUSTER],
         ViewKind::Docker => &[DOCKER],
         ViewKind::Tokens => &[TOKENS],
+        ViewKind::Power => &[POWER],
         // Retired views: the wire keeps their values, nothing is shown (D-91).
         ViewKind::Processes | ViewKind::Sources | ViewKind::Actions => &[],
     }
@@ -128,7 +133,7 @@ mod tests {
                 assert!(BUILTIN_MODULES.contains(module), "{module}");
             }
         }
-        assert_eq!(visible_modules(ViewKind::Overview).len(), 8);
+        assert_eq!(visible_modules(ViewKind::Overview).len(), 9);
     }
 
     /// The retired views show nothing and disable nothing (D-91).

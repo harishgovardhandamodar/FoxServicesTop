@@ -779,17 +779,19 @@ fn tab_clicks_and_keys_switch_views() {
         ViewKind::History,
         "bursts build on the staged view and skip hidden views"
     );
-    // 9 is not a view key, and Tab wraps from the last offered tab,
-    // Tokens, to the overview (D-75).
+    // 0 is not a view key, and Tab wraps from the last offered tab,
+    // Power, to the overview (D-75).
     let sent = harness.submitted().len();
-    harness.keys(&[key('9')]);
-    assert_eq!(harness.submitted().len(), sent, "9 is not a view key");
+    harness.keys(&[key('0')]);
+    assert_eq!(harness.submitted().len(), sent, "0 is not a view key");
     harness.keys(&[key('6')]);
     assert_eq!(harness.last_session().0, ViewKind::Nodes);
     harness.keys(&[key('7')]);
     assert_eq!(harness.last_session().0, ViewKind::Docker);
     harness.keys(&[key('8')]);
     assert_eq!(harness.last_session().0, ViewKind::Tokens);
+    harness.keys(&[key('9')]);
+    assert_eq!(harness.last_session().0, ViewKind::Power);
     harness.keys(&[code(KeyCode::Tab)]);
     assert_eq!(harness.last_session().0, ViewKind::Overview, "Tab wraps");
     harness.keys(&[key('5'), code(KeyCode::Tab)]);
@@ -840,6 +842,20 @@ fn the_overview_sub_tabs_switch_by_click_without_a_command() {
         0,
         "GPU Processes sub-tab selected"
     );
+    let power = harness
+        .hit_map
+        .targets()
+        .iter()
+        .find(|target| target.control_id == controls::OVERVIEW_SUB_POWER)
+        .expect("the Power sub-tab is clickable")
+        .clone();
+    harness.keys(&[click(power.rect.x, power.rect.y)]);
+    assert_eq!(
+        harness.controller.ui_state(harness.now).tabs[&processes],
+        2,
+        "Power sub-tab selected"
+    );
+    assert_eq!(harness.submitted().len(), sent, "no command is sent");
 }
 
 #[test]

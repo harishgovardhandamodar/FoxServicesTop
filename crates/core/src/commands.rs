@@ -35,10 +35,12 @@ pub enum ViewKind {
     Docker,
     /// Token ingress/egress by app and model across the configured nodes.
     Tokens,
+    /// Energy / power consumption: watts timeline and kWh per query window.
+    Power,
 }
 
 impl ViewKind {
-    pub const ALL: [ViewKind; 10] = [
+    pub const ALL: [ViewKind; 11] = [
         ViewKind::Overview,
         ViewKind::GpuDetail,
         ViewKind::Processes,
@@ -49,6 +51,7 @@ impl ViewKind {
         ViewKind::Nodes,
         ViewKind::Docker,
         ViewKind::Tokens,
+        ViewKind::Power,
     ];
 
     pub const fn title(self) -> &'static str {
@@ -63,6 +66,7 @@ impl ViewKind {
             Self::Nodes => "Nodes",
             Self::Docker => "Fox-Services",
             Self::Tokens => "Tokens",
+            Self::Power => "Power",
         }
     }
 

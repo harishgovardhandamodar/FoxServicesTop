@@ -21,6 +21,7 @@ mod memory;
 mod network;
 mod ordering;
 mod plan;
+mod power;
 mod process_shares;
 mod processes;
 mod reader;
@@ -50,9 +51,8 @@ use fox_services_top_core::naming::{adapters, entity};
 use fox_services_top_core::ports::TrendReader;
 use fox_services_top_core::process_model::ProcessHistoryModel;
 use fox_services_top_core::view::{
-    ActionsView, ClusterSnapshot, ClusterView, GpuView, HeaderView, HistoryView,
-    HostStatus, IntervalView, ModuleViews, OverloadState, ServicesView, SessionState, TokensView,
-    ViewModel,
+    ActionsView, ClusterSnapshot, ClusterView, GpuView, HeaderView, HistoryView, HostStatus,
+    IntervalView, ModuleViews, OverloadState, ServicesView, SessionState, TokensView, ViewModel,
 };
 
 use banners::BannerFacts;
@@ -307,6 +307,9 @@ fn build_modules(
             Some(snapshot) => Arc::clone(&snapshot.tokens),
             None => Arc::new(TokensView::disabled()),
         });
+    }
+    if plan.shows(plan::POWER) {
+        modules.power = power::build_power_view(reader, &context.history).map(Arc::new);
     }
     // The process actions' state is the session's, not a module's: every
     // projection carries it, so a pending confirmation is a banner in

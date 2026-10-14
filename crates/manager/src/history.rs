@@ -728,10 +728,12 @@ impl HistoryService {
         refreshes.chain(deadlines).min()
     }
 
-    /// The bars a session on the history view wants; other views read no
-    /// history (the GPU view shows live data, D-48).
+    /// The bars a session on the history or power view wants; other views
+    /// read no history (the GPU view shows live data, D-48). The Power tab
+    /// draws the same window as the Overview History, so its `w`/`W`
+    /// timescale selector applies to both.
     fn wanted(&self, state: &SessionState, columns: u16) -> Option<BarGrid> {
-        if state.view != ViewKind::History {
+        if !matches!(state.view, ViewKind::History | ViewKind::Power) {
             return None;
         }
         let upper = self.settings.max_points.clamp(1, MAX_HISTORY_POINTS);

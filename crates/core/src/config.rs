@@ -32,7 +32,7 @@ pub const MAX_COMMAND_BYTES: u64 = 64 * 1024;
 pub const MIN_COMMAND_BYTES: u64 = 8 * 1024;
 
 /// The built-in display modules, in registration order.
-pub const BUILTIN_MODULES: [&str; 11] = [
+pub const BUILTIN_MODULES: [&str; 12] = [
     "cpu",
     "gpu",
     "memory",
@@ -44,6 +44,7 @@ pub const BUILTIN_MODULES: [&str; 11] = [
     "cluster",
     "docker",
     "tokens",
+    "power",
 ];
 
 /// The cluster modules the Overview also shows as cards: the Nodes table,
@@ -466,7 +467,7 @@ impl Config {
         config.store.archive_enabled = true;
         config.actions.allow_force = true;
         // The Nodes and Docker tabs are built-in: on unless turned off.
-        for module in ["cluster", "docker", "tokens"] {
+        for module in ["cluster", "docker", "tokens", "power"] {
             if !config.viewer.enabled_modules.iter().any(|entry| entry == module) {
                 config.viewer.enabled_modules.push(module.to_owned());
             }
@@ -1559,7 +1560,7 @@ mod tests {
         only_the_owners
             .viewer
             .enabled_modules
-            .retain(|module| !["cluster", "docker", "tokens"].contains(&module.as_str()));
+            .retain(|module| !["cluster", "docker", "tokens", "power"].contains(&module.as_str()));
         assert_eq!(only_the_owners, reference, "nothing else differs");
         assert!(defaults.validate().is_ok());
     }
