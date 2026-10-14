@@ -90,10 +90,10 @@ mod tests {
     fn editing_moves_the_cursor_on_char_boundaries() {
         let mut edit = FilterEdit::new("py");
         assert_eq!(edit.cursor(), 2);
-        edit.insert('あ').unwrap();
+        edit.insert('Ａ').unwrap();
         edit.left();
         edit.insert('x').unwrap();
-        assert_eq!(edit.text(), "pyxあ");
+        assert_eq!(edit.text(), "pyxＡ");
         edit.end();
         edit.backspace();
         assert_eq!(edit.text(), "pyx");
@@ -116,8 +116,8 @@ mod tests {
         assert_eq!(edit.text().len(), MAX_FILTER_BYTES);
         assert_eq!(edit.insert('c'), Err(FilterEditError::TooLong));
         let mut multibyte = FilterEdit::new(&"a".repeat(254));
-        assert_eq!(multibyte.insert('あ'), Err(FilterEditError::TooLong));
-        let long = FilterEdit::new(&"あ".repeat(200));
+        assert_eq!(multibyte.insert('Ａ'), Err(FilterEditError::TooLong));
+        let long = FilterEdit::new(&"Ａ".repeat(200));
         assert!(long.text().len() <= MAX_FILTER_BYTES);
         assert!(long.text().is_char_boundary(long.cursor()));
     }

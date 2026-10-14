@@ -173,7 +173,7 @@ mod tests {
         );
         // A literal backslash is escaped so it never looks like an escape.
         assert_eq!(escape_for_audit(r"a\u{1b}", 64), r"a\\u{1b}");
-        assert_eq!(escape_for_audit("アア", 64), "アア");
+        assert_eq!(escape_for_audit("ＡＡ", 64), "ＡＡ");
     }
 
     #[test]
@@ -190,17 +190,17 @@ mod tests {
         // `\u{1b}` needs 6 bytes after "ab": it is left out whole.
         assert_eq!(escape_for_audit("ab\u{1b}cd", 7), "ab");
         assert_eq!(escape_for_audit("ab\u{1b}cd", 8), r"ab\u{1b}");
-        assert_eq!(escape_for_audit("アアアア", 7), "アア");
+        assert_eq!(escape_for_audit("ＡＡＡＡ", 7), "ＡＡ");
         assert_eq!(escape_for_audit("", 8), "");
     }
 
     #[test]
     fn truncates_on_utf8_boundary() {
-        let text = "アアアア";
+        let text = "ＡＡＡＡ";
         let cut = sanitize_display(text, 7);
-        assert_eq!(cut, "アア");
+        assert_eq!(cut, "ＡＡ");
         assert!(cut.len() <= 7);
-        assert_eq!(truncate_utf8("アア", 4), "ア");
+        assert_eq!(truncate_utf8("ＡＡ", 4), "Ａ");
     }
 
     #[test]

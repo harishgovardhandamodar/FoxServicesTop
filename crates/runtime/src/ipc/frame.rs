@@ -389,11 +389,11 @@ mod tests {
     #[test]
     fn decodes_back_to_back_frames_in_one_chunk() {
         let mut stream = frame(b"{\"a\":1}");
-        stream.extend(frame("{\"b\":\"アア\"}".as_bytes()));
+        stream.extend(frame("{\"b\":\"ＡＡ\"}".as_bytes()));
         let mut decoder = FrameDecoder::new(1024).unwrap();
         let frames = decoder.feed(&stream, 16).unwrap();
         assert_eq!(frames.len(), 2);
-        assert_eq!(frames[1], "{\"b\":\"アア\"}".as_bytes());
+        assert_eq!(frames[1], "{\"b\":\"ＡＡ\"}".as_bytes());
         assert!(decoder.is_idle());
         decoder.finish().unwrap();
     }
@@ -499,7 +499,7 @@ mod tests {
 
     #[test]
     fn encode_frame_round_trips_and_respects_the_cap() {
-        let message = serde_json::json!({"type": "hello", "text": "アア"});
+        let message = serde_json::json!({"type": "hello", "text": "ＡＡ"});
         let encoded = encode_frame(&message, 1024).unwrap();
         let mut decoder = FrameDecoder::new(1024).unwrap();
         let frames = decoder.feed(&encoded, 1).unwrap();
@@ -539,7 +539,7 @@ mod tests {
     fn payload_strategy() -> impl Strategy<Value = Vec<u8>> {
         // Multi-byte UTF-8 content so splits land inside code points.
         proptest::collection::vec(
-            prop_oneof![Just("a"), Just("あ"), Just("€"), Just("é"), Just("🚀")],
+            prop_oneof![Just("a"), Just("Ａ"), Just("€"), Just("é"), Just("🚀")],
             1..40,
         )
         .prop_map(|parts| {

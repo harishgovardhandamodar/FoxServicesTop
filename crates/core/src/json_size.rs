@@ -702,7 +702,7 @@ mod tests {
             "a\"b\\c",
             "\u{1}\u{1f}",
             "\t\n\r\u{8}\u{c}",
-            "é ü あ",
+            "é ü Ａ",
         ] {
             assert_eq!(json_length_bound(text), Some(exact(&text)), "{text:?}");
         }
