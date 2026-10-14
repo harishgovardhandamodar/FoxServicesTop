@@ -22,10 +22,11 @@ pub enum Tab {
     Settings,
     Nodes,
     Docker,
+    Tokens,
 }
 
-/// Offered tabs in order; the digit keys 1–7 follow this order.
-pub const OFFERED_TABS: [Tab; 7] = [
+/// Offered tabs in order; the digit keys 1–8 follow this order.
+pub const OFFERED_TABS: [Tab; 8] = [
     Tab::Overview,
     Tab::Gpu,
     Tab::OverviewHistory,
@@ -33,6 +34,7 @@ pub const OFFERED_TABS: [Tab; 7] = [
     Tab::Settings,
     Tab::Nodes,
     Tab::Docker,
+    Tab::Tokens,
 ];
 
 /// Page of the history module the process history opens on (the list).
@@ -47,6 +49,7 @@ impl Tab {
             Self::Settings => ViewKind::Settings,
             Self::Nodes => ViewKind::Nodes,
             Self::Docker => ViewKind::Docker,
+        Self::Tokens => ViewKind::Tokens,
         }
     }
 
@@ -58,7 +61,8 @@ impl Tab {
             Self::ProcessHistory => "Process History",
             Self::Settings => "Settings",
             Self::Nodes => "Nodes",
-            Self::Docker => "Docker",
+            Self::Docker => "Fox-Services",
+            Self::Tokens => "Tokens",
         }
     }
 
@@ -72,6 +76,7 @@ impl Tab {
             Self::Settings => "tab.settings",
             Self::Nodes => "tab.nodes",
             Self::Docker => "tab.docker",
+            Self::Tokens => "tab.tokens",
         }
     }
 
@@ -92,6 +97,7 @@ impl Tab {
             ViewKind::Settings => Some(Self::Settings),
             ViewKind::Nodes => Some(Self::Nodes),
             ViewKind::Docker => Some(Self::Docker),
+            ViewKind::Tokens => Some(Self::Tokens),
             ViewKind::Processes | ViewKind::Sources | ViewKind::Actions => None,
         }
     }
@@ -132,12 +138,15 @@ mod tests {
         assert_eq!(Tab::Settings.number(), 5);
         assert_eq!(Tab::Nodes.number(), 6);
         assert_eq!(Tab::Docker.number(), 7);
+        assert_eq!(Tab::Tokens.number(), 8);
+        assert_eq!(Tab::of(ViewKind::Tokens, 0), Some(Tab::Tokens));
+        assert_eq!(Tab::Tokens.view(), ViewKind::Tokens);
         assert_eq!(Tab::of(ViewKind::Nodes, 0), Some(Tab::Nodes));
         assert_eq!(Tab::of(ViewKind::Docker, 0), Some(Tab::Docker));
         assert_eq!(Tab::Nodes.view(), ViewKind::Nodes);
         assert_eq!(Tab::Docker.view(), ViewKind::Docker);
-        assert_eq!(next_tab(Some(Tab::Docker)), Tab::Overview);
-        assert_eq!(previous_tab(Some(Tab::Overview)), Tab::Docker);
+        assert_eq!(next_tab(Some(Tab::Tokens)), Tab::Overview);
+        assert_eq!(previous_tab(Some(Tab::Overview)), Tab::Tokens);
     }
 
     /// The two history tabs are one view on two pages (D-75).
@@ -148,7 +157,6 @@ mod tests {
         assert_eq!(Tab::of(ViewKind::History, 2), Some(Tab::ProcessHistory));
         assert_eq!(Tab::ProcessHistory.view(), ViewKind::History);
         assert_eq!(next_tab(Some(Tab::OverviewHistory)), Tab::ProcessHistory);
-        assert_eq!(previous_tab(Some(Tab::Overview)), Tab::Docker);
         assert_eq!(next_tab(None), Tab::Overview);
         for tab in OFFERED_TABS {
             assert_eq!(Tab::for_control(tab.control_id()), Some(tab));

@@ -140,7 +140,7 @@ impl ConfigurationService {
                 value_at(&effective_json, path).map(|value| (path.clone(), value.clone()))
             })
             .collect();
-        let restart_pending = restart_paths(&effective, &saved);
+        let restart_pending = restart_paths(&effective, &saved, &origins);
         Self {
             port,
             running: effective.clone(),
@@ -484,7 +484,7 @@ impl ConfigurationService {
         self.saved = saved;
         let mut effective = self.with_cli_overrides(&self.saved);
         pin_restart_only(&mut effective, &self.running);
-        self.restart_pending = restart_paths(&self.running, &self.saved);
+        self.restart_pending = restart_paths(&self.running, &self.saved, &self.origins);
         std::mem::replace(&mut self.effective, effective)
     }
 
@@ -526,10 +526,19 @@ pub(crate) fn applied_result(change: &AppliedChange, effective_interval_ms: u32)
     result
 }
 
-fn restart_paths(running: &Config, saved: &Config) -> Vec<String> {
+fn restart_paths(
+    running: &Config,
+    saved: &Config,
+    origins: &BTreeMap<String, ValueOrigin>,
+) -> Vec<String> {
     running
         .restart_required_changes(saved)
         .into_iter()
+        .filter(|path| {
+            // A remote section differing solely through CLI overrides takes
+            // effect now (see `remote_diff_is_cli_only`).
+            *path != "remote" || !Config::remote_diff_is_cli_only(saved, running, origins)
+        })
         .map(str::to_owned)
         .collect()
 }

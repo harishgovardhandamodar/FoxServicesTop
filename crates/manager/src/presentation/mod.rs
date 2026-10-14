@@ -50,8 +50,9 @@ use fox_services_top_core::naming::{adapters, entity};
 use fox_services_top_core::ports::TrendReader;
 use fox_services_top_core::process_model::ProcessHistoryModel;
 use fox_services_top_core::view::{
-    ActionsView, ClusterSnapshot, ClusterView, DockerView, GpuView, HeaderView, HistoryView,
-    HostStatus, IntervalView, ModuleViews, OverloadState, SessionState, ViewModel,
+    ActionsView, ClusterSnapshot, ClusterView, GpuView, HeaderView, HistoryView,
+    HostStatus, IntervalView, ModuleViews, OverloadState, ServicesView, SessionState, TokensView,
+    ViewModel,
 };
 
 use banners::BannerFacts;
@@ -298,7 +299,13 @@ fn build_modules(
     if plan.shows(plan::DOCKER) {
         modules.docker = Some(match &context.cluster {
             Some(snapshot) => Arc::clone(&snapshot.docker),
-            None => Arc::new(DockerView::disabled()),
+            None => Arc::new(ServicesView::disabled()),
+        });
+    }
+    if plan.shows(plan::TOKENS) {
+        modules.tokens = Some(match &context.cluster {
+            Some(snapshot) => Arc::clone(&snapshot.tokens),
+            None => Arc::new(TokensView::disabled()),
         });
     }
     // The process actions' state is the session's, not a module's: every

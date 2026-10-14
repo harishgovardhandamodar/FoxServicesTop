@@ -950,70 +950,233 @@ impl ClusterView {
     }
 }
 
-/// One container of a Docker project as the Docker tab shows it.
+/// One service → model pair of a node's live map: real requests and tokens,
+/// not compose config (`/api/llm/live-map`).
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
-pub struct DockerContainerView {
-    pub name: String,
-    /// Raw status text (`Up 3 hours`, `Exited (0) 2 days ago`, ...).
+pub struct ServiceModelView {
+    pub model: String,
+    pub requests: u32,
+    pub tokens: u64,
+    /// Mean request duration of the window.
+    pub avg_ms: Option<f64>,
+}
+
+/// One service (app) of the Fox-Services tab: its status and every LLM
+/// model it used, busiest first.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct ServiceRowView {
+    /// App/service name as the node reports it (`quai-radar`, ...).
+    pub service: String,
+    /// Server-computed status: `Busy`, `Live`, `Running`, `Unreachable`,
+    /// `Stopped` or `Not deployed`.
     pub status: String,
-    pub running: bool,
-    pub image: String,
-    pub ports: String,
-    pub cpu_pct: Option<f64>,
-    pub mem_pct: Option<f64>,
-    pub mem_used_mib: Option<f64>,
+    pub models: Vec<ServiceModelView>,
+    pub requests: u32,
+    pub tokens: u64,
+    /// Seconds since its last request, at poll time.
+    pub ago_s: Option<u64>,
 }
 
-/// One compose project of one node as the Docker tab shows it.
+/// One recent LLM request with app → model attribution.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
-pub struct DockerProjectView {
-    /// Name of the configured node hosting the project.
+pub struct RecentRequestView {
+    /// Node the request was read from.
     pub node: String,
-    pub project: String,
-    /// `running`, `stopped` or `not-deployed`.
+    pub service: String,
+    pub client_ip: String,
+    pub model: String,
+    /// `complete`, `cancelled`, `running`, ...
     pub status: String,
-    pub running: u32,
-    pub total: u32,
-    pub containers: Vec<DockerContainerView>,
+    pub prompt_tokens: u64,
+    pub completion_tokens: u64,
+    pub total_tokens: u64,
+    pub duration_ms: Option<f64>,
+    pub queue_ms: Option<f64>,
+    pub query_type: String,
+    pub requestor: String,
+    /// Prompt, cut to [`SERVICE_PROMPT_MAX_CHARS`] by the poller.
+    pub prompt: String,
+    /// Seconds since the request, at poll time.
+    pub ago_s: u64,
 }
 
-/// Tailed log lines of one container (read-only; refreshed by polling).
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
-pub struct DockerLogView {
-    /// Name of the configured node hosting the container.
-    pub node: String,
-    pub container: String,
-    pub lines: Vec<String>,
-}
+/// Longest prompt snippet a projection carries per recent request.
+pub const SERVICE_PROMPT_MAX_CHARS: usize = 240;
 
-/// The Docker tab: every node's projects plus tailed container logs.
+/// The Fox-Services tab: which app uses which LLM model, per request —
+/// aggregated from actual LLM requests (the window the tab polls), plus the
+/// newest requests with attribution.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
-pub struct DockerView {
+pub struct ServicesView {
     /// False when remote monitoring is disabled: the tab explains itself.
     pub enabled: bool,
-    pub projects: Vec<DockerProjectView>,
-    pub logs: Vec<DockerLogView>,
+    /// Services, busiest status first.
+    pub services: Vec<ServiceRowView>,
+    /// Newest recent requests first.
+    pub recent: Vec<RecentRequestView>,
+    /// Window the node aggregated (`24h`, ...).
+    pub window_label: String,
+    /// True while the node reports no requests in the window.
+    pub idle: bool,
+    /// True while these rows are the last ones that answered: the node
+    /// was too busy to serve the live map in time.
+    pub stale: bool,
 }
 
-impl DockerView {
+impl ServicesView {
     /// What a projection carries without a cluster source.
     pub fn disabled() -> Self {
         Self {
             enabled: false,
-            projects: Vec::new(),
-            logs: Vec::new(),
+            services: Vec::new(),
+            recent: Vec::new(),
+            window_label: String::new(),
+            idle: true,
+            stale: false,
+        }
+    }
+}
+
+/// One app's token flow over the window the tab aggregates
+/// (`/api/usage/history`), ingress = prompt tokens in, egress =
+/// completion tokens out.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct TokenAppView {
+    /// App/service name as the node reports it (`quai-radar`, ...).
+    pub app: String,
+    pub requests: u32,
+    pub ingress_tokens: u64,
+    pub egress_tokens: u64,
+    /// Prompt tokens per second of request time over the window.
+    pub ingress_tps: f64,
+    /// Completion tokens per second of request time over the window.
+    pub egress_tps: f64,
+    /// Mean request duration of the window.
+    pub avg_duration_ms: Option<f64>,
+    /// Newest request of the window, Unix seconds.
+    pub last_seen_s: Option<u64>,
+    /// Models this app used, most tokens first.
+    pub models: Vec<TokenModelView>,
+}
+
+/// One model's flow inside an app.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct TokenModelView {
+    pub model: String,
+    pub requests: u32,
+    pub ingress_tokens: u64,
+    pub egress_tokens: u64,
+    /// Prompt tokens per second of request time (`qwen3.8:27b` at 143).
+    pub ingress_tps: f64,
+    /// Completion tokens per second of request time.
+    pub egress_tps: f64,
+}
+
+/// One bucket of the token flow timeline the Tokens tab charts: the rates
+/// observed over that slice of the window.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct TokenBucketView {
+    /// Bucket start, Unix seconds.
+    pub at_s: u64,
+    /// Requests the node reported inside the bucket.
+    pub requests: u32,
+    /// Prompt tokens per second over the bucket.
+    pub ingress_tps: f64,
+    /// Completion tokens per second over the bucket.
+    pub egress_tps: f64,
+}
+
+/// The Ollama models a node currently serves: installed, which are loaded
+/// in memory, and what each holds (`/api/ollama/stats`).
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct TokenEngineView {
+    /// `ollama`, `lms` or `vllm`; only `ollama` is read now.
+    pub engine: String,
+    pub available: bool,
+    /// Installed models, loaded ones first.
+    pub models: Vec<TokenEngineModelView>,
+    /// Models resident in memory/VRAM now.
+    pub loaded_count: u32,
+    pub model_count: u32,
+    pub vram_total_bytes: u64,
+}
+
+impl TokenEngineView {
+    /// An engine the node does not answer for.
+    pub fn empty(engine: &str) -> Self {
+        Self {
+            engine: engine.to_owned(),
+            available: false,
+            models: Vec::new(),
+            loaded_count: 0,
+            model_count: 0,
+            vram_total_bytes: 0,
+        }
+    }
+}
+
+/// One model of an inference engine.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct TokenEngineModelView {
+    pub model: String,
+    pub running: bool,
+    pub size_bytes: u64,
+    pub size_vram_bytes: Option<u64>,
+    pub parameter_size: String,
+    pub quantization: String,
+    /// Seconds until the resident copy unloads.
+    pub expires_in_s: Option<u64>,
+}
+
+/// The Tokens tab: ingress/egress by app and model, plus the engine's models.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct TokensView {
+    /// False when remote monitoring is disabled: the tab explains itself.
+    pub enabled: bool,
+    /// Apps with traffic, most egress first.
+    pub apps: Vec<TokenAppView>,
+    pub engines: Vec<TokenEngineView>,
+    pub total_requests: u32,
+    pub total_ingress: u64,
+    pub total_egress: u64,
+    /// Window the node aggregated (`1h`, `24h`, ...).
+    pub window_label: String,
+    /// Tokens-per-second timeline over the window, oldest bucket first.
+    pub timeline: Vec<TokenBucketView>,
+    /// True while the node reports no traffic in the window.
+    pub idle: bool,
+    /// True while these totals are the last ones that answered: the node
+    /// was too busy to serve the usage endpoint in time (D-118).
+    pub stale: bool,
+}
+
+impl TokensView {
+    /// What a projection carries without a cluster source.
+    pub fn disabled() -> Self {
+        Self {
+            enabled: false,
+            apps: Vec::new(),
+            engines: Vec::new(),
+            total_requests: 0,
+            total_ingress: 0,
+            total_egress: 0,
+            window_label: String::new(),
+            timeline: Vec::new(),
+            idle: true,
+            stale: false,
         }
     }
 }
 
 /// The latest polled snapshot of the whole cluster: what the Manager reads
 /// from its [`crate::ports::ClusterSource`] every frame. Bounded (the
-/// poller caps nodes, projects, containers, log lines and line lengths), so
+/// poller caps nodes, services, requests and prompt snippets), so
 /// a projection carrying it stays within `runtime.max_projection_bytes`.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct ClusterSnapshot {
     pub cluster: std::sync::Arc<ClusterView>,
-    pub docker: std::sync::Arc<DockerView>,
+    pub docker: std::sync::Arc<ServicesView>,
+    pub tokens: std::sync::Arc<TokensView>,
 }
 
 /// Module-level sub-projections (only subscribed/visible topics are filled).
@@ -1032,8 +1195,10 @@ pub struct ModuleViews {
     pub actions: Option<Arc<ActionsView>>,
     /// Built from the cluster snapshot, for the Nodes tab.
     pub cluster: Option<Arc<ClusterView>>,
-    /// Built from the cluster snapshot, for the Docker tab.
-    pub docker: Option<Arc<DockerView>>,
+    /// Built from the cluster snapshot, for the Fox-Services tab.
+    pub docker: Option<Arc<ServicesView>>,
+    /// Built from the cluster snapshot, for the Tokens tab.
+    pub tokens: Option<Arc<TokensView>>,
 }
 
 /// One immutable projection for one session.

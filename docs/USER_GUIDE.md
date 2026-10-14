@@ -47,7 +47,7 @@ process actions (`K`/`F9`) are disabled in root sessions.
 | `?`, `F1` | Help |
 | `+` / `-` | Faster / slower sampling |
 | `j`/`k`, arrows, `PgUp`/`PgDn`, `Home`/`End` | Move the selection (scroll on Nodes/Docker) |
-| `/` | Filter (`Enter` applies, `Esc` clears; narrows Nodes/Docker tables too) |
+| `/` | Filter (`Enter` applies, `Esc` clears; narrows Nodes/Fox-Services tables too) |
 | `c` | Per-core CPU bars and sensors |
 | `[` / `]` | Scroll the memory panel's GPU processes |
 | `s` / `r` | Next sort column / reverse order (process table) |
@@ -66,7 +66,10 @@ clickable with the mouse.
 
 - **Overview** — every GPU (utilization, memory, temperature, power), CPU,
   memory (split by GPU-process share on unified memory), busiest disks and
-  network interfaces, and the GPU process table in per-process colors.
+  network interfaces, and the GPU process table in per-process colors. The
+  process panel has a second sub-tab, **Fox services**, showing the
+  Fox-Services tables in place — click it (or the `GPU Processes` sub-tab
+  to go back).
 - **GPU** — one GPU at a time with full detail: clocks, fans, PCIe, power
   limits, throttle reasons, firmware and versions.
 - **Overview History** — bars of 1 minute to 24 hours for CPU, memory, GPUs,
@@ -91,19 +94,23 @@ the local monitor: a dead node just keeps its error row.
 
 <img src="images/screenshots/workstation-nodes.png" alt="Nodes tab: axiom online with CPU, memory, GPU, network, token and container readings, axiom-dgx offline, and one mesh peer" width="100%">
 
-## The Docker tab (7)
+## The Fox-Services tab (7)
 
-Every node's compose projects and containers in one place:
+Live: which app uses which LLM model, per request — aggregated from actual
+LLM requests over `remote.service_window_hours` (24 h default), not compose
+config. The node matches services to compose projects itself and reports
+each service's status.
 
-- project table: node, project, status (`running` / `stopped` /
-  `not-deployed`), containers up/total, summed CPU % and memory,
-- one sub-row per container: name, status, image, ports,
-- read-only log tails per container below the table.
+- service table: service, status (`Busy` / `Live` / `Running` /
+  `Unreachable` / `stopped` / `Not deployed`), the models it used with real
+  request and token counts, totals, last request,
+- recent requests below: time, service, model, tokens (prompt/completion/
+  total), duration with queue wait, content type, prompt snippet.
 
-No start/stop/restart actions are offered — it only watches. `/` filters by
-project, node or container name; `j`/`k` scroll the logs.
+Read-only — it only watches. `/` filters both tables by service or model;
+`j`/`k` scroll the recent requests.
 
-<img src="images/screenshots/workstation-docker.png" alt="Docker services tab: running and stopped projects with per-container rows and tailed gateway logs" width="100%">
+<img src="images/screenshots/workstation-services.png" alt="Fox-Services tab: live service-to-model table with request and token counts, then recent LLM requests with attribution" width="100%">
 
 ## Monitoring your nodes
 
@@ -113,9 +120,10 @@ Out of the box, fox-services-top polls the example cluster:
 - `axiom-dgx` → `http://192.168.1.200:8210`
 
 Each node just needs fox-services running (port 8210 by default). The poller
-only reads four endpoints — `/api/hardware/status`, `/api/docker/stats`,
-`/api/docker/logs/overview` and, with mesh discovery on, `/api/mesh/peers` —
-every 5 seconds, on its own thread, with a 4-second per-request timeout.
+only reads fast endpoints — `/api/hardware/status`, `/api/llm/live-map`,
+`/api/usage/history`, `/api/ollama/stats`, `/api/docker/projects` and, with
+mesh discovery on, `/api/mesh/peers` — every 5 seconds, on its own thread,
+with a 4-second per-request timeout.
 
 To point at your own nodes, edit the `remote` section of `config.json`
 (changes need a restart):
@@ -164,7 +172,7 @@ files `0600`. Databases are never migrated: a foreign format starts empty,
 - **A node shows offline.** Check the error in its row (timeout, refused,
   bad status), then `curl http://<host>:8210/api/hardware/status` from this
   machine. LAN firewalls and wrong ports are the usual cause.
-- **Empty Nodes/Docker tabs.** `remote.enabled` may be off, or every node
+- **Empty Nodes/Fox-Services tabs.** `remote.enabled` may be off, or every node
   unreachable — the tabs say which. `--check-config` validates the section.
 - **Tabs missing.** The `cluster` / `docker` modules can be toggled in
   Settings like any display module; both are on by default.

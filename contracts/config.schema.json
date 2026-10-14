@@ -608,6 +608,24 @@
               "base_url"
             ]
           }
+        },
+        "collect_tokens": {
+          "type": "boolean"
+        },
+        "token_window_hours": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 168
+        },
+        "token_history_limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "service_window_hours": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 168
         }
       },
       "required": [
@@ -615,7 +633,11 @@
         "poll_interval_ms",
         "timeout_ms",
         "discover_mesh",
-        "nodes"
+        "nodes",
+        "collect_tokens",
+        "token_window_hours",
+        "token_history_limit",
+        "service_window_hours"
       ]
     }
   },

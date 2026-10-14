@@ -20,8 +20,48 @@ use fox_services_top_core::view::{
     HeaderView, HistoryChartKind, HistoryChartView, HistoryPointView, HistoryView,
     HistoryWindowSummary, HostState, HostStatus, InterfaceView, LabeledCell, LastGoodView,
     MemoryView, MetricCell, ModuleViews, NetworkView, OverloadState, ProcessGpuView,
-    ProcessRowView, ProcessesView, SessionState, SettingField, SettingsView, Trend, ViewModel,
+    ProcessRowView, ProcessesView, RecentRequestView, ServiceModelView, ServiceRowView,
+    ServicesView, SessionState, SettingField, SettingsView, Trend, ViewModel,
 };
+
+/// Fox-Services rows: one live service with a model, one recent request.
+pub(crate) fn services_view() -> ServicesView {
+    ServicesView {
+        enabled: true,
+        services: vec![ServiceRowView {
+            service: "quai-radar".into(),
+            status: "Live".into(),
+            models: vec![ServiceModelView {
+                model: "qwen3.8:latest".into(),
+                requests: 21,
+                tokens: 19_000,
+                avg_ms: Some(4388.0),
+            }],
+            requests: 21,
+            tokens: 19_000,
+            ago_s: Some(840),
+        }],
+        recent: vec![RecentRequestView {
+            node: "axiom".into(),
+            service: "quai-radar".into(),
+            client_ip: "172.26.0.1".into(),
+            model: "qwen3.8:latest".into(),
+            status: "complete".into(),
+            prompt_tokens: 100,
+            completion_tokens: 50,
+            total_tokens: 150,
+            duration_ms: Some(4388.0),
+            queue_ms: Some(0.0),
+            query_type: "chat".into(),
+            requestor: "user".into(),
+            prompt: "hello".into(),
+            ago_s: 840,
+        }],
+        window_label: "24h".into(),
+        idle: false,
+        stale: false,
+    }
+}
 
 pub(crate) const GIB: f64 = 1024.0 * 1024.0 * 1024.0;
 
@@ -902,6 +942,7 @@ pub(crate) fn full_modules(with_confirmation: bool) -> ModuleViews {
         actions: Some(Arc::new(actions_view(with_confirmation))),
         cluster: None,
         docker: None,
+        tokens: None,
     }
 }
 

@@ -44,7 +44,7 @@ cargo build --release --locked
 ```
 
 New here? Start with the [User Guide](docs/USER_GUIDE.md): running it, all seven
-tabs, and pointing the Nodes and Docker tabs at your own fox-services nodes.
+tabs, and pointing the Nodes and Fox-Services tabs at your own fox-services nodes.
 
 ## Features
 
@@ -97,16 +97,17 @@ of the whole machine.
   API (`axiom` and `axiom-dgx` out of the box): online state, CPU, memory, GPU, network and token
   throughput per node, plus the Fox Mesh peers the nodes report. A node that does not answer keeps
   its row with the error.
-- **Docker services everywhere.** The Docker tab lists every node's compose projects and
-  containers — status, image, ports, CPU and memory — with read-only log tails. No actions are
-  offered; it only watches.
+- **Fox-Services everywhere.** The Fox-Services tab shows which app uses which LLM model,
+  per request — live request and token counts plus the newest requests with attribution.
+  Read-only; it only watches.
 
 ## Screens
 
 ### Overview
 
 Every GPU with its utilization and memory, the CPU, memory, busiest disks and network interfaces,
-and the GPU processes in their colors. `c` expands the CPU into per-core bars and sensors.
+and the GPU processes in their colors. The process panel has a clickable `Fox services` sub-tab
+showing the Fox-Services tables in place. `c` expands the CPU into per-core bars and sensors.
 
 <img src="docs/images/screenshots/workstation-overview.png" alt="fox-services-top Overview on a workstation with an RTX 5080 at 97 % and an RTX 3060, the disk and network tables, and four GPU processes, each with its color" width="100%">
 
@@ -148,13 +149,13 @@ Press `6`.
 
 <img src="docs/images/screenshots/workstation-nodes.png" alt="Nodes tab: axiom online with CPU, memory, GPU, network, token and container readings, axiom-dgx offline, and one mesh peer" width="100%">
 
-### Docker services
+### Fox-Services
 
-Every node's compose projects with their containers — status, image, ports, CPU and memory share —
-and read-only log tails below. `/` filters by project, node or container name; `j` / `k` scroll
-the logs. Press `7`.
+Which app uses which LLM model, per request — service statuses with real request and token
+counts, then the newest requests with attribution. `/` filters by service or model; `j` / `k`
+scroll the recent requests. Press `7`.
 
-<img src="docs/images/screenshots/workstation-docker.png" alt="Docker services tab: running and stopped projects with per-container rows and tailed gateway logs" width="100%">
+<img src="docs/images/screenshots/workstation-services.png" alt="Fox-Services tab: live service-to-model table with request and token counts, then recent LLM requests with attribution" width="100%">
 
 ## Capabilities
 
@@ -276,7 +277,7 @@ Each panel names its own keys at the right of its title; the footer keeps the gl
 | `q`, `Ctrl-C` | Quit (`q` is text while typing a filter; `Ctrl-C` always quits) |
 | `?`, `F1` | Help |
 | `+` / `-` | Faster / slower sampling |
-| `j`/`k`, arrows, `PgUp`/`PgDn`, `Home`/`End` | Move the selection (scroll on the Nodes and Docker tabs) |
+| `j`/`k`, arrows, `PgUp`/`PgDn`, `Home`/`End` | Move the selection (scroll on the Nodes and Fox-Services tabs) |
 | `c` | Show or hide the CPU sensors and per-core bars (or click the CPU panel) |
 | `[` / `]` | Scroll the GPU processes of the memory panel |
 | `s` / `r` | Next sort column / reverse order |
@@ -323,9 +324,9 @@ Remote monitoring lives in the `remote` section of `config.json` (changing it ne
 ```
 
 At most 16 nodes, polled in order over plain HTTP. A node is only read: the poller calls
-`/api/hardware/status`, `/api/docker/stats`, `/api/docker/logs/overview` and, with
-`discover_mesh`, `/api/mesh/peers`. Polling runs on its own thread; when a node is slow or
-gone, its tab row says so and the local monitor is unaffected.
+`/api/hardware/status`, `/api/llm/live-map`, `/api/usage/history`, `/api/ollama/stats`,
+`/api/docker/projects` and, with `discover_mesh`, `/api/mesh/peers`. Polling runs on its own
+thread; when a node is slow or gone, its tab row says so and the local monitor is unaffected.
 
 ## License
 

@@ -56,6 +56,13 @@ const COLUMNS: [ColumnSpec; 11] = [
     ColumnSpec::left("NAME", 10, 96).flexible().attached(),
 ];
 
+/// Module id of the process table; the Controller keeps its Overview
+/// sub-tab here (`0` GPU Processes, `1` Fox services).
+pub const PROCESSES_MODULE_ID: &str = "processes";
+
+/// The Overview sub-tabs of the process panel, in order.
+const SUB_TABS: [&str; 2] = ["GPU Processes", "Fox services"];
+
 pub struct ProcessesModule {
     manifest: DisplayModuleManifest,
 }
@@ -64,7 +71,7 @@ impl ProcessesModule {
     pub fn new() -> Result<Self, ModuleBuildError> {
         Ok(Self {
             manifest: build_manifest(ManifestSpec {
-                id: "processes",
+                id: PROCESSES_MODULE_ID,
                 title: "Processes (GPU first)",
                 min_columns: 40,
                 min_rows: 5,
@@ -115,7 +122,18 @@ impl DisplayModule for ProcessesModule {
             output.label("processes: no data");
             return output.finish();
         };
-        let inner = panel_with_keys(frame, area, &title_text(view), PROCESS_KEYS, context);
+        // The Overview panel carries a sub-tab: the process table, or the
+        // Fox-Services tables in the same area.
+        let services_tab = context.tab == 1;
+        let title = if services_tab {
+            services_title(model)
+        } else {
+            title_text(view)
+        };
+        // `j`/`k` still select processes on the Overview; the sub-tab
+        // filters like its tab, and scrolls it there (key `7`).
+        let keys = if services_tab { "/ filter" } else { PROCESS_KEYS };
+        let inner = panel_with_keys(frame, area, &title, keys, context);
         output.label(format!(
             "processes: {} rows, sort {} {}",
             view.total_rows,
@@ -129,12 +147,45 @@ impl DisplayModule for ProcessesModule {
         if inner.is_empty() {
             return output.finish();
         }
+        let mut rows = RowCursor::new(inner);
+        render_sub_tabs(frame, &mut rows, services_tab, model, &self.manifest, context, &mut output);
+        if services_tab {
+            let Some(services) = model.modules.docker.as_deref() else {
+                if let Some(area) = rows.rest() {
+                    message(frame, area, &no_data("services"), context.theme.muted_style());
+                }
+                output.label("services: no data");
+                return output.finish();
+            };
+            if !services.enabled {
+                if let Some(area) = rows.rest() {
+                    message(
+                        frame,
+                        area,
+                        "remote monitoring is disabled (config remote.enabled)",
+                        context.theme.muted_style(),
+                    );
+                }
+                output.label("services: disabled");
+                return output.finish();
+            }
+            super::docker::render_services_content(
+                frame,
+                &mut rows,
+                services,
+                &model.session.filter.to_lowercase(),
+                context,
+                &mut output,
+                true,
+            );
+            return output.finish();
+        }
         if view.rows.is_empty() {
             message(frame, inner, &empty_text(view), context.theme.muted_style());
             output.label(empty_text(view));
             return output.finish();
         }
-        let table = TableLayout::new(inner);
+        let table = TableLayout::new(&mut rows);
         let window = DisplayWindow::new(view, table.body.height);
         let filter = view.gpu_filter.as_ref().map(|(id, _)| id);
         let drawn: Vec<(&ProcessRowView, bool, [TableCell; 11])> = view
@@ -196,6 +247,61 @@ impl DisplayModule for ProcessesModule {
     }
 }
 
+/// The sub-tab strip at the top of the Overview panel: `GPU Processes`
+/// or `Fox services`, each clickable. The active tab reads selected.
+fn render_sub_tabs(
+    frame: &mut Frame<'_>,
+    rows: &mut RowCursor,
+    services_tab: bool,
+    model: &ViewModel,
+    manifest: &DisplayModuleManifest,
+    context: &DisplayContext,
+    output: &mut Output,
+) {
+    let Some(strip) = rows.next_row() else { return };
+    let mut x = strip.x.saturating_add(1);
+    for (index, label) in SUB_TABS.iter().enumerate() {
+        let active = (index == 1) == services_tab;
+        let width = display_width(label).min(usize::from(strip.width.saturating_sub(x - strip.x)));
+        if width == 0 {
+            break;
+        }
+        let rect = Rect::new(x, strip.y, saturate_u16(width + 2), 1);
+        let text = format!(" {label} ");
+        frame.buffer_mut().set_stringn(
+            rect.x,
+            rect.y,
+            truncate_to_width(&text, usize::from(rect.width)),
+            usize::from(rect.width),
+            if active {
+                context.theme.selected_row_style()
+            } else {
+                context.theme.muted_style()
+            },
+        );
+        let control = if index == 0 {
+            controls::OVERVIEW_SUB_PROCESSES
+        } else {
+            controls::OVERVIEW_SUB_SERVICES
+        };
+        output.target(model, manifest, control, rect);
+        output.label(format!("overview sub-tab {label}"));
+        x = rect.x.saturating_add(rect.width).saturating_add(1);
+    }
+}
+
+/// Panel title on the Fox services sub-tab.
+fn services_title(model: &ViewModel) -> String {
+    match model.modules.docker.as_deref() {
+        Some(services) => format!(
+            "Fox services · {} services{}",
+            services.services.len(),
+            if services.stale { " · last read" } else { "" }
+        ),
+        None => "Fox services".to_owned(),
+    }
+}
+
 /// Header, the rule under it, body and optional status row of the table
 /// area.
 struct TableLayout {
@@ -206,12 +312,14 @@ struct TableLayout {
 }
 
 impl TableLayout {
-    fn new(inner: Rect) -> Self {
-        let mut rows = RowCursor::new(inner);
+    /// The header, rule, body and status of what `rows` still has: the
+    /// caller draws its own rows (the sub-tab strip) first.
+    fn new(rows: &mut RowCursor) -> Self {
+        let remaining = rows.remaining();
         let header = rows.next_row().unwrap_or_default();
         // The rule needs a row besides the header, a process and the status.
-        let rule = (inner.height >= 4).then(|| rows.next_row()).flatten();
-        let status_rows = u16::from(inner.height >= 4);
+        let rule = (remaining >= 4).then(|| rows.next_row()).flatten();
+        let status_rows = u16::from(remaining >= 4);
         let body = rows
             .take(rows.remaining().saturating_sub(status_rows))
             .unwrap_or_default();
@@ -580,7 +688,7 @@ mod tests {
             ""
         );
         let mut terminal =
-            ratatui::Terminal::new(ratatui::backend::TestBackend::new(120, 6)).unwrap();
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(120, 7)).unwrap();
         let mut model = test_fixtures::view_model(fox_services_top_core::commands::ViewKind::Overview, 1);
         model.modules.processes = Some(std::sync::Arc::new(view));
         terminal
@@ -592,10 +700,10 @@ mod tests {
             .unwrap();
         let buffer = terminal.backend().buffer();
         let swatch = (0..120)
-            .find(|x| buffer[(*x, 3)].symbol() == COLOR_SWATCH)
+            .find(|x| buffer[(*x, 4)].symbol() == COLOR_SWATCH)
             .expect("the selected row draws its swatch");
-        assert_eq!(buffer[(swatch, 3)].fg, context.theme.process_color(1));
-        assert_eq!(buffer[(swatch, 3)].bg, context.theme.highlight_background);
+        assert_eq!(buffer[(swatch, 4)].fg, context.theme.process_color(1));
+        assert_eq!(buffer[(swatch, 4)].bg, context.theme.highlight_background);
     }
 
     /// The GPU leads (D-66), CPU% follows the type, the host memory is
@@ -606,7 +714,7 @@ mod tests {
         let context = test_fixtures::display_context();
         let view = test_fixtures::processes_view(2, 0, 2);
         let mut terminal =
-            ratatui::Terminal::new(ratatui::backend::TestBackend::new(120, 6)).unwrap();
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(120, 7)).unwrap();
         let mut model = test_fixtures::view_model(fox_services_top_core::commands::ViewKind::Overview, 1);
         model.modules.processes = Some(std::sync::Arc::new(view));
         terminal
@@ -618,7 +726,10 @@ mod tests {
             .unwrap();
         let buffer = terminal.backend().buffer();
         let row = |y: u16| -> String { (0..120).map(|x| buffer[(x, y)].symbol()).collect() };
-        let header = row(1);
+        // Row 1 is the Overview sub-tab strip; the table starts below it.
+        assert!(row(1).contains("GPU Processes"), "{}", row(1));
+        assert!(row(1).contains("Fox services"), "{}", row(1));
+        let header = row(2);
         let titles = [
             "GPU ", "PID", "USER", "TYPE", "CPU%", "GPU%", "GPU MEM", "CPU MEM", "NAME",
         ];
@@ -633,11 +744,11 @@ mod tests {
         assert!(at.windows(2).all(|pair| pair[0] < pair[1]), "{header}");
         assert!(!header.contains("RSS"), "{header}");
         assert_eq!(header.matches(" │ ").count(), 8, "{header}");
-        let first = row(3);
+        let first = row(4);
         assert!(
-            row(2).contains("─┼─"),
+            row(3).contains("─┼─"),
             "the rule under the header: {}",
-            row(2)
+            row(3)
         );
         let bars = |line: &str| -> Vec<usize> {
             line.chars()
@@ -692,15 +803,16 @@ mod tests {
                 .map(|(y, _)| y)
                 .collect()
         };
-        // Three processes in a body of six rows: still one row each.
+        // Three processes in a body of five rows: still one row each.
+        // (The strip above the header costs one row.)
         let few = draw(3, 10);
-        assert!(few[2].contains("─┼─"), "{}", few.join("\n"));
-        assert_eq!(rows_of(&few), vec![3, 4, 5], "{}", few.join("\n"));
-        // Six processes in the same body of five rows: one row each.
+        assert!(few[3].contains("─┼─"), "{}", few.join("\n"));
+        assert_eq!(rows_of(&few), vec![4, 5, 6], "{}", few.join("\n"));
+        // Six processes in the same body of four rows: one row each.
         let packed = draw(6, 10);
         assert_eq!(
             rows_of(&packed),
-            vec![3, 4, 5, 6, 7],
+            vec![4, 5, 6, 7],
             "{}",
             packed.join("\n")
         );

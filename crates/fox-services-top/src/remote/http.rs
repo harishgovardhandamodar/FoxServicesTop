@@ -55,8 +55,13 @@ pub fn get_json(
 fn get_bytes(base_url: &str, path: &str, timeout: Duration) -> Result<Vec<u8>, HttpError> {
     let (host, port, host_header) = split_base(base_url)?;
     let address = resolve(&host, port)?;
-    let mut stream = TcpStream::connect_timeout(&address, timeout)
-        .map_err(|error| HttpError::Io(trim_error(&error)))?;
+    let mut stream = TcpStream::connect_timeout(&address, timeout).map_err(|error| {
+        if error.kind() == std::io::ErrorKind::TimedOut {
+            HttpError::Io(format!("connection timed out after {timeout:?}"))
+        } else {
+            HttpError::Io(trim_error(&error))
+        }
+    })?;
     stream
         .set_read_timeout(Some(timeout))
         .and(stream.set_write_timeout(Some(timeout)))
@@ -66,7 +71,7 @@ fn get_bytes(base_url: &str, path: &str, timeout: Duration) -> Result<Vec<u8>, H
     );
     stream
         .write_all(request.as_bytes())
-        .map_err(|error| HttpError::Io(trim_error(&error)))?;
+        .map_err(|error| HttpError::Io(io_error(&error, timeout)))?;
     let mut raw = Vec::new();
     let mut chunk = [0u8; 8192];
     loop {
@@ -78,7 +83,7 @@ fn get_bytes(base_url: &str, path: &str, timeout: Duration) -> Result<Vec<u8>, H
                     return Err(HttpError::Body("response over the size cap".into()));
                 }
             }
-            Err(error) => return Err(HttpError::Io(trim_error(&error))),
+            Err(error) => return Err(HttpError::Io(io_error(&error, timeout))),
         }
     }
     let head_end = find_crlf_crlf(&raw).ok_or_else(|| HttpError::Body("no header block".into()))?;
@@ -197,6 +202,16 @@ fn trim_error(error: &std::io::Error) -> String {
         }
     }
     short.chars().take(120).collect()
+}
+
+/// Reads a socket error as a short message: on a socket with timeouts a
+/// `WouldBlock` is an expired deadline, never a bare OS string.
+fn io_error(error: &std::io::Error, timeout: Duration) -> String {
+    if error.kind() == std::io::ErrorKind::WouldBlock {
+        format!("timed out after {timeout:?}")
+    } else {
+        trim_error(error)
+    }
 }
 
 #[cfg(test)]

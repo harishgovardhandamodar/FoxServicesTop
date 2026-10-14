@@ -201,6 +201,7 @@ fn filled(model: &ViewModel) -> Vec<&'static str> {
         ("settings", modules.settings.is_some()),
         ("cluster", modules.cluster.is_some()),
         ("docker", modules.docker.is_some()),
+        ("tokens", modules.tokens.is_some()),
         ("actions", modules.actions.is_some()),
     ]
     .into_iter()

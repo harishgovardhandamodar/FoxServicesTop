@@ -124,9 +124,24 @@ pub fn format_compact_count(value: f64) -> String {
     scaled(value, 1000.0, &SI_PREFIXES, "").replace(' ', "")
 }
 
+/// A token rate for a few columns: one decimal below 10, whole numbers to
+/// 10k, then SI (`0.4`, `59`, `143`, `12.3k`). Nothing to report reads `n/a`
+/// rather than a false zero.
+pub fn format_tps(value: f64) -> String {
+    if !value.is_finite() || value <= 0.0 {
+        return NOT_AVAILABLE.to_owned();
+    }
+    if value < 10.0 {
+        fixed(value, 1)
+    } else if value < 10_000.0 {
+        fixed(value, 0)
+    } else {
+        format_compact_count(value)
+    }
+}
+
 /// Fixed decimals without a `-0` artifact for values that round to zero.
-pub fn fixed(value: f64, decimals: usize) -> String {
-    let text = format!("{value:.decimals$}");
+pub fn fixed(value: f64, decimals: usize) -> String {    let text = format!("{value:.decimals$}");
     match text.strip_prefix('-') {
         Some(unsigned) if unsigned.chars().all(|c| c == '0' || c == '.') => unsigned.to_owned(),
         _ => text,

@@ -8,6 +8,20 @@ pub fn format_age(age_ms: u64) -> String {
     format!("{} ago", format_span_seconds(age_ms / 1000))
 }
 
+/// A short age for tight table columns: `45s ago`, `19m ago`, `14h ago`,
+/// `3d ago`.
+pub fn format_short_age(seconds: u64) -> String {
+    if seconds < 60 {
+        format!("{seconds}s ago")
+    } else if seconds < 3600 {
+        format!("{}m ago", seconds / 60)
+    } else if seconds < 172_800 {
+        format!("{}h ago", seconds / 3600)
+    } else {
+        format!("{}d ago", seconds / 86_400)
+    }
+}
+
 /// Compact span: `12s`, `3m 05s`, `2h 03m`, `1d 4h`.
 pub fn format_span_seconds(seconds: u64) -> String {
     if seconds < 60 {
@@ -64,6 +78,14 @@ mod tests {
         assert_eq!(format_age(7_380_000), "2h 03m ago");
         assert_eq!(format_age(100_800_000), "1d 4h ago");
         assert_eq!(format_age(u64::MAX), "213503982334d 14h ago");
+    }
+
+    #[test]
+    fn short_ages_fit_table_columns() {
+        assert_eq!(format_short_age(45), "45s ago");
+        assert_eq!(format_short_age(1140), "19m ago");
+        assert_eq!(format_short_age(50_400), "14h ago");
+        assert_eq!(format_short_age(200_000), "2d ago");
     }
 
     #[test]

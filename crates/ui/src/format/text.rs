@@ -20,6 +20,48 @@ pub fn display_width(text: &str) -> usize {
     UnicodeWidthStr::width(text)
 }
 
+/// A model tag as a name to read: `qwen3.8:27b` becomes `Qwen 3.8 - 27b`,
+/// `nomic-embed-text:latest` becomes `Nomic Embed Text`. A `:latest` tag
+/// says nothing the family does not, so it is dropped.
+pub fn pretty_model_name(name: &str) -> String {
+    let (family, tag) = name.split_once(':').unwrap_or((name, ""));
+    let mut words: Vec<String> = Vec::new();
+    let mut word = String::new();
+    let mut after_letter = false;
+    for ch in family.chars() {
+        if ch == '-' || ch == '_' || ch == ' ' {
+            words.push(std::mem::take(&mut word));
+            after_letter = false;
+            continue;
+        }
+        // `qwen3.8` reads as two words, `3.8` and `27b` stay as they are.
+        if ch.is_ascii_digit() && after_letter {
+            words.push(std::mem::take(&mut word));
+        }
+        word.push(ch);
+        after_letter = ch.is_ascii_alphabetic();
+    }
+    words.push(word);
+    let family = words
+        .into_iter()
+        .filter(|word| !word.is_empty())
+        .map(|word| capitalize(&word))
+        .collect::<Vec<_>>()
+        .join(" ");
+    match tag.trim() {
+        "" | "latest" => family,
+        tag => format!("{family} - {}", clean(tag)),
+    }
+}
+
+fn capitalize(word: &str) -> String {
+    let mut chars = word.chars();
+    match chars.next() {
+        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+        None => String::new(),
+    }
+}
+
 /// Cuts `text` to at most `max_width` columns, ending with `…` when cut.
 pub fn truncate_to_width(text: &str, max_width: usize) -> String {
     if display_width(text) <= max_width {

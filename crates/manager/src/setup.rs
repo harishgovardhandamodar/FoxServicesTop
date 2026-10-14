@@ -112,8 +112,20 @@ pub(crate) fn validate(setup: &ManagerSetup, ports: &ManagerPorts) -> Result<(),
     let restart_only = setup
         .effective_config
         .restart_required_changes(&setup.saved_config);
-    if !restart_only.is_empty() {
-        return Err(invalid(format!(
+    let restart_only: Vec<&str> = restart_only
+        .into_iter()
+        .filter(|path| {
+            // CLI overrides are for this run only: a remote section that
+            // differs from the file solely through them starts now.
+            *path != "remote"
+                || !Config::remote_diff_is_cli_only(
+                    &setup.saved_config,
+                    &setup.effective_config,
+                    &setup.value_origins,
+                )
+        })
+        .collect();
+    if !restart_only.is_empty() {        return Err(invalid(format!(
             "effective configuration differs from the saved one in restart-only fields: {}",
             restart_only.join(", ")
         )));
@@ -163,4 +175,55 @@ fn validate_collectors(registry: &[Arc<dyn Collector>]) -> Result<(), ManagerErr
 
 fn invalid(message: impl Into<String>) -> ManagerError {
     ManagerError::InvalidSetup(message.into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use fox_services_top_core::config::{Config, RemoteNodeConfig};
+
+    fn origins(entries: &[(&str, ValueOrigin)]) -> BTreeMap<String, ValueOrigin> {
+        entries
+            .iter()
+            .map(|(path, origin)| ((*path).to_owned(), *origin))
+            .collect()
+    }
+
+    fn node(name: &str, url: &str) -> RemoteNodeConfig {
+        RemoteNodeConfig {
+            name: name.to_owned(),
+            base_url: url.to_owned(),
+        }
+    }
+
+    #[test]
+    fn cli_overridden_remote_nodes_start_now_but_edited_files_need_a_restart() {
+        let saved = Config::defaults().unwrap();
+        // `--remote-node`: only the nodes differ, through a CLI override.
+        let mut flagged = saved.clone();
+        flagged.remote.nodes = vec![node("lab", "http://10.0.0.9:8210")];
+        assert!(Config::remote_diff_is_cli_only(
+            &saved,
+            &flagged,
+            &origins(&[("remote.nodes", ValueOrigin::CliOverride)]),
+        ));
+        // Same node list from a file edit (no CLI origin) still needs one.
+        assert!(!Config::remote_diff_is_cli_only(&saved, &flagged, &origins(&[])));
+        // A file edit to another leaf is not covered by the nodes flag.
+        let mut timed = flagged.clone();
+        timed.remote.poll_interval_ms = 10_000;
+        assert!(!Config::remote_diff_is_cli_only(
+            &saved,
+            &timed,
+            &origins(&[("remote.nodes", ValueOrigin::CliOverride)]),
+        ));
+        // `--no-remote` likewise starts now.
+        let mut off = saved.clone();
+        off.remote.enabled = false;
+        assert!(Config::remote_diff_is_cli_only(
+            &saved,
+            &off,
+            &origins(&[("remote.enabled", ValueOrigin::CliOverride)]),
+        ));
+    }
 }

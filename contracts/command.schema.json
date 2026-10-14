@@ -658,7 +658,8 @@
                 "settings",
                 "actions",
                 "nodes",
-                "docker"
+                "docker",
+                "tokens"
               ]
             },
             "selected_entity_id": {

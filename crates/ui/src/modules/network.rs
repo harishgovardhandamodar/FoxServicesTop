@@ -64,7 +64,7 @@ impl DisplayModule for NetworkModule {
     }
 
     fn overview_cell(&self) -> Option<OverviewCell> {
-        Some(OverviewCell::at(2, 1, 50))
+        Some(OverviewCell::at(2, 1, 35))
     }
 
     fn preferred_rows(&self, model: &ViewModel, _width: u16, _slot: Slot) -> Option<u16> {

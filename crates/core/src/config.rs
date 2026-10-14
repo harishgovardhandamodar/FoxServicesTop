@@ -32,7 +32,7 @@ pub const MAX_COMMAND_BYTES: u64 = 64 * 1024;
 pub const MIN_COMMAND_BYTES: u64 = 8 * 1024;
 
 /// The built-in display modules, in registration order.
-pub const BUILTIN_MODULES: [&str; 10] = [
+pub const BUILTIN_MODULES: [&str; 11] = [
     "cpu",
     "gpu",
     "memory",
@@ -43,7 +43,12 @@ pub const BUILTIN_MODULES: [&str; 10] = [
     "settings",
     "cluster",
     "docker",
+    "tokens",
 ];
+
+/// The cluster modules the Overview also shows as cards: the Nodes table,
+/// the Docker project table and the token ingress/egress summary.
+pub const OVERVIEW_CLUSTER_MODULES: [&str; 3] = ["cluster", "docker", "tokens"];
 
 /// A configuration key an earlier version wrote that this one ignores,
 /// with the decision that retired it.
@@ -166,7 +171,7 @@ pub struct RemoteNodeConfig {
     pub base_url: String,
 }
 
-/// Remote fox-services monitoring (the Nodes and Docker tabs).
+/// Remote fox-services monitoring (the Nodes, Docker and Tokens tabs).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RemoteConfig {
@@ -177,6 +182,15 @@ pub struct RemoteConfig {
     pub timeout_ms: u32,
     /// Also list Fox Mesh peers a polled node reports (`/api/mesh/peers`).
     pub discover_mesh: bool,
+    /// Also aggregate token ingress/egress by app (`/api/usage/history`,
+    /// `/api/ollama/stats`) for the Tokens tab.
+    pub collect_tokens: bool,
+    /// Window the Tokens tab aggregates, in hours (1–168).
+    pub token_window_hours: u32,
+    /// Window the Fox-Services tab reads the live map over, in hours (1–168).
+    pub service_window_hours: u32,
+    /// Requests read from a node for that window (1–1000).
+    pub token_history_limit: u32,
     /// Statically configured nodes, polled in order.
     pub nodes: Vec<RemoteNodeConfig>,
 }
@@ -189,6 +203,10 @@ impl RemoteConfig {
             poll_interval_ms: 5000,
             timeout_ms: 4000,
             discover_mesh: true,
+            collect_tokens: true,
+            token_window_hours: 24,
+            service_window_hours: 24,
+            token_history_limit: 500,
             nodes: vec![
                 RemoteNodeConfig {
                     name: "axiom".to_owned(),
@@ -448,7 +466,7 @@ impl Config {
         config.store.archive_enabled = true;
         config.actions.allow_force = true;
         // The Nodes and Docker tabs are built-in: on unless turned off.
-        for module in ["cluster", "docker"] {
+        for module in ["cluster", "docker", "tokens"] {
             if !config.viewer.enabled_modules.iter().any(|entry| entry == module) {
                 config.viewer.enabled_modules.push(module.to_owned());
             }
@@ -751,6 +769,21 @@ impl Config {
             "must be 500..=30000",
         );
         check(
+            range(remote.token_window_hours, 1, 168),
+            "remote.token_window_hours",
+            "must be 1..=168",
+        );
+        check(
+            range(remote.token_history_limit, 1, 1000),
+            "remote.token_history_limit",
+            "must be 1..=1000",
+        );
+        check(
+            range(remote.service_window_hours, 1, 168),
+            "remote.service_window_hours",
+            "must be 1..=168",
+        );
+        check(
             remote.nodes.len() <= 16,
             "remote.nodes",
             "at most 16 entries",
@@ -1000,6 +1033,26 @@ impl Config {
             changed.push("remote");
         }
         changed
+    }
+
+    /// Whether the saved and effective remote sections differ only in leaves
+    /// a CLI flag overrode (`--remote-node`, `--no-remote`): replaying those
+    /// leaves onto the saved section must give the effective one. Such a
+    /// difference starts now instead of waiting for a restart.
+    pub fn remote_diff_is_cli_only(
+        saved: &Config,
+        effective: &Config,
+        origins: &std::collections::BTreeMap<String, ValueOrigin>,
+    ) -> bool {
+        let cli = |path: &str| origins.get(path) == Some(&ValueOrigin::CliOverride);
+        let mut rebuilt = saved.remote.clone();
+        if cli("remote.enabled") {
+            rebuilt.enabled = effective.remote.enabled;
+        }
+        if cli("remote.nodes") {
+            rebuilt.nodes.clone_from(&effective.remote.nodes);
+        }
+        rebuilt == effective.remote
     }
 
     /// Whether scheduling-relevant fields differ (requires a new scheduler epoch).
@@ -1506,7 +1559,7 @@ mod tests {
         only_the_owners
             .viewer
             .enabled_modules
-            .retain(|module| module != "cluster" && module != "docker");
+            .retain(|module| !["cluster", "docker", "tokens"].contains(&module.as_str()));
         assert_eq!(only_the_owners, reference, "nothing else differs");
         assert!(defaults.validate().is_ok());
     }

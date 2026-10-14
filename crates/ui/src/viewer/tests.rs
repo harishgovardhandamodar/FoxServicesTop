@@ -143,6 +143,16 @@ fn expanded(module: &str) -> UiState {
     ui
 }
 
+/// Overview with the process panel's Fox services sub-tab selected.
+fn services_sub_tab() -> UiState {
+    let mut ui = UiState::default();
+    ui.tabs.insert(
+        ModuleId::new(crate::modules::PROCESSES_MODULE_ID).unwrap(),
+        1,
+    );
+    ui
+}
+
 /// Row index of the first line containing `needle`.
 fn row_index(rendered: &Rendered, needle: &str) -> usize {
     rendered
@@ -303,7 +313,7 @@ fn processes_table_follows_the_reference_columns_and_marks_the_selection() {
         assert!(rendered.contains("4242"), "{size:?}\n{}", rendered.text());
         assert!(rendered.report.hit_map.visible_selected_process().is_some());
     }
-    let wide = render(&model(ViewKind::Overview), (160, 50));
+    let wide = render(&model(ViewKind::Overview), (200, 50));
     for text in [
         "USER",
         "NAME",
@@ -331,7 +341,7 @@ fn processes_window_shows_scroll_position_filters_and_truncation() {
     processes.filter = "work".into();
     processes.gpu_filter = Some((test_fixtures::entity("gpu:GPU-0"), "GPU0".into()));
     model.modules.processes = Some(Arc::new(processes));
-    let rendered = render(&model, (100, 50));
+    let rendered = render(&model, (160, 50));
     assert!(rendered.contains("filter \"work\""), "{}", rendered.text());
     assert!(rendered.contains("GPU GPU0"), "{}", rendered.text());
     assert!(rendered.contains("of 412"), "{}", rendered.text());
@@ -689,8 +699,35 @@ fn gpu_unavailable_reason_is_shown() {
 }
 
 #[test]
+fn the_overview_fox_services_sub_tab_shows_the_services_tables() {
+    let mut fixture = model(ViewKind::Overview);
+    fixture.modules.docker = Some(Arc::new(test_fixtures::services_view()));
+    let rendered = render_with(
+        &Viewer::builtin(),
+        Some(&fixture),
+        &services_sub_tab(),
+        (200, 60),
+    );
+    for text in [
+        "Fox services",
+        "quai-radar",
+        "qwen3.8:latest (21x, 19.0k tok)",
+        "Recent LLM Requests",
+        "100/50/150",
+        "chat",
+    ] {
+        assert!(rendered.contains(text), "missing {text:?}\n{}", rendered.text());
+    }
+    // Both sub-tabs stay clickable on either page.
+    let map = &rendered.report.hit_map;
+    assert_eq!(map.count(controls::OVERVIEW_SUB_PROCESSES), 1);
+    assert_eq!(map.count(controls::OVERVIEW_SUB_SERVICES), 1);
+}
+
+#[test]
 fn tabs_and_rows_produce_hit_targets_with_the_frame_revision() {
-    let rendered = render(&model(ViewKind::Overview), (160, 50));
+    // Tall enough for every Overview module, the Tokens card included.
+    let rendered = render(&model(ViewKind::Overview), (200, 60));
     let map = &rendered.report.hit_map;
     assert_eq!(map.frame_revision(), 7);
     for tab in crate::views::OFFERED_TABS {

@@ -148,6 +148,10 @@ pub mod controls {
     /// A part of the module that drew the target the mouse wheel scrolls
     /// (D-70).
     pub const MODULE_SCROLL: &str = "module.scroll";
+    /// The Overview's GPU Processes sub-tab: shows the process table.
+    pub const OVERVIEW_SUB_PROCESSES: &str = "overview.subtab.processes";
+    /// The Overview's Fox services sub-tab: shows the Fox-Services tables.
+    pub const OVERVIEW_SUB_SERVICES: &str = "overview.subtab.services";
 }
 
 /// Why a module was not registered.
@@ -309,6 +313,7 @@ pub const fn detail_module_id(view: ViewKind) -> Option<&'static str> {
         ViewKind::Settings => Some("settings"),
         ViewKind::Nodes => Some("cluster"),
         ViewKind::Docker => Some("docker"),
+        ViewKind::Tokens => Some("tokens"),
         ViewKind::Overview | ViewKind::Processes | ViewKind::Sources | ViewKind::Actions => None,
     }
 }

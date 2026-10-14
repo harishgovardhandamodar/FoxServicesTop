@@ -107,6 +107,7 @@ impl DisplayModule for ClusterModule {
             return output.finish();
         }
         render_node_table(frame, &mut rows, &nodes, context, &mut output);
+        render_offline(frame, &mut rows, &nodes, context, &mut output);
         render_peers(frame, &mut rows, cluster, context, &mut output);
         output.finish()
     }
@@ -194,6 +195,28 @@ fn containers_text(node: &ClusterNodeView) -> String {
     match (node.containers_running, node.containers_total) {
         (Some(running), Some(total)) => format!("{running}/{total}"),
         _ => "–".to_owned(),
+    }
+}
+
+fn render_offline(
+    frame: &mut Frame<'_>,
+    rows: &mut RowCursor,
+    nodes: &[&ClusterNodeView],
+    context: &DisplayContext,
+    output: &mut Output,
+) {
+    for node in nodes.iter().filter(|node| !node.online) {
+        let Some(error) = node.error.as_deref() else { continue };
+        let Some(row) = rows.next_row() else { break };
+        draw_line(
+            frame.buffer_mut(),
+            row,
+            &Line::from(Span::styled(
+                format!("{}: {}", clean(&node.name), clean(error)),
+                context.theme.muted_style(),
+            )),
+        );
+        output.label(format!("node {} offline", node.name));
     }
 }
 

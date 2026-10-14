@@ -14,6 +14,7 @@ mod network;
 mod process_memory;
 mod processes;
 mod settings;
+mod tokens;
 
 use fox_services_top_core::identity::IdentityError;
 use thiserror::Error;
@@ -28,8 +29,9 @@ pub use history::HistoryModule;
 pub use memory::MEMORY_MODULE_ID;
 pub use memory::MemoryModule;
 pub use network::NetworkModule;
-pub use processes::ProcessesModule;
+pub use processes::{PROCESSES_MODULE_ID, ProcessesModule};
 pub use settings::SettingsModule;
+pub use tokens::TokensModule;
 
 use crate::registry::{DisplayModule, ManifestError};
 
@@ -59,5 +61,6 @@ pub fn builtin_modules() -> Vec<Result<Box<dyn DisplayModule>, ModuleBuildError>
         SettingsModule::new().map(boxed),
         ClusterModule::new().map(boxed),
         DockerModule::new().map(boxed),
+        TokensModule::new().map(boxed),
     ]
 }
