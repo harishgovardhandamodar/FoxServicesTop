@@ -188,6 +188,8 @@ fn project_cells(project: &DockerProjectView, style: Style) -> Vec<TableCell> {
         .iter()
         .filter_map(|container| container.mem_used_mib)
         .sum();
+    // A float `sum` of no items is `-0.0`; display it as zero.
+    let (cpu, mem) = (cpu + 0.0, mem + 0.0);
     vec![
         TableCell::new(clean(&project.node), style),
         TableCell::new(clean(&project.project), style),

@@ -146,11 +146,15 @@ Every configured fox-services node in one table: reachability, CPU and memory, G
 network rates, token throughput and container counts, then the Fox Mesh peers the nodes discovered.
 Press `6`.
 
+<img src="docs/images/screenshots/workstation-nodes.png" alt="Nodes tab: axiom online with CPU, memory, GPU, network, token and container readings, axiom-dgx offline, and one mesh peer" width="100%">
+
 ### Docker services
 
 Every node's compose projects with their containers — status, image, ports, CPU and memory share —
 and read-only log tails below. `/` filters by project, node or container name; `j` / `k` scroll
 the logs. Press `7`.
+
+<img src="docs/images/screenshots/workstation-docker.png" alt="Docker services tab: running and stopped projects with per-container rows and tailed gateway logs" width="100%">
 
 ## Capabilities
 

@@ -89,6 +89,8 @@ One row per configured fox-services node with its latest polled snapshot:
 `/` narrows the table by node name. The view is read-only and never blocks
 the local monitor: a dead node just keeps its error row.
 
+<img src="images/screenshots/workstation-nodes.png" alt="Nodes tab: axiom online with CPU, memory, GPU, network, token and container readings, axiom-dgx offline, and one mesh peer" width="100%">
+
 ## The Docker tab (7)
 
 Every node's compose projects and containers in one place:
@@ -100,6 +102,8 @@ Every node's compose projects and containers in one place:
 
 No start/stop/restart actions are offered — it only watches. `/` filters by
 project, node or container name; `j`/`k` scroll the logs.
+
+<img src="images/screenshots/workstation-docker.png" alt="Docker services tab: running and stopped projects with per-container rows and tailed gateway logs" width="100%">
 
 ## Monitoring your nodes
 
