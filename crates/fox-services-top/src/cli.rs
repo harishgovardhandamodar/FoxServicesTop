@@ -6,7 +6,7 @@
 use std::path::PathBuf;
 
 use clap::{ArgGroup, Parser};
-use fox_services_top_core::config::{CliOverrides, Theme};
+use fox_services_top_core::config::{CliOverrides, RemoteNodeConfig, Theme};
 use thiserror::Error;
 
 /// Terminal GPU monitor for NVIDIA DGX Spark and Linux machines with NVIDIA GPUs.
@@ -33,6 +33,16 @@ pub struct Cli {
     /// Disable all process actions for this run.
     #[arg(long)]
     pub read_only: bool,
+
+    /// A fox-services node to poll for the Nodes and Docker tabs,
+    /// `NAME=URL` (repeatable, e.g. `--remote-node axiom=http://192.168.1.63:8210`);
+    /// replaces the configured node list for this run only.
+    #[arg(long, value_name = "NAME=URL")]
+    pub remote_node: Vec<String>,
+
+    /// Disable remote fox-services monitoring for this run.
+    #[arg(long)]
+    pub no_remote: bool,
 
     /// Absolute path of the v2 configuration file.
     #[arg(long, value_name = "ABSOLUTE_PATH")]
@@ -105,6 +115,8 @@ pub enum CliError {
     RelativePath { flag: &'static str, path: String },
     #[error("--replay-slice must look like INDEX/COUNT with INDEX < COUNT (got {0})")]
     ReplaySlice(String),
+    #[error("--remote-node must look like NAME=URL with an http(s) URL (got {0})")]
+    RemoteNode(String),
 }
 
 impl Cli {
@@ -129,6 +141,8 @@ impl Cli {
                 })
                 .transpose()?,
             read_only: (self.read_only || self.replay.is_some()).then_some(true),
+            remote_enabled: self.no_remote.then_some(false),
+            remote_nodes: parse_remote_nodes(&self.remote_node)?,
         })
     }
 
@@ -162,6 +176,30 @@ impl Cli {
             .map(Some)
             .ok_or_else(|| CliError::ReplaySlice(text.to_owned()))
     }
+}
+
+/// Parses `--remote-node NAME=URL` flags; `None` when none were given.
+fn parse_remote_nodes(entries: &[String]) -> Result<Option<Vec<RemoteNodeConfig>>, CliError> {
+    if entries.is_empty() {
+        return Ok(None);
+    }
+    entries
+        .iter()
+        .map(|entry| {
+            let (name, url) = entry
+                .split_once('=')
+                .filter(|(name, url)| {
+                    !name.is_empty()
+                        && (url.starts_with("http://") || url.starts_with("https://"))
+                })
+                .ok_or_else(|| CliError::RemoteNode(entry.clone()))?;
+            Ok(RemoteNodeConfig {
+                name: name.to_owned(),
+                base_url: url.to_owned(),
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map(Some)
 }
 
 /// Converts seconds to whole milliseconds and checks the schema range.
@@ -267,5 +305,46 @@ mod tests {
             .overrides()
             .unwrap();
         assert_eq!(overrides.read_only, Some(true));
+    }
+
+    #[test]
+    fn remote_nodes_parse_and_disable() {
+        let overrides = parse(&[
+            "--remote-node",
+            "axiom=http://192.168.1.63:8210",
+            "--remote-node",
+            "axiom-dgx=http://192.168.1.200:8210",
+        ])
+        .overrides()
+        .unwrap();
+        assert_eq!(
+            overrides.remote_nodes,
+            Some(vec![
+                fox_services_top_core::config::RemoteNodeConfig {
+                    name: "axiom".into(),
+                    base_url: "http://192.168.1.63:8210".into(),
+                },
+                fox_services_top_core::config::RemoteNodeConfig {
+                    name: "axiom-dgx".into(),
+                    base_url: "http://192.168.1.200:8210".into(),
+                },
+            ])
+        );
+        assert_eq!(overrides.remote_enabled, None);
+        let off = parse(&["--no-remote"]).overrides().unwrap();
+        assert_eq!(off.remote_enabled, Some(false));
+        assert_eq!(off.remote_nodes, None);
+        assert!(matches!(
+            parse(&["--remote-node", "axiom"]).overrides(),
+            Err(CliError::RemoteNode(_))
+        ));
+        assert!(matches!(
+            parse(&["--remote-node", "=http://x/"]).overrides(),
+            Err(CliError::RemoteNode(_))
+        ));
+        assert!(matches!(
+            parse(&["--remote-node", "axiom=gopher://x"]).overrides(),
+            Err(CliError::RemoteNode(_))
+        ));
     }
 }

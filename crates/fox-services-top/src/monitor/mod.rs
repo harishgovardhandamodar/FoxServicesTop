@@ -121,6 +121,7 @@ struct Application {
     logger: Arc<FileLogger>,
     fps: u32,
     replay_root: Option<PathBuf>,
+    cluster: crate::remote::ClusterMonitor,
     _lock: InstanceLock,
 }
 
@@ -238,6 +239,11 @@ impl Application {
             self.workers
                 .stop_each(|| control.remaining(WORKER_STOP_CAP)),
         );
+        if let Some(thread) = self.cluster.stop()
+            && join_within(thread, control.remaining(WORKER_STOP_CAP)).is_none()
+        {
+            warnings.push("cluster monitor did not stop within the shutdown budget".to_owned());
+        }
         let report = self.supervisor.shutdown(control.remaining(SHUTDOWN_BUDGET));
         if !report.completed_within_deadline {
             warnings

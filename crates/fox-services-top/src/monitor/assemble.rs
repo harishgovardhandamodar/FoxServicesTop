@@ -30,6 +30,7 @@ use super::workers::{Completions, Workers};
 use super::{Application, StartError};
 use crate::cli::Cli;
 use crate::fail_stop::FailStop;
+use crate::remote::ClusterMonitor;
 use crate::startup::LoadedConfiguration;
 use crate::version::BuildInfo;
 
@@ -175,6 +176,9 @@ impl Wiring {
         )?;
 
         let (specs, manifests) = host_specs(cli, effective, self.namespace, &self.clock, &host_id)?;
+        // The Nodes and Docker tabs read this monitor's latest snapshot;
+        // polling lives on its own thread, never on the control thread.
+        let cluster = ClusterMonitor::start(&effective.remote);
         let supervisor = Supervisor::start(
             SupervisorConfig::from_config(effective),
             specs,
@@ -212,6 +216,7 @@ impl Wiring {
             audit: Box::new(audit),
             actions: Box::new(actions),
             process_history: Some(process_history.handles),
+            cluster: Some(cluster.source()),
             logger: Arc::clone(&self.logger),
             ledger: self.ledger.clone(),
             ingress: self.ingress.clone(),
@@ -245,6 +250,7 @@ impl Wiring {
             logger,
             fps: effective.viewer.fps,
             replay_root,
+            cluster,
             _lock: lock,
         })
     }

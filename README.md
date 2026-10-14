@@ -90,6 +90,13 @@ of the whole machine.
 - **Settings in the app.** Change the sampling interval and the display modules, and see each data
   source's state. Every setting shows its saved and effective value, where it came from, and
   whether it applies now or after a restart.
+- **Nodes across the LAN.** The Nodes tab polls every configured fox-services node over its HTTP
+  API (`axiom` and `axiom-dgx` out of the box): online state, CPU, memory, GPU, network and token
+  throughput per node, plus the Fox Mesh peers the nodes report. A node that does not answer keeps
+  its row with the error.
+- **Docker services everywhere.** The Docker tab lists every node's compose projects and
+  containers — status, image, ports, CPU and memory — with read-only log tails. No actions are
+  offered; it only watches.
 
 ## Screens
 
@@ -129,6 +136,18 @@ it), working folder and charts.
 <img src="docs/images/screenshots/workstation-process-run.png" alt="An opened run: PID, name, GPU, start, end, runtime and user, then charts of its CPU, memory, GPU utilization, GPU memory, threads and open files, disk and network" width="100%">
 
 <sub>The run's folder, program, cgroup and command line are masked.</sub>
+
+### Nodes
+
+Every configured fox-services node in one table: reachability, CPU and memory, GPU kind and use,
+network rates, token throughput and container counts, then the Fox Mesh peers the nodes discovered.
+Press `6`.
+
+### Docker services
+
+Every node's compose projects with their containers — status, image, ports, CPU and memory share —
+and read-only log tails below. `/` filters by project, node or container name; `j` / `k` scroll
+the logs. Press `7`.
 
 ## Capabilities
 
@@ -217,6 +236,8 @@ fox-services-top -i 0.5                # sample every 0.5 s for this run (saved 
 fox-services-top -t amber              # color theme for this run: dark, cyan, green or amber
 fox-services-top --no-gpu              # do not start the NVML host
 fox-services-top --read-only           # no process actions
+fox-services-top --no-remote             # no fox-services-top node polling for this run
+fox-services-top --remote-node axiom=http://192.168.1.63:8210   # poll only this node for this run (repeatable)
 fox-services-top --replay fixture.json # simulated data only, read-only, separate temporary state
 fox-services-top --check-config        # validate the configuration and print its saved and effective values
 fox-services-top --diagnostics-json    # versions, SQLite, capabilities and health as JSON
@@ -244,16 +265,16 @@ Each panel names its own keys at the right of its title; the footer keeps the gl
 
 | Key | Action |
 |---|---|
-| `1`–`5`, `Tab`, `Shift-Tab` | Overview, GPU, Overview History, Process History, Settings |
+| `1`–`7`, `Tab`, `Shift-Tab` | Overview, GPU, Overview History, Process History, Settings, Nodes, Docker |
 | `q`, `Ctrl-C` | Quit (`q` is text while typing a filter; `Ctrl-C` always quits) |
 | `?`, `F1` | Help |
 | `+` / `-` | Faster / slower sampling |
-| `j`/`k`, arrows, `PgUp`/`PgDn`, `Home`/`End` | Move the selection |
+| `j`/`k`, arrows, `PgUp`/`PgDn`, `Home`/`End` | Move the selection (scroll on the Nodes and Docker tabs) |
 | `c` | Show or hide the CPU sensors and per-core bars (or click the CPU panel) |
 | `[` / `]` | Scroll the GPU processes of the memory panel |
 | `s` / `r` | Next sort column / reverse order |
 | `g` | Cycle the GPU filter (all GPUs → each GPU) |
-| `/` | Filter processes by name (`Enter` applies, `Esc` clears) |
+| `/` | Filter processes by name (`Enter` applies, `Esc` clears; on Nodes/Docker it narrows their tables) |
 | `K` / `F9` | Stop the selected process with SIGTERM / SIGKILL (asks for confirmation) |
 | `y`/`Enter`, `n`/`Esc` | Confirm / cancel a pending process action |
 | `h`/`l`, `←`/`→` | Previous / next GPU in the GPU view |
@@ -278,6 +299,26 @@ first: in Process History, the ended runs seen longest ago. A database from a ve
 format is started empty instead of migrated; `config.json` is always kept. Upgrading from v1 never
 modifies `~/.config/fox-services-top/config.json`: review the mapping with `--import-legacy <path> --dry-run`,
 then write the v2 file with `--apply`.
+
+Remote monitoring lives in the `remote` section of `config.json` (changing it needs a restart):
+
+```json
+"remote": {
+  "enabled": true,
+  "poll_interval_ms": 5000,
+  "timeout_ms": 4000,
+  "discover_mesh": true,
+  "nodes": [
+    {"name": "axiom", "base_url": "http://192.168.1.63:8210"},
+    {"name": "axiom-dgx", "base_url": "http://192.168.1.200:8210"}
+  ]
+}
+```
+
+At most 16 nodes, polled in order over plain HTTP. A node is only read: the poller calls
+`/api/hardware/status`, `/api/docker/stats`, `/api/docker/logs/overview` and, with
+`discover_mesh`, `/api/mesh/peers`. Polling runs on its own thread; when a node is slow or
+gone, its tab row says so and the local monitor is unaffected.
 
 ## License
 
