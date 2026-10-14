@@ -43,6 +43,9 @@ cargo build --release --locked
 ./target/release/fox-services-top
 ```
 
+New here? Start with the [User Guide](docs/USER_GUIDE.md): running it, all seven
+tabs, and pointing the Nodes and Docker tabs at your own fox-services nodes.
+
 ## Features
 
 htop centers on the CPU, and nvtop and nvidia-smi show GPUs only while you watch. fox-services-top puts the
