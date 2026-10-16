@@ -34,7 +34,15 @@ The installer picks the build for your CPU, checks it against the release's `SHA
 installs it to `~/.local/bin`. The previous version is kept, and `./install.sh --rollback` brings
 it back. For a specific release, append `-s -- --version v2.2.0` to `bash`.
 
-Or build from source with Rust 1.92.0 (pinned by `rust-toolchain.toml`):
+Or build from source with Rust 1.92.0 (pinned by `rust-toolchain.toml`) —
+`install-from-source.sh` does it in one command (`--service` also installs the
+headless collector's systemd user unit, `--install-rust` adds rustup first):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/harishgovardhandamodar/FoxServicesTop/master/install-from-source.sh | bash
+```
+
+Or by hand:
 
 ```bash
 git clone https://github.com/harishgovardhandamodar/FoxServicesTop.git

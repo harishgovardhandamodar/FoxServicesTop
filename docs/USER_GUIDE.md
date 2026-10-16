@@ -14,7 +14,15 @@ Linux x86_64 or aarch64 with glibc 2.34+ (Ubuntu 22.04, Debian 12, RHEL 9+;
 DGX Spark included; WSL 2 works). GPU metrics need the NVIDIA driver —
 without it, CPU, memory, disks and network still work.
 
-Or build from source (Rust 1.92.0, pinned by `rust-toolchain.toml`):
+Or build from source (Rust 1.92.0, pinned by `rust-toolchain.toml`) — one
+command with the source installer, which also has `--service` to set up the
+headless collector below and `--install-rust` to add rustup first:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/harishgovardhandamodar/FoxServicesTop/master/install-from-source.sh | bash
+```
+
+Or by hand:
 
 ```bash
 git clone https://github.com/harishgovardhandamodar/FoxServicesTop.git

@@ -40,15 +40,22 @@ The unit template ships at
 It starts the collector on login, and at boot once lingering is on. No root,
 no terminal.
 
+The unit runs `%h/.local/bin/fox-services-top --daemon` — `install.sh`'s
+default location. If your binary lives elsewhere, edit `ExecStart=` first.
+`install.sh` does not install this file; it is a manual template. The source
+installer does it for you:
+
+```bash
+./install-from-source.sh --service     # build, install and enable the unit
+```
+
+Or by hand:
+
 ```bash
 mkdir -p ~/.config/systemd/user
 curl -fsSL https://raw.githubusercontent.com/harishgovardhandamodar/FoxServicesTop/master/packaging/systemd/fox-services-top.service \
   -o ~/.config/systemd/user/fox-services-top.service
 ```
-
-The unit runs `%h/.local/bin/fox-services-top --daemon` — `install.sh`'s
-default location. If your binary lives elsewhere, edit `ExecStart=` first.
-`install.sh` does not install this file; it is a manual template.
 
 ```bash
 systemctl --user daemon-reload
