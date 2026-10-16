@@ -1262,7 +1262,7 @@ pub struct ModuleViews {
 }
 
 /// One immutable projection for one session.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ViewModel {
     pub frame_revision: u64,
     pub snapshot_revision: u64,
@@ -1393,6 +1393,25 @@ mod tests {
             enabled_modules: Vec::new(),
             permit,
         }
+    }
+
+    /// A projection is serialized across the attach socket and rebuilt by the
+    /// viewer, so its JSON round-trip must be lossless (the byte permit is
+    /// accounting-only and deliberately dropped).
+    #[test]
+    fn a_view_model_survives_a_json_round_trip() {
+        let original = view_model(42, None);
+        let json = serde_json::to_vec(&original).unwrap();
+        let decoded: ViewModel = serde_json::from_slice(&json).unwrap();
+        assert_eq!(decoded.frame_revision, original.frame_revision);
+        assert_eq!(decoded.snapshot_revision, original.snapshot_revision);
+        assert_eq!(decoded.session.session_id, original.session.session_id);
+        assert!(decoded.permit.is_none());
+        assert_eq!(
+            serde_json::to_vec(&decoded).unwrap(),
+            json,
+            "a decoded projection re-encodes identically"
+        );
     }
 
     #[test]

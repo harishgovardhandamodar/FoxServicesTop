@@ -76,6 +76,18 @@ pub struct Cli {
     #[arg(long, value_name = "FIXTURE")]
     pub replay: Option<PathBuf>,
 
+    /// Run headless: keep collecting and persisting with no terminal, and
+    /// serve attaching viewers (`fox-services-top` without `--daemon`) over a
+    /// local socket in the state directory. Intended for a systemd user
+    /// service so history keeps accumulating while no viewer is open.
+    #[arg(long)]
+    pub daemon: bool,
+
+    /// Start a standalone run even when a `--daemon` collector is running:
+    /// never attach to its socket (the run then fails if its lock is held).
+    #[arg(long)]
+    pub no_attach: bool,
+
     /// Print version information (add --verbose for build and runtime details).
     #[arg(short = 'V', long)]
     pub version: bool,

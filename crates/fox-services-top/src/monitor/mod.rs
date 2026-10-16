@@ -54,25 +54,147 @@ const LOG_FLUSH_RESERVE: Duration = Duration::from_millis(250);
 const WORKER_STOP_CAP: Duration = Duration::from_millis(500);
 
 /// Runs the monitor until the user quits, a signal arrives or the terminal hangs up.
+///
+/// Three shapes:
+/// * `--daemon`: collect and persist with no terminal, serving attaching
+///   viewers on the state directory's attach socket.
+/// * a plain interactive run with a `--daemon` collector already listening:
+///   attach to it and run the terminal UI against its live session.
+/// * otherwise: the standalone run (collection and UI in one process).
 pub fn run(cli: &Cli) -> ExitCode {
+    if cli.daemon {
+        return run_daemon(cli);
+    }
+    if !cli.no_attach
+        && cli.replay.is_none()
+        && let Some(attached) = try_attach(cli)
+    {
+        return attached;
+    }
+    run_standalone(cli)
+}
+
+/// Collects and persists with no terminal, serving one attaching viewer at a
+/// time over the state directory's attach socket, until a termination signal
+/// or a shutdown request ends it.
+fn run_daemon(cli: &Cli) -> ExitCode {
+    if cli.replay.is_some() {
+        return fail(EXIT_INVALID, "--daemon cannot be combined with --replay");
+    }
+    let mut application = match Application::start(cli) {
+        Ok(application) => application,
+        Err(error) => return fail(error.exit_code, &error.message),
+    };
+    // There is no terminal frontend to wait for; without this a termination
+    // signal's watcher would force-exit 5 s later instead of letting the
+    // bounded shutdown run (see `signals`).
+    application.frontend_finished.store(true, Ordering::Release);
+    let stop = Arc::new(AtomicBool::new(false));
+    let server = crate::attach::server::serve_in_background(
+        application.session.clone(),
+        &application.attach_socket,
+        Arc::clone(&application.logger) as Arc<dyn fox_services_top_core::ports::Logger>,
+        Arc::clone(&stop),
+    );
+    let server = match server {
+        Ok(server) => server,
+        Err(error) => {
+            let _ = application.shutdown();
+            return fail(
+                EXIT_FAILURE,
+                &format!(
+                    "attach socket {}: {error}",
+                    application.attach_socket.display()
+                ),
+            );
+        }
+    };
+    // The signal watcher triggers the shutdown trigger; so does a fail-stop.
+    while !application.trigger.is_triggered() {
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    stop.store(true, Ordering::Release);
+    let summary = application.shutdown();
+    let _ = join_within(server, Duration::from_secs(1));
+    report_warnings(&summary);
+    match application.fail_stop.reason() {
+        Some(reason) => fail(EXIT_FAILURE, &format!("fail-stop: {reason}")),
+        None => ExitCode::SUCCESS,
+    }
+}
+
+/// Attaches to a running collector, if one is listening; returns the viewer's
+/// exit status, or `None` (and attaches nothing) when no collector runs.
+fn try_attach(cli: &Cli) -> Option<ExitCode> {
+    let paths = startup::resolve_paths(cli).ok()?;
+    match crate::attach::client::connect(&paths.attach_socket) {
+        Ok(crate::attach::client::Attach::NotRunning) => None,
+        Ok(crate::attach::client::Attach::Attached(session)) => {
+            Some(run_attached(Box::new(session)))
+        }
+        Ok(crate::attach::client::Attach::Incompatible { daemon, ours }) => Some(fail(
+            EXIT_FAILURE,
+            &format!(
+                "a collector is running with attach protocol v{daemon}; this build speaks v{ours}; \
+                 restart the collector (or pass --no-attach to force a standalone run)"
+            ),
+        )),
+        Err(error) => Some(fail(
+            EXIT_FAILURE,
+            &format!("attaching to the running collector: {error}"),
+        )),
+    }
+}
+
+/// Runs the terminal UI against an attached session; the collector keeps
+/// collecting whether or not the viewer stays. The data interval comes from
+/// the collector, so the local fps only caps redraws.
+fn run_attached(session: Box<dyn fox_services_top_core::ports::SessionPort>) -> ExitCode {
+    fox_services_top_ui::install_panic_hook();
+    let terminal = NonBlockingTerminal::from_borrowed(std::io::stdout())
+        .and_then(|transport| Ok((transport, TtyInputGate::controlling_terminal()?)));
+    let (transport, input_gate) = match terminal {
+        Ok(terminal) => terminal,
+        Err(error) => return fail(EXIT_FAILURE, &format!("terminal unavailable: {error}")),
+    };
+    let outcome = fox_services_top_ui::run_tui(
+        session,
+        Box::new(transport),
+        Box::new(input_gate),
+        fox_services_top_ui::TuiOptions::default(),
+    );
+    fox_services_top_ui::restore_terminal();
+    match outcome {
+        Ok(_) => ExitCode::SUCCESS,
+        Err(error) => fail(EXIT_FAILURE, &error.to_string()),
+    }
+}
+
+/// The standalone run: collection and the terminal UI in one process.
+fn run_standalone(cli: &Cli) -> ExitCode {
     let mut application = match Application::start(cli) {
         Ok(application) => application,
         Err(error) => return fail(error.exit_code, &error.message),
     };
     let frontend = application.run_frontend();
     let summary = application.shutdown();
-    // The terminal may be gone (hang-up), so stderr failures are ignored.
-    let mut stderr = std::io::stderr();
-    for warning in summary {
-        let _ = writeln!(
-            stderr,
-            "fox-services-top: {}",
-            fox_services_top_core::text::sanitize_message(&warning)
-        );
-    }
+    report_warnings(&summary);
     match application.fail_stop.reason() {
         Some(reason) => fail(EXIT_FAILURE, &format!("fail-stop: {reason}")),
         None => frontend,
+    }
+}
+
+/// Prints shutdown warnings to stderr. The terminal may be gone (hang-up), so
+/// stderr failures are ignored.
+fn report_warnings(warnings: &[String]) {
+    let mut stderr = std::io::stderr();
+    for warning in warnings {
+        let _ = writeln!(
+            stderr,
+            "fox-services-top: {}",
+            fox_services_top_core::text::sanitize_message(warning)
+        );
     }
 }
 
@@ -121,6 +243,8 @@ struct Application {
     logger: Arc<FileLogger>,
     fps: u32,
     replay_root: Option<PathBuf>,
+    /// Where a `--daemon` run serves attaching viewers.
+    attach_socket: PathBuf,
     cluster: crate::remote::ClusterMonitor,
     _lock: InstanceLock,
 }

@@ -73,6 +73,12 @@ of the whole machine.
   and network as bars of 1 minute to 24 hours on the local clock, with now, average and maximum on
   every chart, and each GPU's averages, peaks and energy. Where the CPU's power can be read, the
   power charts start with the total of the CPU and the GPUs and the CPU's own, each with its energy.
+- **Runs in the background.** `fox-services-top --daemon` collects and saves with no window open,
+  and a systemd user service starts it with the machine
+  (`packaging/systemd/fox-services-top.service`). A plain `fox-services-top` then attaches to it
+  for the live data and the full history; quitting the viewer leaves the collector running, so the
+  record covers the whole time the service runs. Full walkthrough:
+  [docs/COLLECTOR.md](docs/COLLECTOR.md).
 - **Full GPU details.** One GPU at a time:
   - performance state, throttle reasons and how long it was throttled, clocks;
   - memory and the memory bus, PCIe link and traffic, NVLink-C2C;
@@ -246,6 +252,7 @@ fox-services-top --no-gpu              # do not start the NVML host
 fox-services-top --read-only           # no process actions
 fox-services-top --no-remote             # no fox-services-top node polling for this run
 fox-services-top --remote-node axiom=http://192.168.1.63:8210   # poll only this node for this run (repeatable)
+fox-services-top --daemon               # headless collector; a plain run attaches to it over a local socket
 fox-services-top --replay fixture.json # simulated data only, read-only, separate temporary state
 fox-services-top --check-config        # validate the configuration and print its saved and effective values
 fox-services-top --diagnostics-json    # versions, SQLite, capabilities and health as JSON
@@ -301,6 +308,7 @@ Each panel names its own keys at the right of its title; the footer keeps the gl
 | Process History (about 40 MiB) | `$XDG_STATE_HOME/fox-services-top/v2/process_history.sqlite3` and `process_recent.json` |
 | Log of process actions (30 days) | `$XDG_STATE_HOME/fox-services-top/v2/audit.sqlite3` |
 | Log file and instance lock | `$XDG_STATE_HOME/fox-services-top/v2/fox-services-top.log`, `instance.lock` |
+| Collector attach socket | `$XDG_STATE_HOME/fox-services-top/v2/attach.sock` (a `--daemon` collector) |
 
 Directories are created `0700` and files `0600`. When a database is full, the oldest data gives way
 first: in Process History, the ended runs seen longest ago. A database from a version with another

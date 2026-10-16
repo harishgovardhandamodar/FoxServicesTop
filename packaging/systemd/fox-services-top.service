@@ -1,0 +1,28 @@
+# fox-services-top headless collector, as a systemd *user* service.
+#
+# The collector keeps sampling and persisting in the background with no
+# terminal; any `fox-services-top` you start attaches to it over the state
+# directory's attach socket and acts as the viewer. See "Run it as a service"
+# in docs/USER_GUIDE.md for the install steps, including `loginctl
+# enable-linger` so it starts at boot without a login.
+#
+# This file is a manual-install template; `install.sh` does not install it.
+
+[Unit]
+Description=fox-services-top collector (headless)
+Documentation=https://github.com/harishgovardhandamodar/fox-services-top
+
+[Service]
+Type=simple
+# User services inherit no interactive PATH, so use an absolute path. This is
+# install.sh's default; change it if you installed the binary elsewhere.
+ExecStart=%h/.local/bin/fox-services-top --daemon
+# The collector exits within its bounded shutdown when asked to stop; give it
+# a little more than the 3 s budget before systemd escalates to SIGKILL.
+KillSignal=SIGTERM
+TimeoutStopSec=15
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

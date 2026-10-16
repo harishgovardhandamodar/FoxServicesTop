@@ -3,7 +3,8 @@
 //! * Config: `$XDG_CONFIG_HOME/fox-services-top/v2/config.json`, falling back to
 //!   `$HOME/.config/fox-services-top/v2/config.json`.
 //! * State: `$XDG_STATE_HOME/fox-services-top/v2/` (fallback `$HOME/.local/state/fox-services-top/v2/`)
-//!   holding `audit.sqlite3`, `history.sqlite3`, `fox-services-top.log`, `instance.lock`.
+//!   holding `audit.sqlite3`, `history.sqlite3`, `fox-services-top.log`,
+//!   `instance.lock` and `attach.sock` (the headless collector's socket).
 //! * Relative XDG values are ignored with a diagnostic note; explicit
 //!   overrides must be absolute. The replay namespace lives under its own
 //!   `replay/` root so simulated data never shares files with live data.
@@ -31,6 +32,8 @@ pub const HISTORY_TIERS_DATABASE_NAME: &str = "history_tiers.sqlite3";
 pub const PROCESS_RECENT_FILE_NAME: &str = "process_recent.json";
 pub const LOG_FILE_NAME: &str = "fox-services-top.log";
 pub const INSTANCE_LOCK_NAME: &str = "instance.lock";
+/// The headless collector's attach socket, served to viewer frontends.
+pub const ATTACH_SOCKET_NAME: &str = "attach.sock";
 
 const XDG_CONFIG_HOME: &str = "XDG_CONFIG_HOME";
 const XDG_STATE_HOME: &str = "XDG_STATE_HOME";
@@ -138,6 +141,9 @@ pub struct StatePaths {
     pub process_recent_file: PathBuf,
     pub log_file: PathBuf,
     pub instance_lock: PathBuf,
+    /// Unix socket on which a `--daemon` collector serves live projections
+    /// to attaching viewer frontends.
+    pub attach_socket: PathBuf,
     /// Default location of the v1 configuration (only read on an explicit
     /// `--import-legacy`); `None` when it cannot be derived.
     pub legacy_config_file: Option<PathBuf>,
@@ -181,6 +187,7 @@ impl StatePaths {
             process_recent_file: state_dir.join(PROCESS_RECENT_FILE_NAME),
             log_file: state_dir.join(LOG_FILE_NAME),
             instance_lock: state_dir.join(INSTANCE_LOCK_NAME),
+            attach_socket: state_dir.join(ATTACH_SOCKET_NAME),
             config_file,
             state_dir,
             legacy_config_file,

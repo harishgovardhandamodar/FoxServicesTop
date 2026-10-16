@@ -20,6 +20,11 @@
 # * never falls back from a GNU to a musl build.
 # Rollback restores the previous binary only: configuration and state stay
 # untouched, and signals already sent to processes cannot be rolled back.
+#
+# To keep collecting while no window is open, run the collector headless
+# (`fox-services-top --daemon`) and attach a viewer to it; see "Background
+# collector" in docs/USER_GUIDE.md. A systemd user unit template is in
+# packaging/systemd/. This installer does not install the unit.
 set -euo pipefail
 
 REPO="harishgovardhandamodar/fox-services-top"

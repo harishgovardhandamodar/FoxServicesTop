@@ -250,6 +250,7 @@ impl Wiring {
             logger,
             fps: effective.viewer.fps,
             replay_root,
+            attach_socket: paths.attach_socket.clone(),
             cluster,
             _lock: lock,
         })

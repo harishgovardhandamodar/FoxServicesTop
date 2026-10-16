@@ -5,6 +5,7 @@
 //! stores, the Manager, the runtime and the terminal UI (Viewer and
 //! Controller). Only this crate depends on every concrete implementation.
 
+mod attach;
 pub mod audit_unavailable;
 pub mod cli;
 pub mod collection_ops;
