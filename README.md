@@ -268,9 +268,21 @@ fox-services-top --import-legacy ~/.config/fox-services-top/config.json --dry-ru
 fox-services-top --version --verbose   # version, commit, toolchain, target, SQLite runtime
 ```
 
-**CPU power and total power:** run fox-services-top with `sudo` to read CPU power counters that require
-root access. Linux powercap/RAPL energy counters are usually root-only; without access, CPU
-power and the CPU + GPU total stay hidden even when GPU power is available.
+**CPU power and total power:** Linux powercap/RAPL energy counters are usually
+root-only (mode `0400` since Linux 5.10), so a non-root collector — including the
+packaged `--daemon` user service — shows no CPU power, and the CPU + GPU total
+stays hidden even when GPU power is available. Make the counters readable once
+with the shipped udev rule; the collector then reads them without running as
+root:
+
+```bash
+./install-from-source.sh --cpu-power   # from a checkout; a one-time sudo for the rule
+```
+
+By hand, install `packaging/udev/60-fox-services-top-powercap.rules` into
+`/etc/udev/rules.d/` and reload udev — see "CPU power without root" in
+[docs/USER_GUIDE.md](docs/USER_GUIDE.md). Alternatively run the whole monitor as
+root:
 
 ```bash
 sudo -H "$HOME/.local/bin/fox-services-top"  # installed with the installer above
@@ -278,8 +290,8 @@ sudo -H ./target/release/fox-services-top   # built from source; run from the re
 ```
 
 The hardware and driver must still expose CPU power data, and every GPU must report its power
-for the total to appear. `sudo` cannot provide missing sensors. With default paths, these commands
-use root's configuration and history. Process termination (`K` / `F9`) is disabled in root sessions.
+for the total to appear. Neither the rule nor `sudo` can provide missing sensors. A root run uses
+root's configuration and history, and process termination (`K` / `F9`) is disabled in root sessions.
 
 `--config` and `--state-dir` take absolute paths for the configuration file and the state
 directory. Command-line values override saved settings only for the current run.

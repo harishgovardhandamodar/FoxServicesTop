@@ -44,8 +44,40 @@ fox-services-top --check-config        # validate config, print saved/effective 
 fox-services-top --diagnostics-json    # versions, SQLite, capabilities, health as JSON
 ```
 
-Run with `sudo -H` to also read root-only CPU power counters (powercap/RAPL);
-process actions (`K`/`F9`) are disabled in root sessions.
+CPU power (the ⚡ figures) comes from the Linux powercap/RAPL counters where the
+hardware exposes them. The kernel makes those counters root-only, so a normal
+run shows no CPU power and no CPU + GPU total even when GPU power is available.
+Grant read access once with the udev rule below (no `sudo` for the monitor
+itself), or run the whole monitor as root — `sudo -H fox-services-top` — in
+which case process actions (`K`/`F9`) are disabled.
+
+## CPU power without root
+
+`energy_uj` under `/sys/class/powercap` is mode `0400 root:root` since Linux
+5.10 (the counters can feed a side-channel attack). The collector reports that
+as `permission_denied` — never as `0` — and leaves the CPU power and the total
+hidden. To read them as your normal user, install the shipped udev rule once:
+
+```bash
+# With the source installer (from the repository directory):
+./install-from-source.sh --cpu-power
+
+# Or by hand, from a checkout:
+sudo cp packaging/udev/60-fox-services-top-powercap.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules
+sudo udevadm trigger --subsystem-match=powercap
+```
+
+The rule runs `chmod a+r` on each `energy_uj` as its zone registers. It changes
+nothing else: the control files stay root-only and nothing becomes writable. A
+running collector re-probes a denied counter by itself, so it picks the reading
+up without a restart; the ⚡ figures appear within a couple of intervals. On a
+shared machine where untrusted local users must not be able to attempt the side
+channel, skip this and run the collector as root instead. Remove the file and
+re-run the two `udevadm` commands to undo it.
+
+The hardware must still expose the counters: a host with no powercap zone (and
+no `spbm` hwmon power sensor) has no CPU power to read, rule or not.
 
 ## Background collector (`--daemon`)
 
@@ -262,6 +294,10 @@ files `0600`. Databases are never migrated: a foreign format starts empty,
   Settings like any display module; both are on by default.
 - **Slow shutdown.** The poller is stopped inside the 3 s shutdown budget; a
   node hanging exactly at timeout can add a warning line, never a hang.
+- **No ⚡ CPU power or total.** Linux powercap/RAPL counters are root-only, so a
+  normal run reads none; install the udev rule under "CPU power without root"
+  above (`install-from-source.sh --cpu-power`). If the host has no powercap
+  zone at all, there is no CPU power to read.
 - **History only covers the time a window was open.** Run `--daemon` (or install
   the service above) so the collector keeps recording while nothing is shown; a
   plain run then attaches to it.

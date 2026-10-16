@@ -1,0 +1,30 @@
+# fox-services-top: let an unprivileged collector read the CPU's power.
+#
+# Since Linux 5.10 the powercap energy counters
+# (/sys/class/powercap/<zone>/energy_uj, the RAPL counters) are root-only
+# (mode 0400): their readings can feed a side-channel attack, so the kernel
+# reserved them for root. Without read access the collector reports
+# `permission_denied` and the CPU's power, the CPU + GPU total and the power
+# charts stay hidden -- which is every run as a normal user, including the
+# packaged `--daemon` systemd *user* service.
+#
+# This rule grants read access as soon as a zone is registered, so the
+# collector sees the counters without ever running as root. The control files
+# stay root-only and write access is never granted. On a shared machine where
+# untrusted local users must not be able to attempt the side channel, do not
+# install this file; run the collector as root instead.
+#
+# Install (once, as root):
+#   sudo cp 60-fox-services-top-powercap.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules
+#   sudo udevadm trigger --subsystem-match=powercap
+#
+# To undo: remove the file and run the two udevadm commands again. No collector
+# restart is needed either way: a denied counter is re-probed on its own, so a
+# running collector picks the reading up shortly after the rule is applied.
+#
+# %S is the sysfs mount and %p the device path, so %S%p/energy_uj is the zone's
+# counter. The ATTR guard restricts the rule to zones that actually have one
+# (the control directory `intel-rapl` and drivers without a counter are
+# skipped); it is driver-agnostic, so Intel/AMD RAPL zones both match.
+ACTION=="add", SUBSYSTEM=="powercap", ATTR{energy_uj}=="?*", RUN+="/bin/chmod a+r %S%p/energy_uj"

@@ -4,6 +4,7 @@
 #   curl -fsSL https://raw.githubusercontent.com/harishgovardhandamodar/FoxServicesTop/master/install-from-source.sh | bash
 #   ./install-from-source.sh --ref v2.2.0
 #   ./install-from-source.sh --service          # also install the headless collector's user unit
+#   ./install-from-source.sh --cpu-power        # also make the CPU power counters readable (needs sudo)
 #   ./install-from-source.sh --install-rust     # install rustup first if cargo is missing
 #
 # Hosts: Linux on x86_64 or aarch64 with glibc, WSL 2 included; WSL 1 and musl
@@ -25,6 +26,11 @@
 # and enabled: the headless collector starts with the session (or at boot with
 # `loginctl enable-linger`), and any `fox-services-top` attaches to it. See
 # "Background collector" in docs/USER_GUIDE.md.
+#
+# With --cpu-power the udev rule from packaging/udev is installed (as root) so
+# the collector reads the powercap/RAPL energy counters as a normal user; the
+# CPU's power, the CPU + GPU total and the power charts need it. Without it a
+# non-root run shows no CPU power, which the installer notes at the end.
 set -euo pipefail
 
 REPO="harishgovardhandamodar/FoxServicesTop"
@@ -32,6 +38,7 @@ BINARY="fox-services-top"
 REF="master"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 SERVICE=0
+CPU_POWER=0
 INSTALL_RUST=0
 STAGING=""
 
@@ -48,11 +55,12 @@ fail() { printf '\033[1;31m[error]\033[0m %s\n' "$1" >&2; exit 1; }
 
 usage() {
     cat <<'EOF'
-Usage: install-from-source.sh [--ref GIT-REF] [--install-dir DIR] [--service] [--install-rust]
+Usage: install-from-source.sh [--ref GIT-REF] [--install-dir DIR] [--service] [--cpu-power] [--install-rust]
 
   --ref           git branch, tag or commit to build (default: master)
   --install-dir   target directory (default: $INSTALL_DIR or ~/.local/bin)
   --service       install and enable the systemd user collector service
+  --cpu-power     make the CPU power counters readable (powercap/RAPL; uses sudo)
   --install-rust  install rustup (with the pinned toolchain) if cargo is missing
 EOF
 }
@@ -63,6 +71,7 @@ parse_args() {
             --ref) REF="${2:?--ref needs a value}"; shift 2 ;;
             --install-dir) INSTALL_DIR="${2:?--install-dir needs a value}"; shift 2 ;;
             --service) SERVICE=1; shift ;;
+            --cpu-power) CPU_POWER=1; shift ;;
             --install-rust) INSTALL_RUST=1; shift ;;
             -h|--help) usage; exit 0 ;;
             *) fail "unknown argument: $1" ;;
@@ -199,6 +208,40 @@ install_service() {
     info "start it at boot (before login) with: loginctl enable-linger \"$USER\""
 }
 
+# powercap/RAPL energy counters are root-only by default (Linux 5.10+), so a
+# non-root collector reads no CPU power. The udev rule restores read access.
+install_cpu_power_rule() {
+    require udevadm
+    local rule="60-fox-services-top-powercap.rules"
+    local rule_dir="/etc/udev/rules.d"
+    local source="${STAGING}/checkout/packaging/udev/${rule}"
+    [ -f "$source" ] || fail "the checkout has no packaging/udev/${rule}"
+    local sudo_cmd=()
+    if [ "$(id -u)" != "0" ]; then
+        command -v sudo >/dev/null 2>&1 || fail "--cpu-power needs root; install ${source} into ${rule_dir} by hand"
+        sudo_cmd=(sudo)
+    fi
+    "${sudo_cmd[@]}" install -m 0644 -- "$source" "${rule_dir}/${rule}" \
+        || fail "could not install ${rule_dir}/${rule}"
+    info "installed ${rule_dir}/${rule}"
+    "${sudo_cmd[@]}" udevadm control --reload-rules || warn "could not reload the udev rules"
+    "${sudo_cmd[@]}" udevadm trigger --subsystem-match=powercap || warn "could not trigger the powercap devices"
+    info "CPU power counters are readable without root; the collector picks them up on its own"
+}
+
+# Notes the option when CPU power is hidden only by permissions, so the missing
+# ⚡ is never a silent surprise.
+hint_cpu_power() {
+    local counter
+    for counter in /sys/class/powercap/*/energy_uj; do
+        [ -e "$counter" ] || continue
+        if [ ! -r "$counter" ]; then
+            info "CPU power counters are root-only: re-run with --cpu-power to make them readable, or run the collector as root"
+            return
+        fi
+    done
+}
+
 main() {
     parse_args "$@"
     # The host is checked first, so an unsupported system hears that rather
@@ -212,6 +255,11 @@ main() {
     [ -f "$candidate" ] || fail "build produced no binary at target/release/${BINARY}"
     verify_binary "$candidate" "$(detect_host)"
     install_binary "$candidate"
+    if [ "$CPU_POWER" = "1" ]; then
+        install_cpu_power_rule
+    else
+        hint_cpu_power
+    fi
     if [ "$SERVICE" = "1" ]; then
         install_service
     else

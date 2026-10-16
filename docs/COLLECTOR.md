@@ -88,8 +88,11 @@ policy revives the collector only after a crash (a non-zero exit), 5 s later.
 systemd allows 15 s for the shutdown, which is more than the app's own 3 s
 budget.
 
-Because the unit runs as your user, root-only CPU power counters (powercap /
-RAPL) are not read — same as any normal session. The app's own log,
+The unit runs as your user, so the kernel's root-only powercap/RAPL energy
+counters are not read — the CPU power and the CPU + GPU total stay hidden. Grant
+read access once with the udev rule described under "CPU power without root" in
+the [user guide](USER_GUIDE.md) (`install-from-source.sh --cpu-power` does it for
+you); the running collector picks the counters up on its own. The app's own log,
 `~/.local/state/fox-services-top/v2/fox-services-top.log`, records what the
 collector does.
 
