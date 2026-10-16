@@ -9,10 +9,10 @@ plus a record of every GPU job from start to end, including how it ended.
 
 [Project page](https://harishgovardhandamodar.me/en/projects/tools/fox-services-top/) · [How it works](https://harishgovardhandamodar.me/en/projects/tools/fox-services-top/#architecture)
 
-[![Release](https://img.shields.io/github/v/release/harishgovardhandamodar/fox-services-top)](https://github.com/harishgovardhandamodar/fox-services-top/releases/latest)
+[![Release](https://img.shields.io/github/v/release/harishgovardhandamodar/FoxServicesTop)](https://github.com/harishgovardhandamodar/FoxServicesTop/releases/latest)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.92.0-orange.svg)](rust-toolchain.toml)
-[![CI](https://github.com/harishgovardhandamodar/fox-services-top/actions/workflows/ci.yml/badge.svg)](https://github.com/harishgovardhandamodar/fox-services-top/actions/workflows/ci.yml)
+[![CI](https://github.com/harishgovardhandamodar/FoxServicesTop/actions/workflows/ci.yml/badge.svg)](https://github.com/harishgovardhandamodar/FoxServicesTop/actions/workflows/ci.yml)
 
 <img src="docs/images/screenshots/dgx-spark-overview.png" alt="fox-services-top Overview on a DGX Spark: the CPU, the unified memory split into the system and two GPU processes in their colors, the GB10 GPU, the disk and network tables, and the GPU process table" width="100%">
 
@@ -23,7 +23,7 @@ plus a record of every GPU job from start to end, including how it ended.
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/harishgovardhandamodar/fox-services-top/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/harishgovardhandamodar/FoxServicesTop/master/install.sh | bash
 ```
 
 Linux on x86_64 or aarch64 with glibc 2.34 or newer (Ubuntu 22.04, Debian 12, RHEL 9 and later),
@@ -37,8 +37,8 @@ it back. For a specific release, append `-s -- --version v2.2.0` to `bash`.
 Or build from source with Rust 1.92.0 (pinned by `rust-toolchain.toml`):
 
 ```bash
-git clone https://github.com/harishgovardhandamodar/fox-services-top.git
-cd fox-services-top
+git clone https://github.com/harishgovardhandamodar/FoxServicesTop.git
+cd FoxServicesTop
 cargo build --release --locked
 ./target/release/fox-services-top
 ```

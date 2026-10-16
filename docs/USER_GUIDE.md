@@ -7,7 +7,7 @@ service on the **Docker** tab.
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/harishgovardhandamodar/fox-services-top/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/harishgovardhandamodar/FoxServicesTop/master/install.sh | bash
 ```
 
 Linux x86_64 or aarch64 with glibc 2.34+ (Ubuntu 22.04, Debian 12, RHEL 9+;
@@ -17,8 +17,8 @@ without it, CPU, memory, disks and network still work.
 Or build from source (Rust 1.92.0, pinned by `rust-toolchain.toml`):
 
 ```bash
-git clone https://github.com/harishgovardhandamodar/fox-services-top.git
-cd fox-services-top
+git clone https://github.com/harishgovardhandamodar/FoxServicesTop.git
+cd FoxServicesTop
 cargo build --release --locked
 ./target/release/fox-services-top
 ```
@@ -83,7 +83,7 @@ lingering enabled — no root and no terminal. The unit template ships at
 
 ```bash
 mkdir -p ~/.config/systemd/user
-curl -fsSL https://raw.githubusercontent.com/harishgovardhandamodar/fox-services-top/main/packaging/systemd/fox-services-top.service \
+curl -fsSL https://raw.githubusercontent.com/harishgovardhandamodar/FoxServicesTop/master/packaging/systemd/fox-services-top.service \
   -o ~/.config/systemd/user/fox-services-top.service
 # If the binary is not in ~/.local/bin, edit ExecStart= in that file first.
 

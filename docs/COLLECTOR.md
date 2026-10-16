@@ -42,7 +42,7 @@ no terminal.
 
 ```bash
 mkdir -p ~/.config/systemd/user
-curl -fsSL https://raw.githubusercontent.com/harishgovardhandamodar/fox-services-top/main/packaging/systemd/fox-services-top.service \
+curl -fsSL https://raw.githubusercontent.com/harishgovardhandamodar/FoxServicesTop/master/packaging/systemd/fox-services-top.service \
   -o ~/.config/systemd/user/fox-services-top.service
 ```
 

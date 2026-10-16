@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # fox-services-top installer.
 #
-#   curl -fsSL https://raw.githubusercontent.com/harishgovardhandamodar/fox-services-top/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/harishgovardhandamodar/FoxServicesTop/master/install.sh | bash
 #   ./install.sh --version v2.0.0
 #   ./install.sh --rollback
 #
@@ -27,7 +27,7 @@
 # packaging/systemd/. This installer does not install the unit.
 set -euo pipefail
 
-REPO="harishgovardhandamodar/fox-services-top"
+REPO="harishgovardhandamodar/FoxServicesTop"
 BINARY="fox-services-top"
 FIRST_RELEASE="v2.0.0"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"

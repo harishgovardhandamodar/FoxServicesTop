@@ -10,7 +10,7 @@
 
 [Unit]
 Description=fox-services-top collector (headless)
-Documentation=https://github.com/harishgovardhandamodar/fox-services-top
+Documentation=https://github.com/harishgovardhandamodar/FoxServicesTop
 
 [Service]
 Type=simple
