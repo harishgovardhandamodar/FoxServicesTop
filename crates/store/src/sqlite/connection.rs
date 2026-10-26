@@ -63,10 +63,36 @@ impl ConnectionProfile {
 /// URI interpretation, no per-connection mutex (the writer is single
 /// threaded), extended result codes.
 pub(crate) fn open_flags() -> OpenFlags {
-    OpenFlags::SQLITE_OPEN_READ_WRITE
+    // `SQLITE_OPEN_NOFOLLOW` refuses every open on macOS (even for regular
+    // files), so it is Linux-only. Symlinked databases stay refused on both
+    // systems: `open_database` rejects them up front in `prepare_file`
+    // before any connection opens.
+    #[cfg(target_os = "macos")]
+    let flags = OpenFlags::SQLITE_OPEN_READ_WRITE
+        | OpenFlags::SQLITE_OPEN_NO_MUTEX
+        | OpenFlags::SQLITE_OPEN_EXRESCODE;
+    #[cfg(not(target_os = "macos"))]
+    let flags = OpenFlags::SQLITE_OPEN_READ_WRITE
         | OpenFlags::SQLITE_OPEN_NO_MUTEX
         | OpenFlags::SQLITE_OPEN_NOFOLLOW
-        | OpenFlags::SQLITE_OPEN_EXRESCODE
+        | OpenFlags::SQLITE_OPEN_EXRESCODE;
+    flags
+}
+
+/// Read-only variant of [`open_flags`] for archive and history readers.
+pub(crate) fn open_flags_read_only() -> OpenFlags {
+    // Same macOS exception as [`open_flags`]: `SQLITE_OPEN_NOFOLLOW`
+    // refuses every open there, so it stays Linux-only.
+    #[cfg(target_os = "macos")]
+    let flags = OpenFlags::SQLITE_OPEN_READ_ONLY
+        | OpenFlags::SQLITE_OPEN_NO_MUTEX
+        | OpenFlags::SQLITE_OPEN_EXRESCODE;
+    #[cfg(not(target_os = "macos"))]
+    let flags = OpenFlags::SQLITE_OPEN_READ_ONLY
+        | OpenFlags::SQLITE_OPEN_NO_MUTEX
+        | OpenFlags::SQLITE_OPEN_NOFOLLOW
+        | OpenFlags::SQLITE_OPEN_EXRESCODE;
+    flags
 }
 
 /// Opens the writer connection with hardening that needs no file access.
@@ -194,6 +220,11 @@ mod tests {
         drop(connection);
         let link = dir.join("link.sqlite3");
         std::os::unix::fs::symlink(&path, &link).unwrap();
+        // `SQLITE_OPEN_NOFOLLOW` refuses the link on Linux; on macOS the
+        // flag itself refuses every open, so the check lives one layer up
+        // (`open_database` rejects symlinks in `prepare_file` before any
+        // connection opens — covered by its own tests).
+        #[cfg(not(target_os = "macos"))]
         assert!(open_connection(&link, Duration::from_millis(100)).is_err());
         assert!(open_connection(&dir.join("missing.sqlite3"), Duration::from_millis(100)).is_err());
         std::fs::remove_dir_all(dir).unwrap();
