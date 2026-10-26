@@ -9,6 +9,8 @@
 pub mod common;
 pub mod filesystem;
 pub mod hwmon;
+#[cfg(target_os = "macos")]
+pub mod macos;
 pub mod network;
 pub mod nvml;
 pub mod powercap;

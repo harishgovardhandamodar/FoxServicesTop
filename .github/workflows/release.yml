@@ -1,9 +1,10 @@
 name: Release
 
 # Runs only when a maintainer pushes a version tag. The release is published
-# once the gate passes and both builds pass their version, glibc and install
-# checks; the published release is then installed on the supported Linux
-# systems (D-63).
+# once the gate passes and all three builds pass their version and install
+# checks (plus the glibc check on Linux and the diagnostics check on macOS);
+# the published release is then installed on the supported Linux systems and
+# on Apple Silicon (D-63).
 on:
   push:
     tags:
@@ -55,11 +56,19 @@ jobs:
         include:
           # GNU targets only: musl builds are not produced because NVML is untested
           # there, and the installer never falls back from GNU to musl. Ubuntu
-          # 22.04 images keep the required glibc at 2.34 at most.
+          # 22.04 images keep the required glibc at 2.34 at most. The macOS
+          # build carries the Apple Silicon diagnostics instead.
           - target: x86_64-unknown-linux-gnu
             runner: ubuntu-22.04
+            os: linux
           - target: aarch64-unknown-linux-gnu
             runner: ubuntu-22.04-arm
+            os: linux
+          # Apple Silicon diagnostics ride the same tag as a parallel
+          # release (macos-14 is arm64).
+          - target: aarch64-apple-darwin
+            runner: macos-14
+            os: macos
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -75,7 +84,20 @@ jobs:
           grep -qxF "fox-services-top ${GITHUB_REF_NAME#v}" version.txt
           grep -qxF "target: ${{ matrix.target }}" version.txt
           grep -qE '^sqlite: [0-9]+(\.[0-9]+)+ \(runtime gate >= 3\.51\.3: ok\)$' version.txt
-      - name: The binary needs glibc 2.34 at most
+      - name: The Apple Silicon diagnostics answer on macOS
+        if: matrix.os == 'macos'
+        run: |
+          bin="target/${{ matrix.target }}/release/fox-services-top"
+          "$bin" --diagnostics-json > diagnostics.json
+          python3 - <<'EOF'
+          import json
+          report = json.load(open("diagnostics.json"))
+          assert [a["adapter_id"] for a in report["adapters"]] == ["macos"], report["adapters"]
+          assert report["target"] == "aarch64-apple-darwin", report
+          print("macOS diagnostics: healthy macos adapter, target ok")
+          EOF
+      - name: The Linux binary needs glibc 2.34 at most
+        if: matrix.os == 'linux'
         run: |
           required="$(objdump -p "target/${{ matrix.target }}/release/fox-services-top" | grep -o 'GLIBC_[0-9.]*' | sed 's/^GLIBC_//' | sort -uV | tail -n 1)"
           echo "highest glibc version required: ${required}"
@@ -84,12 +106,22 @@ jobs:
         run: |
           name="fox-services-top-${GITHUB_REF_NAME}-${{ matrix.target }}"
           tar -C "target/${{ matrix.target }}/release" -czf "${name}.tar.gz" fox-services-top
-          sha256sum "${name}.tar.gz" > "${name}.tar.gz.sha256"
+          # `sha256sum` on Linux, `shasum -a 256` on stock macOS.
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "${name}.tar.gz" > "${name}.tar.gz.sha256"
+          else
+            shasum -a 256 "${name}.tar.gz" > "${name}.tar.gz.sha256"
+          fi
       - name: The archive installs with install.sh
         run: |
           mkdir -p smoke
           cp "fox-services-top-${GITHUB_REF_NAME}-${{ matrix.target }}.tar.gz" smoke/
-          (cd smoke && sha256sum fox-services-top-*.tar.gz > SHA256SUMS)
+          # `sha256sum` on Linux, `shasum -a 256` on stock macOS.
+          if command -v sha256sum >/dev/null 2>&1; then
+            (cd smoke && sha256sum fox-services-top-*.tar.gz > SHA256SUMS)
+          else
+            (cd smoke && shasum -a 256 fox-services-top-*.tar.gz > SHA256SUMS)
+          fi
           ./install.sh --version "${GITHUB_REF_NAME}" --base-url "file://${PWD}/smoke" --install-dir "${RUNNER_TEMP}/bin"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

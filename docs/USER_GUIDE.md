@@ -1,8 +1,8 @@
 # Fox-Services-Top User Guide
 
-Terminal monitor for NVIDIA GPUs on Linux and DGX Spark — plus your whole
-fox-services cluster: per-node health on the **Nodes** tab and every Docker
-service on the **Docker** tab.
+Terminal monitor for NVIDIA GPUs on Linux and DGX Spark, for Apple Silicon on
+macOS — plus your whole fox-services cluster: per-node health on the **Nodes**
+tab and every Docker service on the **Docker** tab.
 
 ## Install
 
@@ -11,8 +11,9 @@ curl -fsSL https://raw.githubusercontent.com/harishgovardhandamodar/FoxServicesT
 ```
 
 Linux x86_64 or aarch64 with glibc 2.34+ (Ubuntu 22.04, Debian 12, RHEL 9+;
-DGX Spark included; WSL 2 works). GPU metrics need the NVIDIA driver —
-without it, CPU, memory, disks and network still work.
+DGX Spark included; WSL 2 works); and macOS on Apple Silicon (arm64).
+GPU metrics need the NVIDIA driver on Linux — without it, CPU, memory, disks
+and network still work; on macOS the Apple GPU needs no driver or privileges.
 
 Or build from source (Rust 1.92.0, pinned by `rust-toolchain.toml`) — one
 command with the source installer, which also has `--service` to set up the
@@ -37,7 +38,7 @@ cargo build --release --locked
 fox-services-top                       # live monitor
 fox-services-top -i 0.5                # sample every 0.5 s for this run only
 fox-services-top -t amber              # theme for this run: dark, cyan, green, amber
-fox-services-top --no-gpu              # do not start the NVML host
+fox-services-top --no-gpu              # no GPU telemetry for this run
 fox-services-top --read-only           # no process actions
 fox-services-top --daemon              # headless collector; viewers attach to it (see below)
 fox-services-top --check-config        # validate config, print saved/effective values
@@ -83,11 +84,16 @@ fox-services-top               # attaches to the collector and draws, or runs st
 - A viewer whose attach protocol differs from the collector's refuses to attach
   and says so; restart the collector to match.
 
-### Install it as a systemd user service
+### Install it as a user service
 
-A systemd **user** service starts the collector on login, or at boot with
-lingering enabled — no root and no terminal. The unit template ships at
-[`packaging/systemd/fox-services-top.service`](../packaging/systemd/fox-services-top.service):
+A user service starts the collector on login with no root and no terminal.
+On Linux that is a systemd **user** unit; on macOS a launchd agent. The
+templates ship at
+[`packaging/systemd/fox-services-top.service`](../packaging/systemd/fox-services-top.service)
+and
+[`packaging/macos/me.harishgovardhandamodar.fox-services-top.plist`](../packaging/macos/me.harishgovardhandamodar.fox-services-top.plist).
+
+On Linux:
 
 ```bash
 mkdir -p ~/.config/systemd/user
@@ -116,10 +122,30 @@ systemctl --user disable --now fox-services-top
 journalctl --user -u fox-services-top -f      # what systemd sees
 ```
 
-The unit runs the collector as your user, so `sudo`-only CPU power counters are
-not read; the app's own log (see the file table below) still records what it
-does. If you installed the binary elsewhere, set `ExecStart=` to its absolute
-path. `install.sh` does not install the unit.
+On macOS:
+
+```bash
+mkdir -p ~/Library/LaunchAgents
+curl -fsSL https://raw.githubusercontent.com/harishgovardhandamodar/FoxServicesTop/master/packaging/macos/me.harishgovardhandamodar.fox-services-top.plist \
+  -o ~/Library/LaunchAgents/me.harishgovardhandamodar.fox-services-top.plist
+# If the binary is not in ~/.local/bin, edit the ProgramArguments in that file first.
+
+launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/me.harishgovardhandamodar.fox-services-top.plist
+```
+
+Manage the agent:
+
+```bash
+launchctl print "gui/$(id -u)/me.harishgovardhandamodar.fox-services-top"
+launchctl bootout "gui/$(id -u)/me.harishgovardhandamodar.fox-services-top"    # stop
+launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/me.harishgovardhandamodar.fox-services-top.plist  # start
+```
+
+The service runs the collector as your user, so `sudo`-only counters are
+not read (CPU power counters on Linux; `powermetrics` samplers on macOS);
+the app's own log (see the file table below) still records what it
+does. If you installed the binary elsewhere, point the unit at its absolute
+path. `install.sh` installs neither unit.
 
 ## Tabs and keys
 

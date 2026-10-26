@@ -8,10 +8,12 @@
 //! reload; the lookup is an in-process table scan.
 
 use fox_services_top_core::gpu_state::{GpuLink, PeerAccess};
+#[cfg(target_os = "linux")]
+use nvml_wrapper::enum_wrappers::device::TopologyLevel;
 use nvml_wrapper::enum_wrappers::device::{
     Brand, Clock, ComputeMode, EccCounter, MemoryError, P2pCapabilitiesIndex, P2pStatus,
     PcieUtilCounter, PerformancePolicy, PerformanceState, RetirementCause, TemperatureSensor,
-    TemperatureThreshold, TopologyLevel,
+    TemperatureThreshold,
 };
 use nvml_wrapper::enums::device::{DeviceArchitecture, SampleValue, UsedGpuMemory};
 use nvml_wrapper::error::NvmlError;
@@ -31,10 +33,13 @@ use super::backend::{
 };
 
 /// Words of the CPU affinity mask asked for: 1024 CPUs.
+#[cfg(target_os = "linux")]
 const CPU_AFFINITY_WORDS: usize = 16;
 /// Words of the NUMA affinity mask asked for: 128 nodes.
+#[cfg(target_os = "linux")]
 const NUMA_AFFINITY_WORDS: usize = 2;
 /// `NVML_AFFINITY_SCOPE_NODE`: the memory affinity by NUMA node.
+#[cfg(target_os = "linux")]
 const NUMA_NODE_SCOPE: u32 = 0;
 
 /// Opens NVML sessions with `Nvml::init()`.
@@ -51,6 +56,77 @@ impl BackendConnector for NvmlLibraryConnector {
 /// One open NVML session; dropping it calls `nvmlShutdown`.
 pub struct NvmlLibraryBackend {
     nvml: Nvml,
+}
+
+/// `nvml-wrapper` gates these queries to `target_os = "linux"`, so the
+/// Apple Silicon build answers them without the driver call. NVML never
+/// connects on macOS (no `libnvidia-ml`), hence these are unreachable in
+/// production there; they exist only so the adapter compiles on both
+/// systems, and every one reports the same `NotSupported` the capability
+/// tracker already handles on old drivers.
+#[cfg(target_os = "linux")]
+fn minor_number_of(device: &nvml_wrapper::Device<'_>) -> Option<u32> {
+    device.minor_number().ok()
+}
+
+/// [`minor_number_of`] on systems without the Linux-gated binding.
+#[cfg(not(target_os = "linux"))]
+fn minor_number_of(_device: &nvml_wrapper::Device<'_>) -> Option<u32> {
+    None
+}
+
+/// Persistence mode without the Linux-gated binding: `NotSupported` on macOS.
+#[cfg(target_os = "linux")]
+fn persistence_mode_of(device: &nvml_wrapper::Device<'_>) -> BackendResult<bool> {
+    query(device.is_in_persistent_mode())
+}
+
+/// [`persistence_mode_of`] on systems without the Linux-gated binding.
+#[cfg(not(target_os = "linux"))]
+fn persistence_mode_of(_device: &nvml_wrapper::Device<'_>) -> BackendResult<bool> {
+    Err(BackendError::NotSupported)
+}
+
+/// CPU affinity without the Linux-gated binding: `NotSupported` on macOS.
+#[cfg(target_os = "linux")]
+fn cpu_affinity_of(device: &nvml_wrapper::Device<'_>) -> BackendResult<Vec<u64>> {
+    query(device.cpu_affinity(CPU_AFFINITY_WORDS))
+}
+
+/// [`cpu_affinity_of`] on systems without the Linux-gated binding.
+#[cfg(not(target_os = "linux"))]
+fn cpu_affinity_of(_device: &nvml_wrapper::Device<'_>) -> BackendResult<Vec<u64>> {
+    Err(BackendError::NotSupported)
+}
+
+/// NUMA affinity without the Linux-gated binding: `NotSupported` on macOS.
+#[cfg(target_os = "linux")]
+fn numa_affinity_of(device: &nvml_wrapper::Device<'_>) -> BackendResult<Vec<u64>> {
+    query(device.memory_affinity(NUMA_AFFINITY_WORDS, NUMA_NODE_SCOPE))
+}
+
+/// [`numa_affinity_of`] on systems without the Linux-gated binding.
+#[cfg(not(target_os = "linux"))]
+fn numa_affinity_of(_device: &nvml_wrapper::Device<'_>) -> BackendResult<Vec<u64>> {
+    Err(BackendError::NotSupported)
+}
+
+/// Peer topology without the Linux-gated binding: `NotSupported` on macOS.
+#[cfg(target_os = "linux")]
+fn peer_link_of(
+    device: nvml_wrapper::Device<'_>,
+    other: nvml_wrapper::Device<'_>,
+) -> BackendResult<GpuLink> {
+    query(device.topology_common_ancestor(other)).map(link_of)
+}
+
+/// [`peer_link_of`] on systems without the Linux-gated binding.
+#[cfg(not(target_os = "linux"))]
+fn peer_link_of(
+    _device: nvml_wrapper::Device<'_>,
+    _other: nvml_wrapper::Device<'_>,
+) -> BackendResult<GpuLink> {
+    Err(BackendError::NotSupported)
 }
 
 impl std::fmt::Debug for NvmlLibraryBackend {
@@ -228,6 +304,7 @@ const fn policy_of(cause: ThrottleCause) -> PerformancePolicy {
     }
 }
 
+#[cfg(target_os = "linux")]
 const fn link_of(level: TopologyLevel) -> GpuLink {
     match level {
         TopologyLevel::Internal => GpuLink::SameBoard,
@@ -322,7 +399,7 @@ impl GpuInventory for NvmlLibraryBackend {
                 .board_part_number()
                 .ok()
                 .filter(|part| !part.trim().is_empty()),
-            minor_number: device.minor_number().ok(),
+            minor_number: minor_number_of(&device),
             pci_device_id: pci.as_ref().map(|info| pci_id(info.pci_device_id)),
             pci_subsystem_id: pci
                 .as_ref()
@@ -337,7 +414,7 @@ impl GpuInventory for NvmlLibraryBackend {
     }
 
     fn persistence_mode(&self, uuid: &str) -> BackendResult<bool> {
-        query(self.device(uuid)?.is_in_persistent_mode())
+        persistence_mode_of(&self.device(uuid)?)
     }
 
     fn fan_count(&self, uuid: &str) -> BackendResult<u32> {
@@ -394,7 +471,7 @@ impl GpuInventory for NvmlLibraryBackend {
     }
 
     fn cpu_affinity(&self, uuid: &str) -> BackendResult<Vec<u64>> {
-        query(self.device(uuid)?.cpu_affinity(CPU_AFFINITY_WORDS))
+        cpu_affinity_of(&self.device(uuid)?)
     }
 
     /// The link count and the first link's bandwidth: the binding reads
@@ -417,15 +494,11 @@ impl GpuInventory for NvmlLibraryBackend {
     }
 
     fn numa_affinity(&self, uuid: &str) -> BackendResult<Vec<u64>> {
-        query(
-            self.device(uuid)?
-                .memory_affinity(NUMA_AFFINITY_WORDS, NUMA_NODE_SCOPE),
-        )
+        numa_affinity_of(&self.device(uuid)?)
     }
 
     fn peer_link(&self, uuid: &str, peer: &str) -> BackendResult<GpuLink> {
-        let other = self.device(peer)?;
-        query(self.device(uuid)?.topology_common_ancestor(other)).map(link_of)
+        peer_link_of(self.device(uuid)?, self.device(peer)?)
     }
 
     fn peer_access(&self, uuid: &str, peer: &str) -> BackendResult<PeerAccess> {

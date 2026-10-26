@@ -2,7 +2,8 @@
 
 # fox-services-top
 
-**A terminal monitor for NVIDIA GPUs on Linux and DGX Spark**
+**A terminal monitor for NVIDIA GPUs on Linux and DGX Spark — and for Apple
+Silicon on macOS**
 
 Every GPU, each job's share of its memory and the whole machine on one screen,<br>
 plus a record of every GPU job from start to end, including how it ended.
@@ -27,16 +28,52 @@ curl -fsSL https://raw.githubusercontent.com/harishgovardhandamodar/FoxServicesT
 ```
 
 Linux on x86_64 or aarch64 with glibc 2.34 or newer (Ubuntu 22.04, Debian 12, RHEL 9 and later),
-DGX Spark included. WSL 2 runs the Linux build. GPU metrics need the NVIDIA driver; without it, CPU,
-memory, disks and network still work. WSL 1, musl, macOS and Windows are not supported.
+DGX Spark included; and macOS on Apple Silicon (arm64). WSL 2 runs the Linux build.
+GPU metrics need the NVIDIA driver on Linux (without it, CPU, memory, disks and
+network still work); on macOS the Apple GPU is read through IOKit with no driver
+or privileges needed. WSL 1, musl, Intel macOS and Windows are not supported.
 
 The installer picks the build for your CPU, checks it against the release's `SHA256SUMS` and
 installs it to `~/.local/bin`. The previous version is kept, and `./install.sh --rollback` brings
 it back. For a specific release, append `-s -- --version v2.2.0` to `bash`.
 
-Or build from source with Rust 1.92.0 (pinned by `rust-toolchain.toml`) —
-`install-from-source.sh` does it in one command (`--service` also installs the
-headless collector's systemd user unit, `--install-rust` adds rustup first):
+### On macOS (Apple Silicon)
+
+`install.sh` works once a release ships a macOS build (the
+`aarch64-apple-darwin` asset rides the same tag as the Linux builds). Until
+then, build from source — Rust 1.92.0 (pinned by `rust-toolchain.toml`) with
+Xcode command line tools for the linker (`xcode-select --install`):
+
+```bash
+git clone https://github.com/harishgovardhandamodar/FoxServicesTop.git
+cd FoxServicesTop
+cargo build --release --locked
+./target/release/fox-services-top
+```
+
+Or in one command, including the headless collector's launchd agent
+(`--service` registers it to start at login; `--install-rust` adds rustup
+first if `cargo` is missing):
+
+```bash
+./install-from-source.sh --service
+```
+
+Check it with `fox-services-top --diagnostics-json`: the report shows
+`"adapter_id": "macos"` healthy and `"target": "aarch64-apple-darwin"`.
+CPU frequency, temperature and power stay unsupported there (they need
+`powermetrics` as root), and per-process GPU memory is not exposed by macOS
+without root — both are reported as unsupported, never as zeros.
+
+<img src="docs/images/screenshots/macos-overview.png" alt="fox-services-top Overview on an Apple Silicon Mac: CPU with per-cluster utilization, unified memory shared with the GPU, the Apple GPU with utilization and unified memory, disks, network and the empty GPU process table" width="100%">
+
+<sub>Overview on Apple Silicon. The M2 Max shares memory with the CPU, so the RAM bar shows the system and GPU shares; temperature, clocks and power stay `unavailable` without root, and the GPU process table stays empty without per-process GPU counters.</sub>
+
+### On Linux, or by hand
+
+`install-from-source.sh` also builds from a checkout in one command
+(`--service` installs the headless collector's systemd user unit,
+`--install-rust` adds rustup first):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/harishgovardhandamodar/FoxServicesTop/master/install-from-source.sh | bash
@@ -82,8 +119,10 @@ of the whole machine.
   every chart, and each GPU's averages, peaks and energy. Where the CPU's power can be read, the
   power charts start with the total of the CPU and the GPUs and the CPU's own, each with its energy.
 - **Runs in the background.** `fox-services-top --daemon` collects and saves with no window open,
-  and a systemd user service starts it with the machine
-  (`packaging/systemd/fox-services-top.service`). A plain `fox-services-top` then attaches to it
+  and a user service starts it with the machine: a systemd unit on Linux
+  (`packaging/systemd/fox-services-top.service`), a launchd agent on macOS
+  (`packaging/macos/me.harishgovardhandamodar.fox-services-top.plist`).
+  A plain `fox-services-top` then attaches to it
   for the live data and the full history; quitting the viewer leaves the collector running, so the
   record covers the whole time the service runs. Full walkthrough:
   [docs/COLLECTOR.md](docs/COLLECTOR.md).
@@ -104,6 +143,12 @@ of the whole machine.
 - **Made for DGX Spark.** On the GB10's unified memory, the RAM bar splits into the system's share
   and each GPU job's share. fox-services-top also reads the GB10's CPU cluster temperatures and its
   NVLink-C2C links, and ships a native aarch64 build.
+- **At home on Apple Silicon.** The macOS build reads the same machine through native APIs:
+  per-cluster CPU times from Mach, unified memory, per-process CPU and memory, disks, network
+  and the Apple GPU's utilization and unified-memory share from IOKit — no driver, no root.
+  CPU frequency, temperature and power need `powermetrics` as root and stay unsupported
+  with an explicit reason instead of a fake zero; per-process GPU memory is not exposed
+  by macOS without root, so the GPU process table stays empty there.
 - **Settings in the app.** Change the sampling interval and the display modules, and see each data
   source's state. Every setting shows its saved and effective value, where it came from, and
   whether it applies now or after a restart.
@@ -173,8 +218,9 @@ scroll the recent requests. Press `7`.
 
 ## Capabilities
 
-- **Several GPUs per machine.** Tested on a DGX Spark (GB10) and on a workstation with an RTX 5080
-  and an RTX 3060.
+- **Several GPUs per machine.** Tested on a DGX Spark (GB10), on a workstation with an RTX 5080
+  and an RTX 3060, and on Apple Silicon (M2 Max), where the one Apple GPU reports utilization
+  and unified memory through IOKit.
 - **History that lasts.** History is saved on disk and survives restarts and reboots, with no age
   limit: each bar size keeps its latest 300 bars, so 1-minute bars cover the last 5 hours and
   24-hour bars about 10 months. Process History lists the latest 512 runs. fox-services-top records while it
@@ -199,7 +245,7 @@ flow down the data path, and the Manager turns them into the views the screen dr
 
 ```mermaid
 flowchart LR
-    kernel["Linux kernel<br/>NVIDIA driver"] --> adapters["Adapters<br/>one process each"]
+    kernel["Linux kernel + NVIDIA driver<br/>or macOS Mach + IOKit"] --> adapters["Adapters<br/>one process each"]
     adapters --> collectors[Collectors]
     collectors --> state["State<br/>in memory"]
     state --> history[History]
@@ -239,7 +285,7 @@ The code is a Rust workspace of eleven crates around one shared contract crate.
 | `fox-services-top` | The program: command line, modes, startup and wiring |
 | `fox-services-top-core` | Shared types: metrics, commands, views and the interfaces between components |
 | `fox-services-top-runtime` | Background processes, IPC, queues, the log, the terminal and the time zone |
-| `fox-services-top-adapters` | procfs, hwmon, thermal, powercap, NVML, network, filesystems, the process probe and process actions |
+| `fox-services-top-adapters` | Linux: procfs, hwmon, thermal, powercap, NVML, network, filesystems, the process probe and process actions; macOS: one native adapter (sysctl, Mach, sysinfo, IOKit) |
 | `fox-services-top-collectors` | Metrics from readings: rates, source selection and process records |
 | `fox-services-top-state` | The live snapshot and the short trends |
 | `fox-services-top-history` | Overview History, Process History and what each keeps |
@@ -256,7 +302,7 @@ The code is a Rust workspace of eleven crates around one shared contract crate.
 fox-services-top                       # live monitor
 fox-services-top -i 0.5                # sample every 0.5 s for this run (saved settings are not changed)
 fox-services-top -t amber              # color theme for this run: dark, cyan, green or amber
-fox-services-top --no-gpu              # do not start the NVML host
+fox-services-top --no-gpu              # no GPU telemetry for this run (NVML host on Linux, Apple GPU groups on macOS)
 fox-services-top --read-only           # no process actions
 fox-services-top --no-remote             # no fox-services-top node polling for this run
 fox-services-top --remote-node axiom=http://192.168.1.63:8210   # poll only this node for this run (repeatable)

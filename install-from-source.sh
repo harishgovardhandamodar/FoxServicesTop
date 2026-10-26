@@ -6,8 +6,9 @@
 #   ./install-from-source.sh --service          # also install the headless collector's user unit
 #   ./install-from-source.sh --install-rust     # install rustup first if cargo is missing
 #
-# Hosts: Linux on x86_64 or aarch64 with glibc, WSL 2 included; WSL 1 and musl
-# are refused before anything is cloned.
+# Hosts: Linux on x86_64 or aarch64 with glibc 2.34+, WSL 2 included; and
+# macOS on Apple Silicon (arm64). WSL 1 and musl are refused before anything
+# is cloned.
 #
 # Where install.sh downloads a published release, this builds one from a git
 # checkout with the toolchain pinned by rust-toolchain.toml. It is the way to
@@ -21,10 +22,12 @@
 #   one as `fox-services-top.previous` for rollback (`install.sh --rollback`),
 # * keeps the configuration and state directories untouched.
 #
-# With --service the systemd *user* unit from packaging/systemd is installed
-# and enabled: the headless collector starts with the session (or at boot with
-# `loginctl enable-linger`), and any `fox-services-top` attaches to it. See
-# "Background collector" in docs/USER_GUIDE.md.
+# With --service the headless collector's user service is installed and
+# enabled: the systemd unit from packaging/systemd on Linux (the collector
+# starts with the session, or at boot with `loginctl enable-linger`), the
+# launchd agent from packaging/macos on macOS (starts at login). Any
+# `fox-services-top` then attaches to it. See "Background collector" in
+# docs/USER_GUIDE.md.
 set -euo pipefail
 
 REPO="harishgovardhandamodar/FoxServicesTop"
@@ -52,7 +55,8 @@ Usage: install-from-source.sh [--ref GIT-REF] [--install-dir DIR] [--service] [-
 
   --ref           git branch, tag or commit to build (default: master)
   --install-dir   target directory (default: $INSTALL_DIR or ~/.local/bin)
-  --service       install and enable the systemd user collector service
+  --service       install and enable the headless collector service (systemd user
+                  unit on Linux, launchd agent on macOS)
   --install-rust  install rustup (with the pinned toolchain) if cargo is missing
 EOF
 }
@@ -89,7 +93,18 @@ is_musl() {
 detect_host() {
     local system arch
     system="$(uname -s)"
-    [ "$system" = "Linux" ] || fail "fox-services-top supports Linux only (found ${system})"
+    case "$system" in
+        Darwin)
+            # Apple Silicon only: there is no Intel macOS build.
+            case "$(uname -m)" in
+                arm64|aarch64) echo "aarch64-apple-darwin" ;;
+                *) fail "fox-services-top supports Apple Silicon only (found $(uname -m))" ;;
+            esac
+            return 0
+            ;;
+        Linux) ;;
+        *) fail "fox-services-top supports Linux and macOS (Apple Silicon) only (found ${system})" ;;
+    esac
     case "$(uname -r)" in
         # WSL 1 translates system calls without a Linux kernel: no pidfd, no GPU.
         *-Microsoft) fail "WSL 1 is not supported (kernel $(uname -r)); use WSL 2" ;;
@@ -176,6 +191,36 @@ install_binary() {
 }
 
 install_service() {
+    case "$(uname -s)" in
+        Darwin) install_launchd_agent ;;
+        *) install_systemd_unit ;;
+    esac
+}
+
+install_launchd_agent() {
+    local agents_dir="$HOME/Library/LaunchAgents"
+    local label="me.harishgovardhandamodar.fox-services-top"
+    local source="${STAGING}/checkout/packaging/macos/${label}.plist"
+    [ -f "$source" ] || fail "the checkout has no packaging/macos/${label}.plist"
+    if [ "$INSTALL_DIR" != "$HOME/.local/bin" ]; then
+        warn "the agent runs ~/.local/bin/${BINARY}; edit ${agents_dir}/${label}.plist for ${INSTALL_DIR}"
+    fi
+    mkdir -p "$agents_dir"
+    cp -- "$source" "${agents_dir}/${label}.plist"
+    info "installed ${agents_dir}/${label}.plist"
+    # `bootstrap` on an already-bootstrapped agent fails: stop the old one
+    # first so reinstalls keep working.
+    launchctl bootout "gui/$(id -u)/${label}" 2>/dev/null || true
+    if launchctl bootstrap "gui/$(id -u)" "${agents_dir}/${label}.plist" 2>/dev/null; then
+        info "collector agent enabled and started (starts at login)"
+    else
+        warn "the agent did not start; see: launchctl print gui/$(id -u)/${label}"
+        warn "or start it by hand: launchctl bootstrap gui/$(id -u) ${agents_dir}/${label}.plist"
+        return
+    fi
+}
+
+install_systemd_unit() {
     require systemctl
     local unit_dir="$HOME/.config/systemd/user" unit="${BINARY}.service"
     local source="${STAGING}/checkout/packaging/systemd/${unit}"

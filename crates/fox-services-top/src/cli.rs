@@ -18,7 +18,8 @@ pub struct Cli {
     #[arg(short = 'i', long, value_name = "SECONDS")]
     pub interval: Option<f64>,
 
-    /// Disable the NVML adapter host for this run.
+    /// Disable GPU telemetry for this run (the NVML host on Linux, the
+    /// Apple GPU groups of the native adapter on macOS).
     #[arg(long)]
     pub no_gpu: bool,
 
@@ -201,8 +202,7 @@ fn parse_remote_nodes(entries: &[String]) -> Result<Option<Vec<RemoteNodeConfig>
             let (name, url) = entry
                 .split_once('=')
                 .filter(|(name, url)| {
-                    !name.is_empty()
-                        && (url.starts_with("http://") || url.starts_with("https://"))
+                    !name.is_empty() && (url.starts_with("http://") || url.starts_with("https://"))
                 })
                 .ok_or_else(|| CliError::RemoteNode(entry.clone()))?;
             Ok(RemoteNodeConfig {

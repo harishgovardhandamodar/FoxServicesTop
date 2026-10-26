@@ -128,9 +128,12 @@ pub(crate) fn descriptor_for(
     keys: &KeyContext,
     spec: &SourceSpec<'_>,
 ) -> Option<SourceDescriptor> {
-    let source_id =
-        fox_services_top_core::naming::source_id(config.adapter_id.as_str(), spec.device_id, spec.channel)
-            .ok()?;
+    let source_id = fox_services_top_core::naming::source_id(
+        config.adapter_id.as_str(),
+        spec.device_id,
+        spec.channel,
+    )
+    .ok()?;
     let metric = MetricKey::new(
         keys.host_id.clone(),
         keys.boot_id.clone(),
@@ -188,6 +191,18 @@ pub(crate) enum Selected<'a, L> {
     Live(&'a LiveSource<L>),
     /// Known to the parent but gone from the latest snapshot.
     Removed(&'a SourceDescriptor),
+}
+
+impl<L> Selected<'_, L> {
+    /// The descriptor of whichever variant this is (used by the macOS
+    /// adapter; the Linux adapters match on the variants directly).
+    #[cfg(target_os = "macos")]
+    pub(crate) fn descriptor(&self) -> &SourceDescriptor {
+        match self {
+            Selected::Live(source) => &source.descriptor,
+            Selected::Removed(descriptor) => descriptor,
+        }
+    }
 }
 
 /// Sources chosen by a read plan plus slots this catalog does not know.

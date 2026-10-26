@@ -8,7 +8,9 @@ use std::sync::Arc;
 use fox_services_top_core::clock::TimeProvider;
 use fox_services_top_core::identity::{AdapterId, HostId};
 use fox_services_top_core::naming::{self, adapters};
-use fox_services_top_core::observation::{AdapterManifest, AdapterOperation, Isolation, MAX_CATALOG_PAGE};
+use fox_services_top_core::observation::{
+    AdapterManifest, AdapterOperation, Isolation, MAX_CATALOG_PAGE,
+};
 use fox_services_top_core::ports::TelemetryPort;
 use fox_services_top_core::quality::Namespace;
 use thiserror::Error;
@@ -63,7 +65,7 @@ pub enum RegistryError {
     NotLive { adapter_id: String },
 }
 
-/// Static manifest of one of the seven live adapters (default options).
+/// Static manifest of one of the live adapters (default options).
 pub fn live_manifest(adapter_id: &str) -> Option<AdapterManifest> {
     match adapter_id {
         adapters::PROCFS => Some(crate::procfs::manifest()),
@@ -73,6 +75,8 @@ pub fn live_manifest(adapter_id: &str) -> Option<AdapterManifest> {
         adapters::NVML => Some(crate::nvml::manifest()),
         adapters::NETWORK => Some(crate::network::manifest()),
         adapters::FILESYSTEM => Some(crate::filesystem::manifest()),
+        #[cfg(target_os = "macos")]
+        adapters::MACOS => Some(crate::macos::manifest()),
         _ => None,
     }
 }
@@ -105,6 +109,8 @@ pub fn build_live_adapter(
         adapters::FILESYSTEM => Box::new(crate::filesystem::FilesystemAdapter::new(
             clock, host_id, files, options,
         )),
+        #[cfg(target_os = "macos")]
+        adapters::MACOS => Box::new(crate::macos::MacosAdapter::new(clock, host_id, options)),
         other if naming::is_replay_adapter(other) => {
             return Err(RegistryError::NotLive {
                 adapter_id: other.to_owned(),

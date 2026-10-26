@@ -176,9 +176,12 @@ impl InputGate for TtyInputGate {
     }
 
     fn wait_for_hang_up(&mut self, timeout: Duration) -> io::Result<bool> {
-        // poll(2) reports the hang-up bits even when no event is requested.
+        // Linux reports the hang-up bits even when no event is requested;
+        // macOS stays silent on empty interest, so the hang-up set itself
+        // is requested: readability alone never answers true, and pending
+        // input still waits out the timeout.
         Ok(self
-            .poll_events(PollFlags::empty(), timeout)?
+            .poll_events(HANG_UP_EVENTS, timeout)?
             .is_some_and(|events| events.intersects(HANG_UP_EVENTS)))
     }
 }
@@ -201,7 +204,16 @@ mod tests {
     use std::time::Instant;
 
     fn pipe() -> (OwnedFd, OwnedFd) {
-        nix::unistd::pipe2(OFlag::O_CLOEXEC).unwrap()
+        // `pipe2` is Linux-only in nix 0.31; the macOS build sets
+        // `FD_CLOEXEC` after `pipe`, matching `private_pipe`.
+        #[cfg(not(target_os = "macos"))]
+        {
+            nix::unistd::pipe2(OFlag::O_CLOEXEC).unwrap()
+        }
+        #[cfg(target_os = "macos")]
+        {
+            crate::supervisor::launch::private_pipe().unwrap()
+        }
     }
 
     fn flags_of(fd: &OwnedFd) -> OFlag {

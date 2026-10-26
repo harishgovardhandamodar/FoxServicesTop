@@ -361,6 +361,7 @@ impl HostSchedule {
         let adapter = self.adapter_id.as_str();
         match self.kind {
             AdapterKind::Live => naming::read_groups_of(adapter)
+                .filter(|spec| settings.gpu_enabled || !is_gpu_group(adapter, spec.group))
                 .map(|spec| (spec.group.to_owned(), spec.period, spec.paged))
                 .collect(),
             AdapterKind::Replay => self
@@ -704,10 +705,19 @@ impl HostSchedule {
     }
 }
 
+/// Whether `(adapter, group)` carries GPU telemetry: the NVML groups and
+/// the Apple Silicon `gpu_fast`/`gpu_health` groups. `--no-gpu` drops them
+/// everywhere; the `macos` adapter keeps its CPU/memory/disk/network groups.
+fn is_gpu_group(adapter: &str, group: &str) -> bool {
+    adapter == naming::adapters::NVML
+        || (adapter == naming::adapters::MACOS
+            && (group == naming::groups::GPU_FAST || group == naming::groups::GPU_HEALTH))
+}
+
 /// The live group a replay group mirrors: `<live adapter>.<group>`.
 fn mirrored_spec(group: &str, gpu_enabled: bool) -> Option<(String, PeriodClass, bool)> {
     let (live_adapter, live_group) = group.split_once('.')?;
-    if live_adapter == naming::adapters::NVML && !gpu_enabled {
+    if !gpu_enabled && is_gpu_group(live_adapter, live_group) {
         return None;
     }
     naming::READ_GROUPS

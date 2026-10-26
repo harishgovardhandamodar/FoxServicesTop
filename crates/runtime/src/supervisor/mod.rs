@@ -20,7 +20,7 @@ mod context;
 mod credit;
 mod event_loop;
 mod handle;
-mod launch;
+pub(crate) mod launch;
 mod outbox;
 mod report;
 mod requests;
@@ -38,7 +38,6 @@ use fox_services_top_core::clock::TimeProvider;
 use fox_services_top_core::errors::InfraError;
 use fox_services_top_core::ports::{IngestionCompletion, Logger};
 use fox_services_top_core::view::{HostState, HostStatus};
-use nix::fcntl::OFlag;
 
 pub use circuit::{CircuitBreaker, backoff_seed};
 pub use config::{MAX_HOSTS, SupervisorConfig};
@@ -109,9 +108,8 @@ impl Supervisor {
         let working_set = ledger
             .try_reserve(Partition::Reserve, working_set_bytes(specs.len()))
             .map_err(|error| InfraError::Unavailable(format!("supervisor working set: {error}")))?;
-        let (wake_reader, wake_writer) =
-            nix::unistd::pipe2(OFlag::O_CLOEXEC | OFlag::O_NONBLOCK)
-                .map_err(|errno| InfraError::Unavailable(format!("wake pipe: {errno}")))?;
+        let (wake_reader, wake_writer) = launch::wake_pipe()
+            .map_err(|errno| InfraError::Unavailable(format!("wake pipe: {errno}")))?;
         let shared = Arc::new(Shared::new(initial_state(&specs, &config), wake_writer));
         let (commands, command_receiver) = bounded(config.command_capacity + specs.len());
         let (finished_sender, finished) = bounded(1);

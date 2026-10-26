@@ -212,8 +212,45 @@ pub(crate) fn set_nonblocking(fd: &OwnedFd) -> Result<(), InfraError> {
 
 /// Close-on-exec pipe so no other child inherits it.
 pub(crate) fn private_pipe() -> Result<(OwnedFd, OwnedFd), InfraError> {
-    nix::unistd::pipe2(OFlag::O_CLOEXEC)
-        .map_err(|errno| InfraError::Unavailable(format!("pipe2 failed: {errno}")))
+    cloexec_pipe(false)
+}
+
+/// Close-on-exec, non-blocking wake pipe for the supervisor event loop.
+pub(crate) fn wake_pipe() -> Result<(OwnedFd, OwnedFd), InfraError> {
+    cloexec_pipe(true)
+}
+
+/// Portable close-on-exec pipe. `pipe2` exists on Linux (and the other Unix
+/// targets nix gates it for) but not on macOS, where `pipe` plus
+/// `FD_CLOEXEC` (and `O_NONBLOCK` where asked) sets the same flags
+/// descriptor by descriptor.
+pub(crate) fn cloexec_pipe(nonblocking: bool) -> Result<(OwnedFd, OwnedFd), InfraError> {
+    #[cfg(not(target_os = "macos"))]
+    {
+        let mut flags = OFlag::O_CLOEXEC;
+        if nonblocking {
+            flags |= OFlag::O_NONBLOCK;
+        }
+        nix::unistd::pipe2(flags)
+            .map_err(|errno| InfraError::Unavailable(format!("pipe2 failed: {errno}")))
+    }
+    #[cfg(target_os = "macos")]
+    {
+        use nix::fcntl::FdFlag;
+        let (reader, writer) = nix::unistd::pipe()
+            .map_err(|errno| InfraError::Unavailable(format!("pipe failed: {errno}")))?;
+        for fd in [&reader, &writer] {
+            fcntl(fd.as_fd(), FcntlArg::F_SETFD(FdFlag::FD_CLOEXEC)).map_err(|errno| {
+                InfraError::Unavailable(format!("F_SETFD FD_CLOEXEC failed: {errno}"))
+            })?;
+        }
+        if nonblocking {
+            for fd in [&reader, &writer] {
+                set_nonblocking(fd)?;
+            }
+        }
+        Ok((reader, writer))
+    }
 }
 
 struct ProcessChild {

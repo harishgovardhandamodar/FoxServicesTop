@@ -52,6 +52,13 @@ nix = { version = "0.31.3", features = ["fs", "poll", "process", "signal", "time
 nvml-wrapper = "0.12.1"
 rusqlite = { version = "=0.40.2", features = ["bundled"] }
 
+# Apple Silicon diagnostics (macOS-only; the Linux build never enables them).
+sysinfo = "0.30"
+# IOKit service properties for the Apple GPU (no subprocesses: adapters must
+# never spawn, so `ioreg` is read through these bindings instead of the CLI).
+io-kit-sys = "0.4"
+core-foundation-sys = "0.8"
+
 # Terminal UI.
 ratatui = { version = "0.30.2", default-features = false, features = ["crossterm", "underline-color"] }
 crossterm = "0.29.0"

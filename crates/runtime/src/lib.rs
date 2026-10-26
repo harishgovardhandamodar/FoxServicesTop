@@ -29,6 +29,8 @@ pub mod clock;
 pub mod host;
 pub mod ipc;
 pub mod logger;
+#[cfg(target_os = "macos")]
+pub(crate) mod macos_sysctl;
 pub mod queues;
 pub mod signals;
 pub mod supervisor;

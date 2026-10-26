@@ -22,6 +22,14 @@ serde_json.workspace = true
 thiserror.workspace = true
 uuid.workspace = true
 
+# Apple Silicon telemetry: sysinfo (processes, disks, networks, swap) and
+# the IOKit/CoreFoundation bindings (Apple GPU properties). CPU times and
+# host facts come from the already-depended-on libc (sysctlbyname, Mach).
+[target.'cfg(target_os = "macos")'.dependencies]
+sysinfo.workspace = true
+io-kit-sys.workspace = true
+core-foundation-sys.workspace = true
+
 [dev-dependencies]
 fox-services-top-core = { workspace = true, features = ["test-support"] }
 # The crate's own integration tests use its test aids.

@@ -173,7 +173,10 @@ mod tests {
         assert_eq!(parse_pidfd_target("Pid:\t-7\n"), None);
     }
 
+    // `/proc/<pid>` exists only on Linux; the macOS build never calls
+    // `HostProcessFiles` (process actions degrade at the pidfd layer).
     #[test]
+    #[cfg(target_os = "linux")]
     fn host_files_read_own_process() {
         let pid = i32::try_from(std::process::id()).unwrap();
         let files = HostProcessFiles;

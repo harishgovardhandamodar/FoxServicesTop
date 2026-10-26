@@ -5,9 +5,10 @@
 #   ./install.sh --version v2.0.0
 #   ./install.sh --rollback
 #
-# Hosts: Linux on x86_64 or aarch64 with glibc, WSL 2 included. Other systems,
-# WSL 1 and musl are refused before anything is downloaded, and so are the
-# releases before v2.0.0 (the earlier fox-services-top, packaged differently).
+# Hosts: Linux on x86_64 or aarch64 with glibc 2.34+, WSL 2 included; and
+# macOS on Apple Silicon (arm64). Other systems, WSL 1 and musl are refused
+# before anything is downloaded, and so are the releases before v2.0.0 (the
+# earlier fox-services-top, packaged differently).
 #
 # Safety properties:
 # * downloads into a temporary directory on the SAME filesystem as the target,
@@ -24,7 +25,8 @@
 # To keep collecting while no window is open, run the collector headless
 # (`fox-services-top --daemon`) and attach a viewer to it; see "Background
 # collector" in docs/USER_GUIDE.md. A systemd user unit template is in
-# packaging/systemd/. This installer does not install the unit.
+# packaging/systemd/ and a launchd agent template for macOS in
+# packaging/macos/. This installer does not install either unit.
 set -euo pipefail
 
 REPO="harishgovardhandamodar/FoxServicesTop"
@@ -90,7 +92,19 @@ is_musl() {
 detect_target() {
     local system arch
     system="$(uname -s)"
-    [ "$system" = "Linux" ] || fail "fox-services-top supports Linux only (found ${system})"
+    case "$system" in
+        Darwin)
+            # Apple Silicon only: Rosetta is not a supported way to run the
+            # monitor, and there is no Intel macOS build.
+            case "$(uname -m)" in
+                arm64|aarch64) echo "aarch64-apple-darwin" ;;
+                *) fail "fox-services-top supports Apple Silicon only (found $(uname -m))" ;;
+            esac
+            return 0
+            ;;
+        Linux) ;;
+        *) fail "fox-services-top supports Linux and macOS (Apple Silicon) only (found ${system})" ;;
+    esac
     case "$(uname -r)" in
         # WSL 1 translates system calls without a Linux kernel: no pidfd, no GPU.
         *-Microsoft) fail "WSL 1 is not supported (kernel $(uname -r)); use WSL 2" ;;
@@ -143,12 +157,22 @@ host_glibc() {
     getconf GNU_LIBC_VERSION 2>/dev/null || echo "an unknown glibc"
 }
 
+# SHA-256 of a file: `sha256sum` on Linux, `shasum -a 256` on stock macOS.
+sha256_of() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{ print $1 }'
+    else
+        shasum -a 256 "$1" | awk '{ print $1 }'
+    fi
+}
+
 verify_checksum() {
     local archive="$1" sums="$2" name expected actual
     name="$(basename "$archive")"
     expected="$(awk -v file="$name" '$2 == file || $2 == "*" file { print $1 }' "$sums" | head -n 1)"
     [ -n "$expected" ] || fail "SHA256SUMS has no entry for $name"
-    actual="$(sha256sum "$archive" | awk '{ print $1 }')"
+    actual="$(sha256_of "$archive")"
+    [ -n "$actual" ] || fail "could not hash $name"
     [ "$expected" = "$actual" ] || fail "checksum mismatch for $name (expected $expected, got $actual)"
 }
 
@@ -192,7 +216,12 @@ install_release() {
     note_wsl2
     require curl
     require tar
-    require sha256sum
+    case "$target" in
+        # Stock macOS ships `shasum`, not `sha256sum`; either hashes.
+        *-apple-darwin)
+            command -v sha256sum >/dev/null 2>&1 || require shasum ;;
+        *) require sha256sum ;;
+    esac
     version="$(resolve_version)"
     base="${BASE_URL:-https://github.com/${REPO}/releases/download/${version}}"
     archive_name="${BINARY}-${version}-${target}.tar.gz"
