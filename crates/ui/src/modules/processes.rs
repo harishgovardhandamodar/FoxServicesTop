@@ -205,7 +205,11 @@ impl DisplayModule for ProcessesModule {
             return output.finish();
         }
         if view.rows.is_empty() {
-            message(frame, inner, &empty_text(view), context.theme.muted_style());
+            // The sub-tab row above stays: the message takes the rows below
+            // it, not the whole panel (which would overprint the tabs).
+            if let Some(area) = rows.rest() {
+                message(frame, area, &empty_text(view), context.theme.muted_style());
+            }
             output.label(empty_text(view));
             return output.finish();
         }
@@ -882,6 +886,48 @@ mod tests {
         assert!(
             first.contains(" │   python3 "),
             "no swatch, then the name: {first}"
+        );
+    }
+
+    /// An empty GPU table keeps its sub-tab row: the "no process" message
+    /// goes below the tabs, never over them.
+    #[test]
+    fn an_empty_table_keeps_its_sub_tabs_above_the_message() {
+        let context = test_fixtures::display_context();
+        let view = test_fixtures::processes_view(0, 0, 0);
+        let mut model =
+            test_fixtures::view_model(fox_services_top_core::commands::ViewKind::Overview, 1);
+        model.modules.processes = Some(std::sync::Arc::new(view));
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(120, 7)).unwrap();
+        terminal
+            .draw(|frame| {
+                ProcessesModule::new()
+                    .unwrap()
+                    .render(&context, &model, frame.area(), frame);
+            })
+            .unwrap();
+        let buffer = terminal.backend().buffer();
+        let lines: Vec<String> = (0..7)
+            .map(|y| (0..120).map(|x| buffer[(x, y)].symbol()).collect())
+            .collect();
+        let tabs = lines
+            .iter()
+            .position(|line| line.contains("Fox services"))
+            .expect("the sub-tab row is drawn");
+        assert!(
+            lines[tabs].contains("GPU Processes") && lines[tabs].contains("Power"),
+            "tabs intact: {}",
+            lines[tabs]
+        );
+        let message = lines
+            .iter()
+            .position(|line| line.contains("no process is using a GPU"))
+            .expect("the empty message is drawn");
+        assert!(
+            message > tabs,
+            "message below the tabs:\n{}",
+            lines.join("\n")
         );
     }
 
