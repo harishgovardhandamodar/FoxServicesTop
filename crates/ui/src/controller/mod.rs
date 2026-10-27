@@ -899,9 +899,8 @@ impl Controller {
         }
     }
 
-    /// Shows the Overview process panel's sub-tab: the GPU process table,
-    /// the Fox-Services tables or the power summary. A pure presentation
-    /// toggle like the history pages: nothing is sent to the Manager.
+    /// Shows an Overview process-panel sub-tab. A pure presentation toggle
+    /// like the history pages: nothing is sent to the Manager.
     fn show_overview_sub_tab(&mut self, tab: u8) {
         let Ok(processes) = ModuleId::new(crate::modules::PROCESSES_MODULE_ID) else {
             return;

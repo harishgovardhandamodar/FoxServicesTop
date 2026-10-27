@@ -1,4 +1,4 @@
-//! Nodes module: the fox-services cluster as one table (read-only).
+//! LAN machines module: the fox-services cluster as one table (read-only).
 //!
 //! One row per statically configured node with its latest polled hardware
 //! snapshot, then the Fox Mesh peers the nodes reported. An offline node
@@ -17,7 +17,9 @@ use super::common::{
 };
 use crate::format::{clean, format_bytes};
 use crate::num::saturate_u16;
-use crate::registry::{DisplayContext, DisplayModule, DisplayModuleManifest, RenderOutput, Slot};
+use crate::registry::{
+    DisplayContext, DisplayModule, DisplayModuleManifest, OverviewCell, RenderOutput, Slot,
+};
 
 /// The keys acting on the view, at the right of its title.
 const NODES_KEYS: &str = "j/k scroll · / filter";
@@ -42,11 +44,11 @@ impl ClusterModule {
         Ok(Self {
             manifest: build_manifest(ManifestSpec {
                 id: "cluster",
-                title: "Nodes",
+                title: "LAN Machines",
                 min_columns: 40,
                 min_rows: 5,
-                priority: 30,
-                slots: &[Slot::Detail],
+                priority: 70,
+                slots: &[Slot::Overview, Slot::Detail],
             })?,
         })
     }
@@ -55,6 +57,14 @@ impl ClusterModule {
 impl DisplayModule for ClusterModule {
     fn manifest(&self) -> &DisplayModuleManifest {
         &self.manifest
+    }
+
+    fn include_in_overview(&self, model: &ViewModel) -> bool {
+        model.modules.cluster.is_some()
+    }
+
+    fn overview_cell(&self) -> Option<OverviewCell> {
+        Some(OverviewCell::at(2, 0, 100).filling())
     }
 
     fn render(
@@ -66,7 +76,7 @@ impl DisplayModule for ClusterModule {
     ) -> RenderOutput {
         let mut output = Output::default();
         let Some(cluster) = model.modules.cluster.as_deref() else {
-            let inner = panel_with_keys(frame, area, "Nodes", NODES_KEYS, context);
+            let inner = panel_with_keys(frame, area, "LAN Machines", NODES_KEYS, context);
             message(
                 frame,
                 inner,
@@ -80,42 +90,57 @@ impl DisplayModule for ClusterModule {
         let inner = panel_with_keys(
             frame,
             area,
-            &format!("Nodes · {online}/{} online", cluster.nodes.len()),
+            &format!("LAN Machines · {online}/{} online", cluster.nodes.len()),
             NODES_KEYS,
             context,
         );
-        if !cluster.enabled {
+        let mut rows = RowCursor::new(inner);
+        let filter = model.session.filter.to_lowercase();
+        render_cluster_content(frame, &mut rows, cluster, &filter, context, &mut output);
+        output.finish()
+    }
+}
+
+fn render_cluster_content(
+    frame: &mut Frame<'_>,
+    rows: &mut RowCursor,
+    cluster: &ClusterView,
+    filter: &str,
+    context: &DisplayContext,
+    output: &mut Output,
+) {
+    if !cluster.enabled {
+        if let Some(area) = rows.rest() {
             message(
                 frame,
-                inner,
+                area,
                 "remote monitoring is disabled (config remote.enabled)",
                 context.theme.muted_style(),
             );
-            output.label("nodes: disabled");
-            return output.finish();
         }
-        let mut rows = RowCursor::new(inner);
-        let filter = model.session.filter.to_lowercase();
-        let nodes: Vec<&ClusterNodeView> = cluster
-            .nodes
-            .iter()
-            .filter(|node| filter.is_empty() || node.name.to_lowercase().contains(&filter))
-            .collect();
-        if nodes.is_empty() {
+        output.label("nodes: disabled");
+        return;
+    }
+    let nodes: Vec<&ClusterNodeView> = cluster
+        .nodes
+        .iter()
+        .filter(|node| filter.is_empty() || node.name.to_lowercase().contains(filter))
+        .collect();
+    if nodes.is_empty() {
+        if let Some(area) = rows.rest() {
             message(
                 frame,
-                inner,
+                area,
                 "no nodes configured (config remote.nodes)",
                 context.theme.muted_style(),
             );
-            output.label("nodes: none configured");
-            return output.finish();
         }
-        render_node_table(frame, &mut rows, &nodes, context, &mut output);
-        render_offline(frame, &mut rows, &nodes, context, &mut output);
-        render_peers(frame, &mut rows, cluster, context, &mut output);
-        output.finish()
+        output.label("nodes: none configured");
+        return;
     }
+    render_node_table(frame, rows, &nodes, context, output);
+    render_offline(frame, rows, &nodes, context, output);
+    render_peers(frame, rows, cluster, context, output);
 }
 
 fn render_node_table(

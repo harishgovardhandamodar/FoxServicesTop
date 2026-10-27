@@ -111,6 +111,11 @@ pub trait DisplayModule: Send {
         frame: &mut Frame<'_>,
     ) -> RenderOutput;
 
+    /// Whether this module has an Overview panel for the current projection.
+    fn include_in_overview(&self, _model: &ViewModel) -> bool {
+        true
+    }
+
     /// Height this module would like at `width` columns in `slot`; `None`
     /// means "take spare rows". A layout hint only: the default keeps a
     /// module at its manifest minimum plus its share of spare rows.

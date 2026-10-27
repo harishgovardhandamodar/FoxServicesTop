@@ -280,8 +280,7 @@ impl DisplayModule for ProcessesModule {
     }
 }
 
-/// The sub-tab strip at the top of the Overview panel: `GPU Processes`,
-/// `Fox services` or `Power`, each clickable. The active tab reads selected.
+/// The sub-tab strip at the top of the Overview panel.
 fn render_sub_tabs(
     frame: &mut Frame<'_>,
     rows: &mut RowCursor,
@@ -293,7 +292,13 @@ fn render_sub_tabs(
 ) {
     let Some(strip) = rows.next_row() else { return };
     let mut x = strip.x.saturating_add(1);
-    for (index, label) in SUB_TABS.iter().enumerate() {
+    let compact_labels = ["GPU", "Services", "Power"];
+    let labels = if strip.width < 54 {
+        &compact_labels
+    } else {
+        &SUB_TABS
+    };
+    for (index, label) in labels.iter().enumerate() {
         let active = index == usize::from(active_tab.min(2));
         let width = display_width(label).min(usize::from(strip.width.saturating_sub(x - strip.x)));
         if width == 0 {

@@ -763,6 +763,41 @@ fn the_overview_power_sub_tab_summarizes_watts_and_kwh() {
 }
 
 #[test]
+fn overview_shows_lan_machines_alongside_other_modules() {
+    let mut fixture = model(ViewKind::Overview);
+    fixture.modules.cluster = Some(Arc::new(test_fixtures::cluster_view()));
+    let rendered = render(&fixture, (200, 60));
+    for text in [
+        "LAN Machines · 1/2 online",
+        "1/2 online",
+        "axiom",
+        "axiom-dgx",
+        "cuda 80%",
+        "offline",
+    ] {
+        assert!(
+            rendered.contains(text),
+            "missing {text:?}\n{}",
+            rendered.text()
+        );
+    }
+    assert!(
+        rendered
+            .report
+            .rendered_modules
+            .contains(&"cluster".to_owned()),
+        "cluster module should have its own Overview panel"
+    );
+    assert!(
+        rendered
+            .report
+            .rendered_modules
+            .contains(&"processes".to_owned()),
+        "the existing Overview modules remain visible"
+    );
+}
+
+#[test]
 fn the_power_tab_charts_watts_and_lists_kwh_per_query() {
     let rendered = render(&model(ViewKind::Power), (160, 40));
     for text in [
