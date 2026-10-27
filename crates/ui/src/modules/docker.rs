@@ -62,7 +62,7 @@ impl DockerModule {
                 min_columns: 40,
                 min_rows: 8,
                 priority: 29,
-                slots: &[Slot::Detail],
+                slots: &[Slot::Overview, Slot::Detail],
             })?,
         })
     }
@@ -73,7 +73,14 @@ impl DisplayModule for DockerModule {
         &self.manifest
     }
 
+    fn include_in_overview(&self, model: &ViewModel) -> bool {
+        model.session.view.is_fox_services_dashboard()
+    }
+
     fn preferred_rows(&self, model: &ViewModel, _width: u16, slot: Slot) -> Option<u16> {
+        if slot == Slot::Overview {
+            return Some(6);
+        }
         if slot != Slot::Detail {
             return None;
         }
@@ -136,7 +143,11 @@ impl DisplayModule for DockerModule {
             frame.buffer_mut(),
             rows.next_row().unwrap_or_default(),
             &Line::from(Span::styled(
-                "Live: which app uses which LLM model, per request — actual requests, not compose config.",
+                if context.slot == Slot::Overview {
+                    "Live service usage · real requests"
+                } else {
+                    "Live: which app uses which LLM model, per request — actual requests, not compose config."
+                },
                 context.theme.muted_style(),
             )),
         );
@@ -148,15 +159,15 @@ impl DisplayModule for DockerModule {
             &filter,
             context,
             &mut output,
-            true,
+            context.slot == Slot::Detail,
         );
         output.finish()
     }
 }
 
 /// The Fox-Services tables: services with their models, the status legend,
-/// then the recent requests. The Docker tab and the Overview's Fox services
-/// sub-tab share them; `legend` keeps the legend line on the full tab.
+/// then the recent requests. The dashboard and the Overview's Fox services
+/// sub-tab share them; `legend` keeps the legend line on the full panel.
 pub(crate) fn render_services_content(
     frame: &mut Frame<'_>,
     rows: &mut RowCursor,

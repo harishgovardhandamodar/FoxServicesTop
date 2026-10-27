@@ -55,8 +55,8 @@ pub struct ManagerPorts {
     /// The history's process actor (D-76, D-79): the GPU process runs and
     /// colors; `None` without one (tests and tools).
     pub process_history: Option<ProcessHistoryHandles>,
-    /// The cluster monitor's latest snapshot (Nodes and Docker tabs);
-    /// `None` without one (tests and tools): the tabs explain themselves.
+    /// The cluster monitor's latest dashboard snapshot; `None` without one
+    /// (tests and tools): the widgets explain themselves.
     pub cluster: Option<Arc<dyn ClusterSource>>,
     pub logger: Arc<dyn Logger>,
     pub ledger: ByteLedger,

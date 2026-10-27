@@ -121,6 +121,40 @@ fn every_view_renders_at_every_size_with_a_quit_hint() {
 }
 
 #[test]
+fn fox_services_tab_renders_nodes_services_tokens_and_power_together() {
+    let mut dashboard = model(ViewKind::Nodes);
+    dashboard.modules.cluster = Some(Arc::new(test_fixtures::cluster_view()));
+    dashboard.modules.docker = Some(Arc::new(test_fixtures::services_view()));
+
+    for size in [(160, 50), (80, 24)] {
+        let rendered = render(&dashboard, size);
+        for widget in ["cluster", "docker", "tokens", "power"] {
+            assert!(
+                rendered
+                    .report
+                    .rendered_modules
+                    .iter()
+                    .any(|id| id == widget),
+                "{widget} not rendered at {size:?}:\n{}",
+                rendered.text()
+            );
+        }
+        for title in ["Fox-Services", "LAN Machines", "Tokens", "watts"] {
+            assert!(
+                rendered.contains(title),
+                "{title} not visible at {size:?}:\n{}",
+                rendered.text()
+            );
+        }
+        if size == (160, 50) {
+            assert!(rendered.contains("KWH"), "power details not visible");
+            assert!(rendered.text().contains('█'), "dashboard charts not drawn");
+        }
+        assert!(rendered.report.module_errors.is_empty(), "{size:?}");
+    }
+}
+
+#[test]
 fn tiers_are_reported_per_size() {
     let tiers: Vec<SizeTier> = SIZES
         .iter()

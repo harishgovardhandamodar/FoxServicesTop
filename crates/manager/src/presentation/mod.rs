@@ -110,8 +110,8 @@ pub struct PresentationContext<'a> {
     pub history: Arc<HistoryView>,
     /// The state's short trends (D-99).
     pub trends: &'a dyn TrendReader,
-    /// The cluster monitor's latest snapshot (Nodes and Docker tabs); `None`
-    /// without a source: the tabs explain themselves.
+    /// The cluster monitor's latest snapshot for the dashboard; `None`
+    /// without a source: its widgets explain themselves.
     pub cluster: Option<Arc<ClusterSnapshot>>,
     /// The GPU process runs and colors the history's process actor
     /// published (D-64, D-76, D-79).

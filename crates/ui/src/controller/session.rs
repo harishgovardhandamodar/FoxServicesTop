@@ -72,10 +72,7 @@ const fn memory_slot(view: ViewKind) -> Option<usize> {
         ViewKind::GpuDetail => Some(1),
         ViewKind::History => Some(2),
         ViewKind::Settings => Some(3),
-        ViewKind::Nodes => Some(4),
-        ViewKind::Docker => Some(5),
-        ViewKind::Tokens => Some(6),
-        ViewKind::Power => Some(7),
+        ViewKind::Nodes | ViewKind::Docker | ViewKind::Tokens | ViewKind::Power => Some(4),
         ViewKind::Zombies => Some(8),
         ViewKind::Processes | ViewKind::Sources | ViewKind::Actions => None,
     }

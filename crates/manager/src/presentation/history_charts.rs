@@ -236,7 +236,7 @@ fn platform_spec(reader: &MetricReader<'_>) -> Option<HistoryChartSpec> {
 
 /// The host's power series in order — total, first packages by number,
 /// platform — each only while reported. Charts and statistics share the
-/// pick so the Power tab's timeline and kWh agree.
+/// pick so the dashboard's power timeline and kWh agree.
 fn host_power_specs(reader: &MetricReader<'_>) -> Vec<HistoryChartSpec> {
     let mut specs = Vec::new();
     let mut push = |kind, subject: String, metric: &str, entity: &str, scope: &str| {

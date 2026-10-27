@@ -271,15 +271,35 @@ impl Viewer {
     }
 
     fn overview_candidates(&self, model: &ViewModel, ui: &UiState) -> Vec<Candidate> {
+        let fox_services = model.session.view.is_fox_services_dashboard();
         self.registry
             .iter()
             .enumerate()
             .filter(|(_, module)| module.manifest().has_slot(Slot::Overview))
+            .filter(|(_, module)| {
+                !fox_services || is_fox_services_widget(module.manifest().module_id.as_str())
+            })
             .filter(|(_, module)| module_enabled(model, module.manifest()))
             .filter(|(_, module)| module.include_in_overview(model))
-            .map(|(index, module)| Candidate {
-                expanded: is_expanded(ui, module.manifest()),
-                ..candidate(index, module.manifest(), module.overview_cell())
+            .map(|(index, module)| {
+                let manifest = module.manifest();
+                let cell = if fox_services {
+                    fox_services_cell(manifest.module_id.as_str())
+                } else {
+                    module.overview_cell()
+                };
+                let mut candidate = candidate(index, manifest, cell);
+                candidate.expanded = is_expanded(ui, manifest);
+                if fox_services {
+                    candidate.min_rows = match manifest.module_id.as_str() {
+                        "cluster" => 5,
+                        "docker" => 6,
+                        "tokens" => 4,
+                        "power" => 5,
+                        _ => candidate.min_rows,
+                    };
+                }
+                candidate
             })
             .collect()
     }
@@ -312,6 +332,20 @@ impl Viewer {
                 view.title()
             ),
         }
+    }
+}
+
+fn is_fox_services_widget(module_id: &str) -> bool {
+    matches!(module_id, "cluster" | "docker" | "tokens" | "power")
+}
+
+fn fox_services_cell(module_id: &str) -> Option<OverviewCell> {
+    match module_id {
+        "cluster" => Some(OverviewCell::at(0, 0, 58)),
+        "docker" => Some(OverviewCell::at(0, 1, 42)),
+        "tokens" => Some(OverviewCell::at(1, 0, 50)),
+        "power" => Some(OverviewCell::at(1, 1, 50)),
+        _ => None,
     }
 }
 

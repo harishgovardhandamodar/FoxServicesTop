@@ -48,7 +48,7 @@ pub const BUILTIN_MODULES: [&str; 13] = [
     "zombies",
 ];
 
-/// The cluster modules the Overview also shows as cards: the Nodes table,
+/// The cluster modules the Overview also shows as cards: the LAN machine table,
 /// the Docker project table and the token ingress/egress summary.
 pub const OVERVIEW_CLUSTER_MODULES: [&str; 3] = ["cluster", "docker", "tokens"];
 
@@ -154,7 +154,7 @@ pub struct Config {
     pub queues: QueuesConfig,
     pub privacy: PrivacyConfig,
     pub runtime: RuntimeConfig,
-    /// Fox-services nodes polled for the Nodes and Docker tabs. Documents
+    /// Fox-services nodes polled for the dashboard's cluster and service widgets. Documents
     /// written before it default to polling the example nodes, so old
     /// files keep loading; the section is only written back once set.
     #[serde(
@@ -165,7 +165,7 @@ pub struct Config {
 }
 
 /// One statically configured fox-services node: polled over HTTP for the
-/// Nodes and Docker tabs (`/api/hardware/status`, `/api/docker/projects`,
+/// Fox-Services dashboard (`/api/hardware/status`, `/api/docker/projects`,
 /// `/api/docker/stats`, `/api/mesh/peers`, ...).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -176,7 +176,7 @@ pub struct RemoteNodeConfig {
     pub base_url: String,
 }
 
-/// Remote fox-services monitoring (the Nodes, Docker and Tokens tabs).
+/// Remote fox-services monitoring for the Fox-Services dashboard.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RemoteConfig {
@@ -188,11 +188,11 @@ pub struct RemoteConfig {
     /// Also list Fox Mesh peers a polled node reports (`/api/mesh/peers`).
     pub discover_mesh: bool,
     /// Also aggregate token ingress/egress by app (`/api/usage/history`,
-    /// `/api/ollama/stats`) for the Tokens tab.
+    /// `/api/ollama/stats`) for the dashboard's token-flow widget.
     pub collect_tokens: bool,
-    /// Window the Tokens tab aggregates, in hours (1–168).
+    /// Window the token-flow widget aggregates, in hours (1–168).
     pub token_window_hours: u32,
-    /// Window the Fox-Services tab reads the live map over, in hours (1–168).
+    /// Window the services widget reads the live map over, in hours (1–168).
     pub service_window_hours: u32,
     /// Requests read from a node for that window (1–1000).
     pub token_history_limit: u32,
@@ -472,7 +472,7 @@ impl Config {
         let mut config = Self::reference()?;
         config.store.archive_enabled = true;
         config.actions.allow_force = true;
-        // The Nodes and Docker tabs are built-in: on unless turned off.
+        // The Fox-Services dashboard's remote widgets are built-in unless turned off.
         for module in ["cluster", "docker", "tokens", "power", "zombies"] {
             if !config
                 .viewer

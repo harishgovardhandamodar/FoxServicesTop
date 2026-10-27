@@ -66,9 +66,7 @@ impl PowerModule {
                 min_columns: 28,
                 min_rows: 2,
                 priority: 27,
-                // Detail tab only; the Overview summary lives in the
-                // process panel's Power sub-tab.
-                slots: &[Slot::Detail],
+                slots: &[Slot::Overview, Slot::Detail],
             })?,
         })
     }
@@ -79,7 +77,14 @@ impl DisplayModule for PowerModule {
         &self.manifest
     }
 
+    fn include_in_overview(&self, model: &ViewModel) -> bool {
+        model.session.view.is_fox_services_dashboard()
+    }
+
     fn preferred_rows(&self, model: &ViewModel, _width: u16, slot: Slot) -> Option<u16> {
+        if slot == Slot::Overview {
+            return Some(5);
+        }
         if slot != Slot::Detail {
             return None;
         }

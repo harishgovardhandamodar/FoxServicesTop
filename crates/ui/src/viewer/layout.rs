@@ -157,6 +157,7 @@ pub fn plan(request: &LayoutRequest<'_>) -> FramePlan {
     };
     match request.view {
         ViewKind::Overview => plan_overview(&mut plan, request),
+        view if view.is_fox_services_dashboard() => plan_grid(&mut plan, request),
         _ => plan_detail(&mut plan, request),
     }
     plan

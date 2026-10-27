@@ -39,7 +39,7 @@ pub enum KeyAction {
     ToggleCpuDetail,
     ScrollMemoryUp,
     ScrollMemoryDown,
-    /// Scrolls the current detail view (the Nodes and Docker tabs).
+    /// Scrolls the current detail view or dashboard widget.
     ScrollDetailUp,
     ScrollDetailDown,
     HistoryDown,
@@ -217,7 +217,7 @@ const FILTER_VIEWS: &[ViewKind] = &[
     ViewKind::Power,
     ViewKind::Zombies,
 ];
-/// The single-page polled views, scrolled with `j`/`k`.
+/// The Fox-Services dashboard and Zombies list, scrolled with `j`/`k`.
 const SCROLL_VIEWS: &[ViewKind] = &[
     ViewKind::Nodes,
     ViewKind::Docker,
@@ -226,7 +226,13 @@ const SCROLL_VIEWS: &[ViewKind] = &[
     ViewKind::Zombies,
 ];
 /// Views whose charts follow the history bar sizes (`w`/`W`).
-const BAR_VIEWS: &[ViewKind] = &[ViewKind::History, ViewKind::Power];
+const BAR_VIEWS: &[ViewKind] = &[
+    ViewKind::History,
+    ViewKind::Nodes,
+    ViewKind::Docker,
+    ViewKind::Tokens,
+    ViewKind::Power,
+];
 
 /// Table-row constructor: positional arguments keep the table one line per binding.
 #[allow(clippy::too_many_arguments)]
@@ -268,10 +274,7 @@ pub static KEYMAP: &[KeyBinding] = &[
     binding("3", "Overview History", None, Section::Views, ModeSet::NORMAL, ViewScope::All, &[KeyPattern::char('3')], KeyAction::ShowTab(Tab::OverviewHistory)),
     binding("4", "Process History", None, Section::Views, ModeSet::NORMAL, ViewScope::All, &[KeyPattern::char('4')], KeyAction::ShowTab(Tab::ProcessHistory)),
     binding("5/F2", "Settings", None, Section::Views, ModeSet::NORMAL, ViewScope::All, &[KeyPattern::char('5'), KeyPattern::key(KeyCode::F(2))], KeyAction::ShowTab(Tab::Settings)),
-    binding("6", "Nodes (fox-services cluster)", None, Section::Views, ModeSet::NORMAL, ViewScope::All, &[KeyPattern::char('6')], KeyAction::ShowTab(Tab::Nodes)),
-    binding("7", "Fox-Services (all nodes)", None, Section::Views, ModeSet::NORMAL, ViewScope::All, &[KeyPattern::char('7')], KeyAction::ShowTab(Tab::Docker)),
-    binding("8", "Tokens (ingress / egress by app and model)", None, Section::Views, ModeSet::NORMAL, ViewScope::All, &[KeyPattern::char('8')], KeyAction::ShowTab(Tab::Tokens)),
-    binding("9", "Power (watts timeline and kWh)", None, Section::Views, ModeSet::NORMAL, ViewScope::All, &[KeyPattern::char('9')], KeyAction::ShowTab(Tab::Power)),
+    binding("6", "Fox-Services dashboard (nodes, services, tokens, power)", None, Section::Views, ModeSet::NORMAL, ViewScope::All, &[KeyPattern::char('6')], KeyAction::ShowTab(Tab::FoxServices)),
     binding("0", "Zombie processes grouped by parent PID", None, Section::Views, ModeSet::NORMAL, ViewScope::All, &[KeyPattern::char('0')], KeyAction::ShowTab(Tab::Zombies)),
     binding("j/↓", "scroll down", None, Section::Views, ModeSet::NORMAL, ViewScope::Only(SCROLL_VIEWS), &[KeyPattern::char('j'), KeyPattern::key(KeyCode::Down)], KeyAction::ScrollDetailDown),
     binding("k/↑", "scroll up", None, Section::Views, ModeSet::NORMAL, ViewScope::Only(SCROLL_VIEWS), &[KeyPattern::char('k'), KeyPattern::key(KeyCode::Up)], KeyAction::ScrollDetailUp),

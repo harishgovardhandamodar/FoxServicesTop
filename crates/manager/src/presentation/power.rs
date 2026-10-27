@@ -15,9 +15,9 @@ use fox_services_top_core::view::{
 
 use super::reader::MetricReader;
 
-/// Builds the Power tab's view from the history service's view and the
+/// Builds the dashboard's power widget from the history service's view and the
 /// live snapshot. `None` while the history holds no power series: an empty
-/// view would carry no topic, so the tab and the Overview sub-tab say
+/// view would carry no topic, so the widget and the Overview sub-tab say
 /// "no power data" instead.
 pub(crate) fn build_power_view(
     reader: &MetricReader<'_>,

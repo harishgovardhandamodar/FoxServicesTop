@@ -784,19 +784,21 @@ fn tab_clicks_and_keys_switch_views() {
         ViewKind::History,
         "bursts build on the staged view and skip hidden views"
     );
-    // 0 selects the tenth tab; Tab wraps from it to the overview (D-75).
+    // 0 selects Zombies; Tab wraps from it to the Overview (D-75).
     let sent = harness.submitted().len();
     harness.keys(&[key('0')]);
     assert!(harness.submitted().len() > sent);
     assert_eq!(harness.last_session().0, ViewKind::Zombies);
     harness.keys(&[key('6')]);
     assert_eq!(harness.last_session().0, ViewKind::Nodes);
-    harness.keys(&[key('7')]);
-    assert_eq!(harness.last_session().0, ViewKind::Docker);
-    harness.keys(&[key('8')]);
-    assert_eq!(harness.last_session().0, ViewKind::Tokens);
-    harness.keys(&[key('9')]);
-    assert_eq!(harness.last_session().0, ViewKind::Power);
+    let sent = harness.submitted().len();
+    harness.keys(&[key('7'), key('8'), key('9')]);
+    assert_eq!(
+        harness.submitted().len(),
+        sent,
+        "merged tabs have no old keys"
+    );
+    assert_eq!(harness.last_session().0, ViewKind::Nodes);
     harness.keys(&[key('0')]);
     assert_eq!(harness.last_session().0, ViewKind::Zombies);
     harness.keys(&[code(KeyCode::Tab)]);

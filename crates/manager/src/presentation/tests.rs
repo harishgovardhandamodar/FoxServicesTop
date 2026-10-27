@@ -521,7 +521,20 @@ fn a_projection_inside_the_budget_is_accounted_at_its_bound() {
     assert!(measured <= exact * 2, "{measured} vs {exact}");
 }
 
-/// The Power tab and the Overview fill power while the history carries
+#[test]
+fn legacy_fox_services_views_share_dashboard_projections() {
+    let widgets = ["cluster", "docker", "tokens", "power"];
+    for view in [
+        ViewKind::Nodes,
+        ViewKind::Docker,
+        ViewKind::Tokens,
+        ViewKind::Power,
+    ] {
+        assert_eq!(super::plan::visible_modules(view), widgets, "{view:?}");
+    }
+}
+
+/// The dashboard and Overview fill power while the history carries
 /// power series, and stay empty otherwise.
 #[test]
 fn power_fills_only_with_power_series() {
@@ -531,7 +544,7 @@ fn power_fills_only_with_power_series() {
     let plain = Fixture::new();
     let reader = MetricReader::new(&plain.snapshot, &plain.catalog, NOW);
     assert!(build_power_view(&reader, &plain.history).is_none());
-    for view in [ViewKind::Power, ViewKind::Overview] {
+    for view in [ViewKind::Power, ViewKind::Overview, ViewKind::Nodes] {
         let mut fixture = Fixture::new();
         fixture.session.view = view;
         let model = build_view_model_measured(&fixture.context()).0;
@@ -568,7 +581,7 @@ fn power_fills_only_with_power_series() {
         ..(*fixture.history).clone()
     };
     fixture.history = Arc::new(history);
-    for view in [ViewKind::Power, ViewKind::Overview] {
+    for view in [ViewKind::Power, ViewKind::Overview, ViewKind::Nodes] {
         fixture.session.view = view;
         let model = build_view_model_measured(&fixture.context()).0;
         let power = model.modules.power.as_ref().expect("{view:?}");

@@ -143,7 +143,7 @@ pub trait TrendReader: Send + Sync {
 #[derive(Clone, Default)]
 pub struct CancelFlag(Arc<AtomicBool>);
 
-/// Latest polled fox-services cluster snapshot (Nodes and Docker tabs).
+/// Latest polled fox-services cluster snapshot for the dashboard widgets.
 /// Implemented by the composition root's cluster monitor, which polls the
 /// configured nodes' HTTP APIs on its own thread; the Manager only reads
 /// the latest snapshot and never touches the network.

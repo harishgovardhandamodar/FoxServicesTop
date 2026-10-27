@@ -87,7 +87,7 @@ impl FoxServicesClient {
                 return poll;
             }
         }
-        // Which app uses which model: the Fox-Services tab's own endpoint.
+        // Which app uses which model: the dashboard's services widget endpoint.
         if let Ok(live_map) = self.get(&self.services.live_map_path()) {
             poll.services = Some(self.services.apply(&live_map));
         }
@@ -100,7 +100,7 @@ impl FoxServicesClient {
                 poll.tokens = Some(tokens.apply(&usage, stats.as_ref()));
             }
         }
-        // Container counts for the Nodes tab; the project list itself is
+        // Container counts for the dashboard's LAN widget; the project list itself is
         // not shown anywhere, so only the totals are kept.
         if let Ok(projects) = self.get("/api/docker/projects") {
             apply_project_counts(&mut poll.node, &projects);
@@ -164,7 +164,7 @@ fn apply_hardware(node: &mut ClusterNodeView, hardware: &Value) {
     }
 }
 
-/// Container counts for the Nodes tab. The project list itself is not
+/// Container counts for the dashboard's LAN widget. The project list itself is not
 /// shown anywhere, so only the totals are kept.
 fn apply_project_counts(node: &mut ClusterNodeView, projects: &Value) {
     let Some(entries) = projects.get("projects").and_then(Value::as_array) else {

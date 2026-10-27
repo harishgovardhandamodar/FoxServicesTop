@@ -1,4 +1,4 @@
-//! Fox-services cluster monitoring for the Nodes, Fox-Services and Tokens tabs.
+//! Fox-services cluster monitoring for the dashboard's cluster, service and token widgets.
 //!
 //! The composition root polls the statically configured nodes' HTTP APIs
 //! (`/api/hardware/status`, `/api/llm/live-map`, `/api/usage/history`,

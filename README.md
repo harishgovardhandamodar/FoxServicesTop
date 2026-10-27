@@ -88,8 +88,8 @@ cargo build --release --locked
 ./target/release/fox-services-top
 ```
 
-New here? Start with the [User Guide](docs/USER_GUIDE.md): running it, all ten
-tabs, and pointing the Nodes and Fox-Services tabs at your own fox-services nodes.
+New here? Start with the [User Guide](docs/USER_GUIDE.md): running it, the seven
+tabs, and pointing the Fox-Services dashboard at your own fox-services nodes.
 
 ## Features
 
@@ -162,13 +162,11 @@ of the whole machine.
 - **Settings in the app.** Change the sampling interval and the display modules, and see each data
   source's state. Every setting shows its saved and effective value, where it came from, and
   whether it applies now or after a restart.
-- **Nodes across the LAN.** The Nodes tab polls every configured fox-services node over its HTTP
-  API (`axiom` and `axiom-dgx` out of the box): online state, CPU, memory, GPU, network and token
-  throughput per node, plus the Fox Mesh peers the nodes report. A node that does not answer keeps
-  its row with the error.
-- **Fox-Services everywhere.** The Fox-Services tab shows which app uses which LLM model,
-  per request — live request and token counts plus the newest requests with attribution.
-  Read-only; it only watches.
+- **Fox-Services dashboard.** One multi-widget tab (key `6`) combines LAN machine health,
+  live services and recent LLM requests, token-flow charts, and a watts timeline. Its
+  responsive, color-coded panels arrange as a graphical dashboard and stack on narrow terminals.
+  A node that does not answer stays visible with its error; service and process monitoring are
+  read-only.
 
 ## Screens
 
@@ -183,8 +181,8 @@ showing the Fox-Services tables in place. `c` expands the CPU into per-core bars
 #### Show LAN machines
 
 1. Start `fox-services-top` on the machine where you want to view the cluster.
-2. Press `1` to open **Overview**. The **LAN Machines** panel appears alongside the local
-   monitoring panels; this machine is included automatically.
+2. Press `1` for the local **Overview**, or `6` for the full **Fox-Services** dashboard. The local
+   machine is included automatically.
 3. To show other machines, make sure each has a reachable fox-services HTTP API, then add its
    name and LAN address. For a one-time launch, repeat `--remote-node` for every remote you want
    listed:
@@ -236,21 +234,13 @@ Each group lists its zombie PIDs, names and available command lines; `/` filters
 scroll. The process scan is capped at 4,096 PIDs per poll.
 Zombies have already exited, so signals cannot remove them; the parent process must reap them.
 
-### Nodes
+### Fox-Services dashboard
 
-Every configured fox-services node in one table: reachability, CPU and memory, GPU kind and use,
-network rates, token throughput and container counts, then the Fox Mesh peers the nodes discovered.
-Press `6`.
-
-<img src="docs/images/screenshots/workstation-nodes.png" alt="Nodes tab: axiom online with CPU, memory, GPU, network, token and container readings, axiom-dgx offline, and one mesh peer" width="100%">
-
-### Fox-Services
-
-Which app uses which LLM model, per request — service statuses with real request and token
-counts, then the newest requests with attribution. `/` filters by service or model; `j` / `k`
-scroll the recent requests. Press `7`.
-
-<img src="docs/images/screenshots/workstation-services.png" alt="Fox-Services tab: live service-to-model table with request and token counts, then recent LLM requests with attribution" width="100%">
+Press `6` for the responsive, multi-widget dashboard. Its panels show configured LAN machines
+(reachability, CPU, memory, GPU, network, token throughput, containers and Fox Mesh peers),
+live per-app service/model usage with recent requests, token ingress/egress flow, and a watts
+timeline with current and peak power. `/` filters the node and service tables; the dashboard is
+read-only.
 
 ## Capabilities
 
@@ -382,16 +372,16 @@ Each panel names its own keys at the right of its title; the footer keeps the gl
 
 | Key | Action |
 |---|---|
-| `1`–`7`, `Tab`, `Shift-Tab` | Overview, GPU, Overview History, Process History, Settings, Nodes, Docker |
+| `1`–`6`, `0`, `Tab`, `Shift-Tab` | Overview, GPU, Overview History, Process History, Settings, Fox-Services, Zombies |
 | `q`, `Ctrl-C` | Quit (`q` is text while typing a filter; `Ctrl-C` always quits) |
 | `?`, `F1` | Help |
 | `+` / `-` | Faster / slower sampling |
-| `j`/`k`, arrows, `PgUp`/`PgDn`, `Home`/`End` | Move the selection (scroll on the Nodes, Fox-Services and Zombies tabs) |
+| `j`/`k`, arrows, `PgUp`/`PgDn`, `Home`/`End` | Move the selection (scroll on Fox-Services and Zombies) |
 | `c` | Show or hide the CPU sensors and per-core bars (or click the CPU panel) |
 | `[` / `]` | Scroll the GPU processes of the memory panel |
 | `s` / `r` | Next sort column / reverse order |
 | `g` | Cycle the GPU filter (all GPUs → each GPU) |
-| `/` | Filter processes by name (`Enter` applies, `Esc` clears; on Nodes/Docker it narrows their tables) |
+| `/` | Filter (`Enter` applies, `Esc` clears; narrows dashboard node and service tables too) |
 | `K` / `F9` | Stop the selected process with SIGTERM / SIGKILL (asks for confirmation) |
 | `y`/`Enter`, `n`/`Esc` | Confirm / cancel a pending process action |
 | `h`/`l`, `←`/`→` | Previous / next GPU in the GPU view |

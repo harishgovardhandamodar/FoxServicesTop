@@ -28,14 +28,13 @@ pub enum ViewKind {
     Sources,
     Settings,
     Actions,
-    /// Fox-services cluster: every configured node (axiom, axiom-dgx, ...)
-    /// polled over its HTTP API, plus mesh-discovered peers.
+    /// Fox-Services dashboard: cluster nodes, live services, token flow and power.
     Nodes,
-    /// Fox-Services of every configured node: live LLM usage per app (read-only).
+    /// Legacy selectable view retained for saved sessions; renders the Fox-Services dashboard.
     Docker,
-    /// Token ingress/egress by app and model across the configured nodes.
+    /// Legacy selectable view retained for saved sessions; renders the Fox-Services dashboard.
     Tokens,
-    /// Energy / power consumption: watts timeline and kWh per query window.
+    /// Legacy selectable view retained for saved sessions; renders the Fox-Services dashboard.
     Power,
     /// Zombie processes grouped by their parent process ID.
     Zombies,
@@ -57,6 +56,14 @@ impl ViewKind {
         ViewKind::Zombies,
     ];
 
+    /// Whether this view value selects the unified Fox-Services dashboard.
+    pub const fn is_fox_services_dashboard(self) -> bool {
+        matches!(
+            self,
+            Self::Nodes | Self::Docker | Self::Tokens | Self::Power
+        )
+    }
+
     pub const fn title(self) -> &'static str {
         match self {
             Self::Overview => "Overview",
@@ -66,10 +73,7 @@ impl ViewKind {
             Self::Sources => "Sources",
             Self::Settings => "Settings",
             Self::Actions => "Actions",
-            Self::Nodes => "Nodes",
-            Self::Docker => "Fox-Services",
-            Self::Tokens => "Tokens",
-            Self::Power => "Power",
+            Self::Nodes | Self::Docker | Self::Tokens | Self::Power => "Fox-Services",
             Self::Zombies => "Zombies",
         }
     }

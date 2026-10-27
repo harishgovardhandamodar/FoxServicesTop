@@ -975,8 +975,8 @@ pub struct ServiceModelView {
     pub avg_ms: Option<f64>,
 }
 
-/// One service (app) of the Fox-Services tab: its status and every LLM
-/// model it used, busiest first.
+/// One service (app) in the Fox-Services dashboard: its status and every
+/// LLM model it used, busiest first.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct ServiceRowView {
     /// App/service name as the node reports it (`quai-radar`, ...).
@@ -1017,12 +1017,11 @@ pub struct RecentRequestView {
 /// Longest prompt snippet a projection carries per recent request.
 pub const SERVICE_PROMPT_MAX_CHARS: usize = 240;
 
-/// The Fox-Services tab: which app uses which LLM model, per request —
-/// aggregated from actual LLM requests (the window the tab polls), plus the
-/// newest requests with attribution.
+/// The Fox-Services dashboard's live service usage, aggregated from actual
+/// LLM requests plus the newest requests with attribution.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct ServicesView {
-    /// False when remote monitoring is disabled: the tab explains itself.
+    /// False when remote monitoring is disabled: the widget explains itself.
     pub enabled: bool,
     /// Services, busiest status first.
     pub services: Vec<ServiceRowView>,
@@ -1086,7 +1085,7 @@ pub struct TokenModelView {
     pub egress_tps: f64,
 }
 
-/// One bucket of the token flow timeline the Tokens tab charts: the rates
+/// One bucket of the token-flow chart: the rates
 /// observed over that slice of the window.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct TokenBucketView {
@@ -1142,10 +1141,10 @@ pub struct TokenEngineModelView {
     pub expires_in_s: Option<u64>,
 }
 
-/// The Tokens tab: ingress/egress by app and model, plus the engine's models.
+/// Token ingress/egress by app and model, plus the engine's models.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct TokensView {
-    /// False when remote monitoring is disabled: the tab explains itself.
+    /// False when remote monitoring is disabled: the widget explains itself.
     pub enabled: bool,
     /// Apps with traffic, most egress first.
     pub apps: Vec<TokenAppView>,
@@ -1216,8 +1215,8 @@ pub struct PowerWindowView {
     pub energy_joules: Option<f64>,
 }
 
-/// The Power tab: watts timeline and kWh per query window, built from the
-/// history's power charts and summaries plus the live snapshot.
+/// The power widget: watts timeline and kWh per query window, built from
+/// the history's power charts and summaries plus the live snapshot.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct PowerView {
     /// Bar size the timeline draws (`1m`, `1h`, ...): the session's
@@ -1293,13 +1292,13 @@ pub struct ModuleViews {
     pub settings: Option<Arc<SettingsView>>,
     pub actions: Option<Arc<ActionsView>>,
     /// Built from local and remote machine data for Overview, or the remote
-    /// cluster snapshot for the Nodes tab.
+    /// cluster snapshot for the Fox-Services dashboard.
     pub cluster: Option<Arc<ClusterView>>,
-    /// Built from the cluster snapshot, for the Fox-Services tab.
+    /// Built from the cluster snapshot for the dashboard's services widget.
     pub docker: Option<Arc<ServicesView>>,
-    /// Built from the cluster snapshot, for the Tokens tab.
+    /// Built from the cluster snapshot for the dashboard's token-flow widget.
     pub tokens: Option<Arc<TokensView>>,
-    /// Built from the history and the live snapshot, for the Power tab.
+    /// Built from history and the live snapshot for the dashboard's power widget.
     pub power: Option<Arc<PowerView>>,
     /// Built from the live process table for the Zombies tab.
     pub zombies: Option<Arc<ZombiesView>>,

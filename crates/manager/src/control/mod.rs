@@ -94,8 +94,7 @@ pub(crate) struct ControlCore {
     ingestion: IngestionService,
     /// The state's short trends (D-99): read, never recorded here.
     trends: Arc<dyn TrendReader>,
-    /// The cluster monitor's latest snapshot (Nodes and Docker tabs): read,
-    /// never polled here.
+    /// The cluster monitor's latest dashboard snapshot: read, never polled here.
     cluster: Option<Arc<dyn ClusterSource>>,
     /// How often the process table is read (its memory values hold a few
     /// such periods, D-64).

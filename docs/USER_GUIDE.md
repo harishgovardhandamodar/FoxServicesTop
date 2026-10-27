@@ -183,12 +183,12 @@ path. `install.sh` installs neither unit.
 
 | Key | Action |
 |---|---|
-| `1`–`9`, `0`, `Tab`, `Shift-Tab` | Overview, GPU, Overview History, Process History, Settings, Nodes, Fox-Services, Tokens, Power, Zombies |
+| `1`–`6`, `0`, `Tab`, `Shift-Tab` | Overview, GPU, Overview History, Process History, Settings, Fox-Services, Zombies |
 | `q`, `Ctrl-C` | Quit (`q` is text while typing a filter) |
 | `?`, `F1` | Help |
 | `+` / `-` | Faster / slower sampling |
-| `j`/`k`, arrows, `PgUp`/`PgDn`, `Home`/`End` | Move the selection (scroll on Nodes/Docker) |
-| `/` | Filter (`Enter` applies, `Esc` clears; narrows Nodes/Fox-Services tables too) |
+| `j`/`k`, arrows, `PgUp`/`PgDn`, `Home`/`End` | Move the selection (scroll on Fox-Services/Zombies) |
+| `/` | Filter (`Enter` applies, `Esc` clears; narrows dashboard node/service tables too) |
 | `c` | Per-core CPU bars and sensors |
 | `[` / `]` | Scroll the memory panel's GPU processes |
 | `s` / `r` | Next sort column / reverse order (process table) |
@@ -224,37 +224,25 @@ clickable with the mouse.
   Each setting shows saved vs effective value, origin, and whether it applies
   now or after a restart.
 
-## The Nodes tab (6)
+## The Fox-Services dashboard (6)
 
-One row per configured fox-services node with its latest polled snapshot:
+The former Nodes, Fox-Services, Tokens and Power tabs are now one responsive
+multi-widget dashboard. At wide sizes it arranges four color-coded panels in
+a two-by-two grid; on narrower terminals the panels stack to fit:
 
-- reachability (`online`, or the error when it does not answer),
-- CPU %, memory %, GPU kind + utilization, network RX/TX,
-- LLM token throughput, running/total container counts,
-- Fox Mesh peers the nodes discovered, with which node reported them.
+- **LAN machines:** reachability and errors, CPU, memory, GPU, network,
+  token throughput and container counts, plus Fox Mesh peers reported by
+  configured nodes. The local machine is included automatically.
+- **Services:** live app/model usage from actual LLM requests over
+  `remote.service_window_hours` (24 h by default), with status, request and
+  token totals, and recent request attribution. This is read-only and does
+  not use compose configuration as a proxy for real requests.
+- **Token flow:** a compact chart of ingress and egress by app/model.
+- **Power:** a watts timeline with current and peak values.
 
-`/` narrows the table by node name. The view is read-only and never blocks
-the local monitor: a dead node just keeps its error row.
-
-<img src="images/screenshots/workstation-nodes.png" alt="Nodes tab: axiom online with CPU, memory, GPU, network, token and container readings, axiom-dgx offline, and one mesh peer" width="100%">
-
-## The Fox-Services tab (7)
-
-Live: which app uses which LLM model, per request — aggregated from actual
-LLM requests over `remote.service_window_hours` (24 h default), not compose
-config. The node matches services to compose projects itself and reports
-each service's status.
-
-- service table: service, status (`Busy` / `Live` / `Running` /
-  `Unreachable` / `stopped` / `Not deployed`), the models it used with real
-  request and token counts, totals, last request,
-- recent requests below: time, service, model, tokens (prompt/completion/
-  total), duration with queue wait, content type, prompt snippet.
-
-Read-only — it only watches. `/` filters both tables by service or model;
-`j`/`k` scroll the recent requests.
-
-<img src="images/screenshots/workstation-services.png" alt="Fox-Services tab: live service-to-model table with request and token counts, then recent LLM requests with attribution" width="100%">
+`/` filters the node and service tables; `j`/`k` scroll their content. The
+dashboard never blocks local monitoring, and an unreachable node remains
+visible with its error.
 
 ## The Zombies tab (0)
 
@@ -334,8 +322,8 @@ files `0600`. Databases are never migrated: a foreign format starts empty,
 - **A node shows offline.** Check the error in its row (timeout, refused,
   bad status), then `curl http://<host>:8210/api/hardware/status` from this
   machine. LAN firewalls and wrong ports are the usual cause.
-- **Empty Nodes/Fox-Services tabs.** `remote.enabled` may be off, or every node
-  unreachable — the tabs say which. `--check-config` validates the section.
+- **Empty Fox-Services dashboard.** `remote.enabled` may be off, or every node
+  unreachable — the widgets say which. `--check-config` validates the section.
 - **Tabs missing.** The `cluster` / `docker` modules can be toggled in
   Settings like any display module; both are on by default.
 - **Slow shutdown.** The poller is stopped inside the 3 s shutdown budget; a

@@ -75,7 +75,7 @@ impl GpuStats<'_> {
 
 /// Whether a summary belongs to a GPU block of the long-term table, as
 /// opposed to the host's power (total, packages, platform), which the
-/// Power tab shows.
+/// dashboard's power widget shows.
 fn is_gpu_series(kind: HistoryChartKind) -> bool {
     SERIES.contains(&kind)
 }
@@ -607,7 +607,7 @@ mod tests {
     }
 
     /// Host power summaries (total, packages, platform) never form a GPU
-    /// block: the Power tab shows them.
+    /// block: the dashboard's power widget shows them.
     #[test]
     fn host_power_summaries_form_no_gpu_block() {
         use fox_services_top_core::metric::CanonicalUnit;

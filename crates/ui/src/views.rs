@@ -7,8 +7,9 @@
 //!
 //! The view kinds are fixed by the command contract, so the two history
 //! tabs are one view, `History`, on two pages of its module: the overview's
-//! resources and the GPU processes (D-75). The Nodes and Docker tabs show
-//! the fox-services cluster; Zombies has its own single-page process table.
+//! resources and the GPU processes (D-75). Fox-Services combines the
+//! cluster, live service, token-flow and power widgets; Zombies has its own
+//! single-page process table.
 
 use fox_services_top_core::commands::ViewKind;
 
@@ -20,24 +21,18 @@ pub enum Tab {
     OverviewHistory,
     ProcessHistory,
     Settings,
-    Nodes,
-    Docker,
-    Tokens,
-    Power,
+    FoxServices,
     Zombies,
 }
 
-/// Offered tabs in order; digit keys 1–9 and 0 follow this order.
-pub const OFFERED_TABS: [Tab; 10] = [
+/// Offered tabs in order; digit keys 1–6 and 0 follow this order.
+pub const OFFERED_TABS: [Tab; 7] = [
     Tab::Overview,
     Tab::Gpu,
     Tab::OverviewHistory,
     Tab::ProcessHistory,
     Tab::Settings,
-    Tab::Nodes,
-    Tab::Docker,
-    Tab::Tokens,
-    Tab::Power,
+    Tab::FoxServices,
     Tab::Zombies,
 ];
 
@@ -51,10 +46,7 @@ impl Tab {
             Self::Gpu => ViewKind::GpuDetail,
             Self::OverviewHistory | Self::ProcessHistory => ViewKind::History,
             Self::Settings => ViewKind::Settings,
-            Self::Nodes => ViewKind::Nodes,
-            Self::Docker => ViewKind::Docker,
-            Self::Tokens => ViewKind::Tokens,
-            Self::Power => ViewKind::Power,
+            Self::FoxServices => ViewKind::Nodes,
             Self::Zombies => ViewKind::Zombies,
         }
     }
@@ -66,10 +58,7 @@ impl Tab {
             Self::OverviewHistory => "Overview History",
             Self::ProcessHistory => "Process History",
             Self::Settings => "Settings",
-            Self::Nodes => "Nodes",
-            Self::Docker => "Fox-Services",
-            Self::Tokens => "Tokens",
-            Self::Power => "Power",
+            Self::FoxServices => "Fox-Services",
             Self::Zombies => "Zombies",
         }
     }
@@ -82,10 +71,7 @@ impl Tab {
             Self::OverviewHistory => "tab.history",
             Self::ProcessHistory => "tab.process_history",
             Self::Settings => "tab.settings",
-            Self::Nodes => "tab.nodes",
-            Self::Docker => "tab.docker",
-            Self::Tokens => "tab.tokens",
-            Self::Power => "tab.power",
+            Self::FoxServices => "tab.fox_services",
             Self::Zombies => "tab.zombies",
         }
     }
@@ -105,16 +91,15 @@ impl Tab {
             ViewKind::History if page == 0 => Some(Self::OverviewHistory),
             ViewKind::History => Some(Self::ProcessHistory),
             ViewKind::Settings => Some(Self::Settings),
-            ViewKind::Nodes => Some(Self::Nodes),
-            ViewKind::Docker => Some(Self::Docker),
-            ViewKind::Tokens => Some(Self::Tokens),
-            ViewKind::Power => Some(Self::Power),
+            ViewKind::Nodes | ViewKind::Docker | ViewKind::Tokens | ViewKind::Power => {
+                Some(Self::FoxServices)
+            }
             ViewKind::Zombies => Some(Self::Zombies),
             ViewKind::Processes | ViewKind::Sources | ViewKind::Actions => None,
         }
     }
 
-    /// 1-based tab number, with the tenth tab selected by `0`.
+    /// 1-based position in the offered tab order.
     pub fn number(self) -> usize {
         OFFERED_TABS
             .iter()
@@ -161,29 +146,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_retired_views_are_not_offered() {
+    fn legacy_fox_services_views_share_one_offered_tab() {
         assert_eq!(Tab::of(ViewKind::Sources, 0), None);
         assert_eq!(Tab::of(ViewKind::Processes, 0), None);
         assert_eq!(Tab::of(ViewKind::Actions, 0), None);
         assert_eq!(Tab::Overview.number(), 1);
         assert_eq!(Tab::Settings.number(), 5);
-        assert_eq!(Tab::Nodes.number(), 6);
-        assert_eq!(Tab::Docker.number(), 7);
-        assert_eq!(Tab::Tokens.number(), 8);
-        assert_eq!(Tab::Power.number(), 9);
-        assert_eq!(Tab::Zombies.number(), 10);
+        assert_eq!(Tab::FoxServices.number(), 6);
+        assert_eq!(Tab::Zombies.number(), 7);
         assert_eq!(Tab::Zombies.shortcut(), "0");
-        assert_eq!(Tab::of(ViewKind::Power, 0), Some(Tab::Power));
+        assert_eq!(Tab::of(ViewKind::Power, 0), Some(Tab::FoxServices));
         assert_eq!(Tab::of(ViewKind::Zombies, 0), Some(Tab::Zombies));
-        assert_eq!(Tab::Power.view(), ViewKind::Power);
-        assert_eq!(Tab::of(ViewKind::Tokens, 0), Some(Tab::Tokens));
-        assert_eq!(Tab::Tokens.view(), ViewKind::Tokens);
-        assert_eq!(Tab::of(ViewKind::Nodes, 0), Some(Tab::Nodes));
-        assert_eq!(Tab::of(ViewKind::Docker, 0), Some(Tab::Docker));
-        assert_eq!(Tab::Nodes.view(), ViewKind::Nodes);
-        assert_eq!(Tab::Docker.view(), ViewKind::Docker);
-        assert_eq!(next_tab(Some(Tab::Tokens)), Tab::Power);
-        assert_eq!(next_tab(Some(Tab::Power)), Tab::Zombies);
+        assert_eq!(Tab::of(ViewKind::Tokens, 0), Some(Tab::FoxServices));
+        assert_eq!(Tab::of(ViewKind::Nodes, 0), Some(Tab::FoxServices));
+        assert_eq!(Tab::of(ViewKind::Docker, 0), Some(Tab::FoxServices));
+        assert_eq!(Tab::FoxServices.view(), ViewKind::Nodes);
+        assert_eq!(next_tab(Some(Tab::FoxServices)), Tab::Zombies);
         assert_eq!(next_tab(Some(Tab::Zombies)), Tab::Overview);
         assert_eq!(previous_tab(Some(Tab::Overview)), Tab::Zombies);
     }

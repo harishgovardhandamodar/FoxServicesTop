@@ -35,7 +35,7 @@ pub struct Cli {
     #[arg(long)]
     pub read_only: bool,
 
-    /// A fox-services node to poll for the Nodes and Docker tabs,
+    /// A fox-services node to poll for the Fox-Services dashboard,
     /// `NAME=URL` (repeatable, e.g. `--remote-node axiom=http://192.168.1.63:8210`);
     /// replaces the configured node list for this run only.
     #[arg(long, value_name = "NAME=URL")]

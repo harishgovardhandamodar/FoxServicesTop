@@ -29,6 +29,9 @@ const GPU_OVERVIEW_POINT_BUDGET: usize = 2048;
 /// Module ids (from `config::BUILTIN_MODULES`) shown by each view.
 pub fn visible_modules(view: ViewKind) -> &'static [&'static str] {
     match view {
+        ViewKind::Nodes | ViewKind::Docker | ViewKind::Tokens | ViewKind::Power => {
+            &[CLUSTER, DOCKER, TOKENS, POWER]
+        }
         // DOCKER rides the Overview: the process panel's Fox services
         // sub-tab shows its tables in place. POWER rides it too: the process
         // panel's Power sub-tab summarizes it in place. CLUSTER has its own
@@ -39,10 +42,6 @@ pub fn visible_modules(view: ViewKind) -> &'static [&'static str] {
         ViewKind::GpuDetail => &[GPU],
         ViewKind::History => &[HISTORY],
         ViewKind::Settings => &[SETTINGS],
-        ViewKind::Nodes => &[CLUSTER],
-        ViewKind::Docker => &[DOCKER],
-        ViewKind::Tokens => &[TOKENS],
-        ViewKind::Power => &[POWER],
         ViewKind::Zombies => &[ZOMBIES],
         // Retired views: the wire keeps their values, nothing is shown (D-91).
         ViewKind::Processes | ViewKind::Sources | ViewKind::Actions => &[],

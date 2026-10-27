@@ -992,7 +992,7 @@ pub(crate) fn header() -> HeaderView {
     }
 }
 
-/// Power tab fixture: total plus two GPUs over the 1 h window, with kWh
+/// Power widget fixture: total plus two GPUs over the 1 h window, with kWh
 /// over 1 h and 24 h.
 pub(crate) fn power_view() -> PowerView {
     let row = |kind, subject: &str, current: f64, mean: f64, peak: f64| PowerRowView {

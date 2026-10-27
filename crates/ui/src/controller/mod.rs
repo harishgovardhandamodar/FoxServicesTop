@@ -518,9 +518,8 @@ impl Controller {
             ViewKind::Overview => self.navigate_processes(movement, context),
             ViewKind::GpuDetail => self.navigate_gpu(movement, context),
             ViewKind::Settings => self.navigate_modules(movement, context),
-            // The history view charts fixed series (D-46), the Nodes and
-            // Docker tabs scroll with `j`/`k`, and the retired views are
-            // never shown (D-91).
+            // The history view charts fixed series (D-46), dashboard widgets
+            // scroll with `j`/`k`, and the retired views are never shown (D-91).
             ViewKind::History
             | ViewKind::Nodes
             | ViewKind::Docker

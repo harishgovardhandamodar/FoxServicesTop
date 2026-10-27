@@ -367,10 +367,9 @@ fn validate_view(
             Ok(())
         }
         ViewKind::Settings => Ok(()),
-        // The Nodes and Docker tabs show polled snapshots: no selection or
-        // series to validate, and the filter narrows their tables.
-        // The Power tab draws the history's power charts: the filter
-        // narrows its tables like the cluster tabs'.
+        // The Fox-Services dashboard and Zombies show polled snapshots:
+        // no selection or series to validate, and the filter narrows their
+        // tables.
         ViewKind::Nodes
         | ViewKind::Docker
         | ViewKind::Tokens
