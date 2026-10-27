@@ -9,8 +9,8 @@ use fox_services_top_core::commands::ViewKind;
 use fox_services_top_core::identity::ModuleId;
 use fox_services_top_core::quality::SampleKind;
 use fox_services_top_core::view::{
-    Banner, BannerLevel, CellState, DiskHistory, ModuleViews, OVERVIEW_GPU_CHART_ROWS,
-    OverloadState, ViewModel,
+    Banner, BannerLevel, CellState, ClusterNodeView, ClusterView, DiskHistory, ModuleViews,
+    OVERVIEW_GPU_CHART_ROWS, OverloadState, ViewModel,
 };
 use ratatui::Frame;
 use ratatui::Terminal;
@@ -795,6 +795,27 @@ fn overview_shows_lan_machines_alongside_other_modules() {
             .contains(&"processes".to_owned()),
         "the existing Overview modules remain visible"
     );
+}
+
+#[test]
+fn overview_shows_the_local_machine_when_remote_monitoring_is_disabled() {
+    let mut fixture = model(ViewKind::Overview);
+    let mut cluster = ClusterView::disabled();
+    cluster.nodes.push(ClusterNodeView {
+        name: "dgx-test (local)".into(),
+        online: true,
+        cpu_busy_pct: Some(41.0),
+        ..ClusterNodeView::default()
+    });
+    fixture.modules.cluster = Some(Arc::new(cluster));
+    let rendered = render(&fixture, (200, 60));
+    assert!(
+        rendered.contains("remote monitoring is disabled"),
+        "{}",
+        rendered.text()
+    );
+    assert!(rendered.contains("dgx-test (local)"), "{}", rendered.text());
+    assert!(rendered.contains("41.0"), "{}", rendered.text());
 }
 
 #[test]

@@ -61,20 +61,22 @@ pub(crate) fn fit_projection(
         }
     }
     let kib = max_bytes / 1024;
-    let (level, text) = if model.accounted_bytes(target) <= target {
-        (
-            BannerLevel::Info,
-            format!("view reduced to fit runtime.max_projection_bytes ({kib} KiB)"),
-        )
-    } else {
-        (
-            BannerLevel::Warning,
-            format!("view exceeds runtime.max_projection_bytes ({kib} KiB) after reduction"),
-        )
-    };
+    let reduced_text = format!("view reduced to fit runtime.max_projection_bytes ({kib} KiB)");
     let mut banners = std::mem::take(&mut model.banners);
-    push(&mut banners, level, text);
+    push(&mut banners, BannerLevel::Info, reduced_text.clone());
     model.banners = order_and_bound(banners);
+    if model.accounted_bytes(max_bytes) > max_bytes {
+        let mut banners = std::mem::take(&mut model.banners);
+        if let Some(banner) = banners
+            .iter_mut()
+            .find(|banner| banner.text == reduced_text)
+        {
+            banner.level = BannerLevel::Warning;
+            banner.text =
+                format!("view exceeds runtime.max_projection_bytes ({kib} KiB) after reduction");
+        }
+        model.banners = order_and_bound(banners);
+    }
     model.accounted_bytes(max_bytes)
 }
 

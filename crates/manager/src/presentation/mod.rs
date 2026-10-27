@@ -51,8 +51,9 @@ use fox_services_top_core::naming::{adapters, entity};
 use fox_services_top_core::ports::TrendReader;
 use fox_services_top_core::process_model::ProcessHistoryModel;
 use fox_services_top_core::view::{
-    ActionsView, ClusterSnapshot, ClusterView, GpuView, HeaderView, HistoryView, HostStatus,
-    IntervalView, ModuleViews, OverloadState, ServicesView, SessionState, TokensView, ViewModel,
+    ActionsView, ClusterNodeView, ClusterSnapshot, ClusterView, GpuView, HeaderView, HistoryView,
+    HostStatus, IntervalView, MetricCell, ModuleViews, OverloadState, ServicesView, SessionState,
+    TokensView, ViewModel,
 };
 
 use banners::BannerFacts;
@@ -291,10 +292,21 @@ fn build_modules(
         )));
     }
     if plan.shows(plan::CLUSTER) {
-        modules.cluster = Some(match &context.cluster {
-            Some(snapshot) => Arc::clone(&snapshot.cluster),
-            None => Arc::new(ClusterView::disabled()),
-        });
+        let mut cluster = context
+            .cluster
+            .as_ref()
+            .map_or_else(ClusterView::disabled, |snapshot| {
+                (*snapshot.cluster).clone()
+            });
+        if context.session.view == ViewKind::Overview {
+            let local = local_cluster_node(context, &modules);
+            let local_host_name = context.facts.host_name.trim();
+            cluster
+                .nodes
+                .retain(|node| !node.name.trim().eq_ignore_ascii_case(local_host_name));
+            cluster.nodes.insert(0, local);
+        }
+        modules.cluster = Some(Arc::new(cluster));
     }
     if plan.shows(plan::DOCKER) {
         modules.docker = Some(match &context.cluster {
@@ -316,6 +328,73 @@ fn build_modules(
     // every view (D-91).
     modules.actions = Some(Arc::clone(&context.actions));
     modules
+}
+
+fn local_cluster_node(context: &PresentationContext<'_>, modules: &ModuleViews) -> ClusterNodeView {
+    let cpu = modules.cpu.as_deref();
+    let memory = modules.memory.as_deref();
+    let gpu = modules.gpu.as_deref();
+    let gpu_memory_used = gpu.and_then(|view| {
+        sum_available_metrics(view.cards.iter().map(|card| &card.framebuffer_used))
+    });
+    let gpu_memory_total = gpu.and_then(|view| {
+        sum_available_metrics(view.cards.iter().map(|card| &card.framebuffer_total))
+    });
+    let gpu_name = gpu.and_then(|view| match view.cards.as_slice() {
+        [] => None,
+        [card] => Some(card.name.clone()),
+        cards => Some(format!("{} GPUs", cards.len())),
+    });
+    let memory_used = memory.and_then(|view| metric_u64(&view.used));
+    let memory_total = memory.and_then(|view| metric_u64(&view.total));
+    let local_name = if context.facts.host_name.trim().is_empty() {
+        "localhost".to_owned()
+    } else {
+        format!("{} (local)", context.facts.host_name.trim())
+    };
+
+    ClusterNodeView {
+        name: local_name,
+        machine: cpu.and_then(|view| view.model.clone()),
+        online: true,
+        uptime_s: Some(context.now_boot_ns / 1_000_000_000),
+        cpu_busy_pct: cpu.and_then(|view| view.total.value_f64()),
+        cpu_cores: cpu.and_then(|view| u32::try_from(view.cores.len()).ok()),
+        memory_used_bytes: memory_used,
+        memory_total_bytes: memory_total,
+        memory_busy_pct: memory_used.zip(memory_total).and_then(|(used, total)| {
+            (total > 0).then(|| (used as f64 / total as f64 * 100.0).clamp(0.0, 100.0))
+        }),
+        gpu_kind: gpu_name,
+        gpu_util_pct: gpu.and_then(|view| {
+            view.cards
+                .iter()
+                .filter_map(|card| card.utilization.value_f64())
+                .max_by(f64::total_cmp)
+        }),
+        gpu_mem_used_bytes: gpu_memory_used,
+        gpu_mem_total_bytes: gpu_memory_total,
+        ..ClusterNodeView::default()
+    }
+}
+
+fn metric_u64(cell: &MetricCell) -> Option<u64> {
+    cell.state
+        .has_value()
+        .then(|| cell.value.and_then(|value| value.as_u64()))
+        .flatten()
+}
+
+fn sum_available_metrics<'a>(cells: impl IntoIterator<Item = &'a MetricCell>) -> Option<u64> {
+    let mut total = 0_u64;
+    let mut found = false;
+    for cell in cells {
+        if let Some(value) = metric_u64(cell) {
+            total = total.saturating_add(value);
+            found = true;
+        }
+    }
+    found.then_some(total)
 }
 
 /// Overview shows every card as a summary with the utilization chart it

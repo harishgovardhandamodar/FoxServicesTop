@@ -885,10 +885,11 @@ pub struct SessionState {
     pub process_bar: BarSize,
 }
 
-/// One fox-services node as the Nodes tab shows it: the latest polled
-/// hardware snapshot of its `/api/hardware/status`, or the error when the
-/// node did not answer. Every field is optional because a node may answer
-/// only part of the API (older versions) or nothing at all.
+/// One machine in the LAN overview. Remote nodes use the latest polled
+/// `/api/hardware/status` snapshot, or the error when the node did not
+/// answer; the local machine uses metrics from this process's projection.
+/// Fields are optional because a node may report only part of the API or
+/// its local collectors may not provide every metric.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct ClusterNodeView {
     /// Name from the static node list (`axiom`, `axiom-dgx`, ...).
@@ -931,7 +932,7 @@ pub struct MeshPeerView {
     pub via: String,
 }
 
-/// The Nodes tab: one row per configured node plus mesh-discovered peers.
+/// Local and configured remote machines plus mesh-discovered peers.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct ClusterView {
     /// False when remote monitoring is disabled: the tab explains itself.
@@ -1251,7 +1252,8 @@ pub struct ModuleViews {
     pub process_history: Option<Arc<ProcessHistoryView>>,
     pub settings: Option<Arc<SettingsView>>,
     pub actions: Option<Arc<ActionsView>>,
-    /// Built from the cluster snapshot, for the Nodes tab.
+    /// Built from local and remote machine data for Overview, or the remote
+    /// cluster snapshot for the Nodes tab.
     pub cluster: Option<Arc<ClusterView>>,
     /// Built from the cluster snapshot, for the Fox-Services tab.
     pub docker: Option<Arc<ServicesView>>,

@@ -110,16 +110,27 @@ fn render_cluster_content(
     output: &mut Output,
 ) {
     if !cluster.enabled {
-        if let Some(area) = rows.rest() {
+        if cluster.nodes.is_empty() {
+            if let Some(area) = rows.rest() {
+                message(
+                    frame,
+                    area,
+                    "remote monitoring is disabled (config remote.enabled)",
+                    context.theme.muted_style(),
+                );
+            }
+            output.label("nodes: disabled");
+            return;
+        }
+        if let Some(area) = rows.next_row() {
             message(
                 frame,
                 area,
-                "remote monitoring is disabled (config remote.enabled)",
+                "remote monitoring is disabled",
                 context.theme.muted_style(),
             );
         }
-        output.label("nodes: disabled");
-        return;
+        output.label("nodes: remote monitoring disabled");
     }
     let nodes: Vec<&ClusterNodeView> = cluster
         .nodes

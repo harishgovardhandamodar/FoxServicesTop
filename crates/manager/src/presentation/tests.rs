@@ -11,7 +11,8 @@ use fox_services_top_core::naming::attributes;
 use fox_services_top_core::observation::EntityKind;
 use fox_services_top_core::testing::metric_key;
 use fox_services_top_core::view::{
-    BannerLevel, CellState, ConfirmationView, HistoryPointView, HistoryView, ViewModel,
+    BannerLevel, CellState, ClusterNodeView, ClusterSnapshot, ClusterView, ConfirmationView,
+    HistoryPointView, HistoryView, ServicesView, TokensView, ViewModel,
 };
 
 use super::testkit::{
@@ -278,6 +279,54 @@ fn each_view_fills_only_its_visible_topics() {
 }
 
 #[test]
+fn overview_includes_local_machine_without_a_remote_monitor() {
+    let fixture = reference_fixture(8, 0);
+    let model = build_view_model_measured(&fixture.context()).0;
+    let cluster = model.modules.cluster.as_deref().unwrap();
+    assert!(!cluster.enabled);
+    assert_eq!(cluster.nodes.len(), 1);
+    let local = &cluster.nodes[0];
+    assert_eq!(local.name, "dgx-test (local)");
+    assert!(local.online);
+    assert_eq!(local.cpu_busy_pct, Some(41.0));
+    assert_eq!(local.cpu_cores, Some(8));
+    assert_eq!(local.memory_busy_pct, Some(100.0));
+    assert_eq!(local.gpu_util_pct, Some(55.5));
+}
+
+#[test]
+fn overview_keeps_configured_remote_nodes_beside_local_machine() {
+    let fixture = reference_fixture(8, 0);
+    let cluster = ClusterView {
+        enabled: true,
+        nodes: vec![
+            ClusterNodeView {
+                name: "dgx-test".into(),
+                online: true,
+                ..ClusterNodeView::default()
+            },
+            ClusterNodeView {
+                name: "axiom-dgx".into(),
+                online: true,
+                ..ClusterNodeView::default()
+            },
+        ],
+        peers: Vec::new(),
+    };
+    let mut context = fixture.context();
+    context.cluster = Some(Arc::new(ClusterSnapshot {
+        cluster: Arc::new(cluster),
+        docker: Arc::new(ServicesView::default()),
+        tokens: Arc::new(TokensView::default()),
+    }));
+    let model = build_view_model_measured(&context).0;
+    let nodes = &model.modules.cluster.as_deref().unwrap().nodes;
+    assert_eq!(nodes.len(), 2, "the local host should not be duplicated");
+    assert_eq!(nodes[0].name, "dgx-test (local)");
+    assert_eq!(nodes[1].name, "axiom-dgx");
+}
+
+#[test]
 fn pending_confirmation_is_first_and_carries_action_details_on_any_view() {
     let mut fixture = Fixture::new();
     fixture.session.view = ViewKind::Overview;
@@ -464,7 +513,10 @@ fn small_budget_is_respected_and_announced() {
     assert!(
         model.banners.iter().any(
             |banner| banner.text == "view reduced to fit runtime.max_projection_bytes (64 KiB)"
-        )
+        ),
+        "measured {measured} bytes, estimate {}; banners: {:?}",
+        model.estimated_bytes(),
+        model.banners
     );
     let gpu = model.modules.gpu.as_ref().unwrap();
     assert_eq!(gpu.cards.len(), 8);

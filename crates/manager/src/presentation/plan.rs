@@ -28,11 +28,12 @@ const GPU_OVERVIEW_POINT_BUDGET: usize = 2048;
 /// Module ids (from `config::BUILTIN_MODULES`) shown by each view.
 pub fn visible_modules(view: ViewKind) -> &'static [&'static str] {
     match view {
-        // DOCKER rides the Overview too: the process panel's Fox services
-        // sub-tab shows its tables in place. POWER rides it too: the
-        // process panel's Power sub-tab summarizes it in place.
+        // DOCKER rides the Overview: the process panel's Fox services
+        // sub-tab shows its tables in place. POWER rides it too: the process
+        // panel's Power sub-tab summarizes it in place. CLUSTER has its own
+        // Overview panel containing local and configured remote machines.
         ViewKind::Overview => &[
-            CPU, GPU, MEMORY, DISK, NETWORK, PROCESSES, DOCKER, TOKENS, POWER,
+            CPU, GPU, MEMORY, DISK, NETWORK, PROCESSES, CLUSTER, DOCKER, TOKENS, POWER,
         ],
         ViewKind::GpuDetail => &[GPU],
         ViewKind::History => &[HISTORY],
@@ -133,7 +134,7 @@ mod tests {
                 assert!(BUILTIN_MODULES.contains(module), "{module}");
             }
         }
-        assert_eq!(visible_modules(ViewKind::Overview).len(), 9);
+        assert_eq!(visible_modules(ViewKind::Overview).len(), 10);
     }
 
     /// The retired views show nothing and disable nothing (D-91).
