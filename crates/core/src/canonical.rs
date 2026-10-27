@@ -378,6 +378,8 @@ pub struct ZombieProcess {
     pub name: String,
     pub command: String,
     pub parent_name: Option<String>,
+    #[serde(default)]
+    pub parent_state: Option<char>,
 }
 
 /// Previous counter reading for exact delta computation.

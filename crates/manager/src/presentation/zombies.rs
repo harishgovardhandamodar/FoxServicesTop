@@ -11,6 +11,7 @@ pub(crate) fn build_zombies_view(table: &ProcessTable) -> ZombiesView {
             .or_insert_with(|| ZombieGroupView {
                 parent_pid: process.parent_pid,
                 parent_name: process.parent_name.clone(),
+                parent_state: process.parent_state,
                 processes: Vec::new(),
             });
         group.processes.push(ZombieProcessView {
@@ -54,6 +55,7 @@ mod tests {
                     name: "unknown-parent-child".into(),
                     command: String::new(),
                     parent_name: None,
+                    parent_state: None,
                 },
                 ZombieProcess {
                     pid: 12,
@@ -61,6 +63,7 @@ mod tests {
                     name: "worker-a".into(),
                     command: "worker --a".into(),
                     parent_name: Some("supervisor".into()),
+                    parent_state: Some('S'),
                 },
                 ZombieProcess {
                     pid: 13,
@@ -68,6 +71,7 @@ mod tests {
                     name: "worker-b".into(),
                     command: "worker --b".into(),
                     parent_name: Some("supervisor".into()),
+                    parent_state: Some('S'),
                 },
             ],
             ..ProcessTable::default()
@@ -78,6 +82,7 @@ mod tests {
         assert_eq!(view.groups.len(), 2);
         assert_eq!(view.groups[0].parent_pid, Some(5));
         assert_eq!(view.groups[0].parent_name.as_deref(), Some("supervisor"));
+        assert_eq!(view.groups[0].parent_state, Some('S'));
         assert_eq!(view.groups[0].processes.len(), 2);
         assert_eq!(view.groups[1].parent_pid, None);
     }

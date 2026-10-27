@@ -194,6 +194,10 @@ fn zombie_processes(samples: &BTreeMap<ProcessKey, HostSample<'_>>) -> Vec<Zombi
             (key.pid.get(), sanitize_command_name(name))
         })
         .collect();
+    let states_by_pid: BTreeMap<i32, char> = samples
+        .iter()
+        .filter_map(|(key, sample)| sample.stat.state.map(|state| (key.pid.get(), state)))
+        .collect();
 
     samples
         .iter()
@@ -210,6 +214,10 @@ fn zombie_processes(samples: &BTreeMap<ProcessKey, HostSample<'_>>) -> Vec<Zombi
                     .stat
                     .ppid
                     .and_then(|parent_pid| names_by_pid.get(&parent_pid).cloned()),
+                parent_state: sample
+                    .stat
+                    .ppid
+                    .and_then(|parent_pid| states_by_pid.get(&parent_pid).copied()),
             }
         })
         .collect()

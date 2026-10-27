@@ -340,6 +340,7 @@ fn zombies_view_projects_the_latest_parent_groups() {
             name: "worker".into(),
             command: "worker --queue".into(),
             parent_name: Some("systemd".into()),
+            parent_state: Some('S'),
         }],
         ..ProcessTable::default()
     });
@@ -356,6 +357,7 @@ fn zombies_view_projects_the_latest_parent_groups() {
     assert_eq!(zombies.groups.len(), 1);
     assert_eq!(zombies.groups[0].parent_pid, Some(1));
     assert_eq!(zombies.groups[0].parent_name.as_deref(), Some("systemd"));
+    assert_eq!(zombies.groups[0].parent_state, Some('S'));
     assert_eq!(zombies.groups[0].processes[0].pid, 44);
     assert_eq!(zombies.groups[0].processes[0].command, "worker --queue");
 }
@@ -373,6 +375,7 @@ fn large_zombie_view_is_bounded_by_the_projection_budget() {
                 name: format!("zombie-{pid}"),
                 command: "x".repeat(240),
                 parent_name: Some("systemd".into()),
+                parent_state: Some('S'),
             })
             .collect(),
         ..ProcessTable::default()

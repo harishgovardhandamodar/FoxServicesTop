@@ -186,13 +186,24 @@ fn zombie_lines(
             .map(clean)
             .filter(|name| !name.is_empty())
             .map_or_else(String::new, |name| format!(" · {name}"));
+        let parent_state = group
+            .parent_state
+            .map(|state| format!(" · state {} ({state})", process_state_name(state)))
+            .unwrap_or_default();
         lines.push(Line::from(Span::styled(
             format!(
-                "PPID {parent_id}{parent_name} · {} zombie(s)",
-                processes.len()
+                "PPID {parent_id}{parent_name}{parent_state} · {} zombie(s)",
+                processes.len(),
             ),
             context.theme.title_style(),
         )));
+        if group
+            .parent_name
+            .as_deref()
+            .is_some_and(is_fox_services_top)
+        {
+            lines.push(Line::from("  Fox-Services Top is the direct parent"));
+        }
         for process in processes {
             let command = clean(&process.command);
             let description = if command.is_empty() {
@@ -207,6 +218,31 @@ fn zombie_lines(
         }
     }
     lines
+}
+
+fn process_state_name(state: char) -> &'static str {
+    match state {
+        'R' => "running",
+        'S' => "sleeping",
+        'D' => "uninterruptible sleep",
+        'T' | 't' => "stopped",
+        'Z' => "zombie",
+        'I' => "idle",
+        'X' | 'x' => "dead",
+        _ => "unknown",
+    }
+}
+
+fn is_fox_services_top(name: &str) -> bool {
+    let executable = name
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or(name)
+        .to_ascii_lowercase();
+    matches!(
+        executable.strip_suffix(".exe").unwrap_or(&executable),
+        "fox-services-top" | "fox_services_top"
+    )
 }
 
 fn append_distribution(

@@ -115,11 +115,12 @@ of the whole machine.
   command line, working folder and charts of its CPU, memory, GPU, threads, open files, disk and
   network.
 - **Zombie Processes.** The Zombies tab collects zombie processes from the local process scan and
-  groups them by parent PID, with process names and command lines to help identify which parent
-  needs attention. It charts displayed counts by parent process name and shows an inferred reaping
-  context based on whether the parent appears in the scan. This is diagnostic evidence, not proof
-  of the underlying cause: zombies have exited and the parent must reap them. Press `0`; use `/` to
-  filter and `j` / `k` to scroll. The scan covers up to 4,096 PIDs per poll.
+  groups them by parent PID, showing the sampled parent's name and state alongside zombie names
+  and command lines. When the parent executable is `fox-services-top`, it marks Fox-Services Top
+  as the direct parent. It charts displayed counts by parent process name and shows an inferred
+  reaping context based on whether the parent appears in the scan. This is diagnostic evidence, not
+  proof of the underlying cause: zombies have exited and the parent must reap them. Press `0`; use
+  `/` to filter and `j` / `k` to scroll. The scan covers up to 4,096 PIDs per poll.
 - **Overview History.** CPU, memory, each GPU's utilization, memory, temperature and power, disks
   and network as bars of 1 minute to 24 hours on the local clock, with now, average and maximum on
   every chart, and each GPU's averages, peaks and energy. Where the CPU's power can be read, the

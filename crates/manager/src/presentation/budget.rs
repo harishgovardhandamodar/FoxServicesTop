@@ -381,6 +381,7 @@ mod tests {
                 groups: vec![ZombieGroupView {
                     parent_pid: Some(1),
                     parent_name: Some("init".into()),
+                    parent_state: Some('S'),
                     processes: (1..=16)
                         .map(|pid| ZombieProcessView {
                             pid,

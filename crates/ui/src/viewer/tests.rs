@@ -827,6 +827,7 @@ fn zombies_tab_groups_processes_by_parent_pid() {
             ZombieGroupView {
                 parent_pid: Some(1),
                 parent_name: Some("systemd".into()),
+                parent_state: Some('S'),
                 processes: vec![
                     ZombieProcessView {
                         pid: 44,
@@ -843,6 +844,7 @@ fn zombies_tab_groups_processes_by_parent_pid() {
             ZombieGroupView {
                 parent_pid: Some(88),
                 parent_name: None,
+                parent_state: None,
                 processes: vec![ZombieProcessView {
                     pid: 46,
                     name: "orphaned-worker".into(),
@@ -863,7 +865,7 @@ fn zombies_tab_groups_processes_by_parent_pid() {
         "parent visible in scan ██████ 2 (66%)",
         "parent not in scan ███ 1 (33%)",
         "Cause: child exited; exact reason the parent has not reaped it is unknown.",
-        "PPID 1 · systemd · 2 zombie(s)",
+        "PPID 1 · systemd · state sleeping (S) · 2 zombie(s)",
         "PID     44  worker-a · worker --queue a",
         "PID     45  worker-b · worker --queue b",
         "PPID 88 · 1 zombie(s)",
@@ -882,6 +884,37 @@ fn zombies_tab_groups_processes_by_parent_pid() {
             .contains(&"zombies".to_owned()),
         "the Zombies tab should render its detail module"
     );
+}
+
+#[test]
+fn zombies_tab_identifies_fox_services_as_the_direct_parent() {
+    let mut fixture = model(ViewKind::Zombies);
+    fixture.modules.zombies = Some(Arc::new(ZombiesView {
+        groups: vec![ZombieGroupView {
+            parent_pid: Some(42),
+            parent_name: Some("fox-services-top".into()),
+            parent_state: Some('R'),
+            processes: vec![ZombieProcessView {
+                pid: 44,
+                name: "worker".into(),
+                command: String::new(),
+            }],
+        }],
+        total_processes: 1,
+        truncated: false,
+    }));
+
+    let rendered = render(&fixture, (120, 24));
+    for text in [
+        "PPID 42 · fox-services-top · state running (R) · 1 zombie(s)",
+        "Fox-Services Top is the direct parent",
+    ] {
+        assert!(
+            rendered.contains(text),
+            "missing {text:?}\n{}",
+            rendered.text()
+        );
+    }
 }
 
 #[test]

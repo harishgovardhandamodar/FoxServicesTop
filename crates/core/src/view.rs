@@ -1232,6 +1232,8 @@ pub struct PowerView {
 pub struct ZombieGroupView {
     pub parent_pid: Option<i32>,
     pub parent_name: Option<String>,
+    #[serde(default)]
+    pub parent_state: Option<char>,
     pub processes: Vec<ZombieProcessView>,
 }
 

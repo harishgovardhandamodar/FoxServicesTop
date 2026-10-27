@@ -56,6 +56,7 @@ fn zombies_are_collected_before_regular_process_rows_are_bounded() {
     assert_eq!(table.zombies.len(), 2);
     assert_eq!(table.zombies[0].parent_pid, Some(1));
     assert_eq!(table.zombies[0].parent_name.as_deref(), Some("worker-1"));
+    assert_eq!(table.zombies[0].parent_state, Some('S'));
     assert_eq!(table.zombies[0].name, "worker-first");
     assert_eq!(table.zombies[1].pid, 91);
 }
