@@ -866,11 +866,9 @@ impl Controller {
             controls::MODULE_TOGGLE => self.toggle_expanded(target.module_id),
             controls::OVERVIEW_SUB_PROCESSES
             | controls::OVERVIEW_SUB_SERVICES
-            | controls::OVERVIEW_SUB_POWER
-            | controls::OVERVIEW_SUB_NODES => self.show_overview_sub_tab(match target.control_id {
+            | controls::OVERVIEW_SUB_POWER => self.show_overview_sub_tab(match target.control_id {
                 controls::OVERVIEW_SUB_SERVICES => 1,
                 controls::OVERVIEW_SUB_POWER => 2,
-                controls::OVERVIEW_SUB_NODES => 3,
                 _ => 0,
             }),
             controls::PROCESS_ROW | controls::PROCESS_ROW_SELECTED => {
@@ -907,7 +905,7 @@ impl Controller {
         let Ok(processes) = ModuleId::new(crate::modules::PROCESSES_MODULE_ID) else {
             return;
         };
-        self.tabs.insert(processes, tab.min(3));
+        self.tabs.insert(processes, tab.min(2));
         self.bump();
     }
 

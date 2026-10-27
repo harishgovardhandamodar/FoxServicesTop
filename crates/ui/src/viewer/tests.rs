@@ -163,16 +163,6 @@ fn power_sub_tab() -> UiState {
     ui
 }
 
-/// Overview with the process panel's LAN Machines sub-tab selected.
-fn nodes_sub_tab() -> UiState {
-    let mut ui = UiState::default();
-    ui.tabs.insert(
-        ModuleId::new(crate::modules::PROCESSES_MODULE_ID).unwrap(),
-        3,
-    );
-    ui
-}
-
 /// Row index of the first line containing `needle`.
 fn row_index(rendered: &Rendered, needle: &str) -> usize {
     rendered
@@ -748,7 +738,6 @@ fn the_overview_fox_services_sub_tab_shows_the_services_tables() {
     assert_eq!(map.count(controls::OVERVIEW_SUB_PROCESSES), 1);
     assert_eq!(map.count(controls::OVERVIEW_SUB_SERVICES), 1);
     assert_eq!(map.count(controls::OVERVIEW_SUB_POWER), 1);
-    assert_eq!(map.count(controls::OVERVIEW_SUB_NODES), 1);
 }
 
 #[test]
@@ -771,21 +760,15 @@ fn the_overview_power_sub_tab_summarizes_watts_and_kwh() {
     assert_eq!(map.count(controls::OVERVIEW_SUB_PROCESSES), 1);
     assert_eq!(map.count(controls::OVERVIEW_SUB_SERVICES), 1);
     assert_eq!(map.count(controls::OVERVIEW_SUB_POWER), 1);
-    assert_eq!(map.count(controls::OVERVIEW_SUB_NODES), 1);
 }
 
 #[test]
-fn the_overview_lan_machines_sub_tab_shows_all_configured_nodes() {
+fn overview_shows_lan_machines_alongside_other_modules() {
     let mut fixture = model(ViewKind::Overview);
     fixture.modules.cluster = Some(Arc::new(test_fixtures::cluster_view()));
-    let rendered = render_with(
-        &Viewer::builtin(),
-        Some(&fixture),
-        &nodes_sub_tab(),
-        (200, 60),
-    );
+    let rendered = render(&fixture, (200, 60));
     for text in [
-        "LAN Machines",
+        "LAN Machines · 1/2 online",
         "1/2 online",
         "axiom",
         "axiom-dgx",
@@ -798,15 +781,20 @@ fn the_overview_lan_machines_sub_tab_shows_all_configured_nodes() {
             rendered.text()
         );
     }
-    let map = &rendered.report.hit_map;
-    for control in [
-        controls::OVERVIEW_SUB_PROCESSES,
-        controls::OVERVIEW_SUB_SERVICES,
-        controls::OVERVIEW_SUB_POWER,
-        controls::OVERVIEW_SUB_NODES,
-    ] {
-        assert_eq!(map.count(control), 1, "{control}");
-    }
+    assert!(
+        rendered
+            .report
+            .rendered_modules
+            .contains(&"cluster".to_owned()),
+        "cluster module should have its own Overview panel"
+    );
+    assert!(
+        rendered
+            .report
+            .rendered_modules
+            .contains(&"processes".to_owned()),
+        "the existing Overview modules remain visible"
+    );
 }
 
 #[test]

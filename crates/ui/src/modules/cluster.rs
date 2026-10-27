@@ -1,4 +1,4 @@
-//! Nodes module: the fox-services cluster as one table (read-only).
+//! LAN machines module: the fox-services cluster as one table (read-only).
 //!
 //! One row per statically configured node with its latest polled hardware
 //! snapshot, then the Fox Mesh peers the nodes reported. An offline node
@@ -17,7 +17,9 @@ use super::common::{
 };
 use crate::format::{clean, format_bytes};
 use crate::num::saturate_u16;
-use crate::registry::{DisplayContext, DisplayModule, DisplayModuleManifest, RenderOutput, Slot};
+use crate::registry::{
+    DisplayContext, DisplayModule, DisplayModuleManifest, OverviewCell, RenderOutput, Slot,
+};
 
 /// The keys acting on the view, at the right of its title.
 const NODES_KEYS: &str = "j/k scroll · / filter";
@@ -42,11 +44,11 @@ impl ClusterModule {
         Ok(Self {
             manifest: build_manifest(ManifestSpec {
                 id: "cluster",
-                title: "Nodes",
+                title: "LAN Machines",
                 min_columns: 40,
                 min_rows: 5,
-                priority: 30,
-                slots: &[Slot::Detail],
+                priority: 70,
+                slots: &[Slot::Overview, Slot::Detail],
             })?,
         })
     }
@@ -55,6 +57,14 @@ impl ClusterModule {
 impl DisplayModule for ClusterModule {
     fn manifest(&self) -> &DisplayModuleManifest {
         &self.manifest
+    }
+
+    fn include_in_overview(&self, model: &ViewModel) -> bool {
+        model.modules.cluster.is_some()
+    }
+
+    fn overview_cell(&self) -> Option<OverviewCell> {
+        Some(OverviewCell::at(2, 0, 100).filling())
     }
 
     fn render(
@@ -66,7 +76,7 @@ impl DisplayModule for ClusterModule {
     ) -> RenderOutput {
         let mut output = Output::default();
         let Some(cluster) = model.modules.cluster.as_deref() else {
-            let inner = panel_with_keys(frame, area, "Nodes", NODES_KEYS, context);
+            let inner = panel_with_keys(frame, area, "LAN Machines", NODES_KEYS, context);
             message(
                 frame,
                 inner,
@@ -80,53 +90,15 @@ impl DisplayModule for ClusterModule {
         let inner = panel_with_keys(
             frame,
             area,
-            &format!("Nodes · {online}/{} online", cluster.nodes.len()),
+            &format!("LAN Machines · {online}/{} online", cluster.nodes.len()),
             NODES_KEYS,
             context,
         );
         let mut rows = RowCursor::new(inner);
         let filter = model.session.filter.to_lowercase();
-        render_cluster_content(
-            frame,
-            &mut rows,
-            cluster,
-            &filter,
-            context,
-            &mut output,
-            true,
-        );
+        render_cluster_content(frame, &mut rows, cluster, &filter, context, &mut output);
         output.finish()
     }
-}
-
-pub(super) fn render_overview_nodes(
-    frame: &mut Frame<'_>,
-    rows: &mut RowCursor,
-    model: &ViewModel,
-    context: &DisplayContext,
-    output: &mut Output,
-) {
-    let Some(cluster) = model.modules.cluster.as_deref() else {
-        if let Some(area) = rows.rest() {
-            message(
-                frame,
-                area,
-                &no_data("cluster"),
-                context.theme.muted_style(),
-            );
-        }
-        output.label("nodes: no data");
-        return;
-    };
-    render_cluster_content(
-        frame,
-        rows,
-        cluster,
-        &model.session.filter.to_lowercase(),
-        context,
-        output,
-        false,
-    );
 }
 
 fn render_cluster_content(
@@ -136,7 +108,6 @@ fn render_cluster_content(
     filter: &str,
     context: &DisplayContext,
     output: &mut Output,
-    include_peers: bool,
 ) {
     if !cluster.enabled {
         if let Some(area) = rows.rest() {
@@ -169,9 +140,7 @@ fn render_cluster_content(
     }
     render_node_table(frame, rows, &nodes, context, output);
     render_offline(frame, rows, &nodes, context, output);
-    if include_peers {
-        render_peers(frame, rows, cluster, context, output);
-    }
+    render_peers(frame, rows, cluster, context, output);
 }
 
 fn render_node_table(

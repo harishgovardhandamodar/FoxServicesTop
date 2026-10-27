@@ -276,6 +276,7 @@ impl Viewer {
             .enumerate()
             .filter(|(_, module)| module.manifest().has_slot(Slot::Overview))
             .filter(|(_, module)| module_enabled(model, module.manifest()))
+            .filter(|(_, module)| module.include_in_overview(model))
             .map(|(index, module)| Candidate {
                 expanded: is_expanded(ui, module.manifest()),
                 ..candidate(index, module.manifest(), module.overview_cell())

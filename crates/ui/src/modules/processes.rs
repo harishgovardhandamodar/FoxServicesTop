@@ -59,11 +59,11 @@ const COLUMNS: [ColumnSpec; 11] = [
 ];
 
 /// Module id of the process table; the Controller keeps its Overview
-/// sub-tab here (`0` GPU Processes, `1` Fox services, `2` Power, `3` LAN).
+/// sub-tab here (`0` GPU Processes, `1` Fox services, `2` Power).
 pub const PROCESSES_MODULE_ID: &str = "processes";
 
 /// The Overview sub-tabs of the process panel, in order.
-const SUB_TABS: [&str; 4] = ["GPU Processes", "Fox services", "Power", "LAN Machines"];
+const SUB_TABS: [&str; 3] = ["GPU Processes", "Fox services", "Power"];
 
 pub struct ProcessesModule {
     manifest: DisplayModuleManifest,
@@ -124,18 +124,18 @@ impl DisplayModule for ProcessesModule {
             output.label("processes: no data");
             return output.finish();
         };
-        // The Overview panel carries parallel views in the same area.
-        let sub_tab = context.tab.min(3);
+        // The Overview panel carries a sub-tab: the process table, the
+        // Fox-Services tables or the power summary in the same area.
+        let sub_tab = context.tab.min(2);
         let title = match sub_tab {
             1 => services_title(model),
             2 => power_title(model),
-            3 => nodes_title(model),
             _ => title_text(view),
         };
         // `j`/`k` still select processes on the Overview; the sub-tab
         // filters like its tab, and scrolls it there (key `7`).
         let keys = match sub_tab {
-            1..=3 => "/ filter",
+            1 | 2 => "/ filter",
             _ => PROCESS_KEYS,
         };
         let inner = panel_with_keys(frame, area, &title, keys, context);
@@ -207,10 +207,6 @@ impl DisplayModule for ProcessesModule {
                 context,
                 &mut output,
             );
-            return output.finish();
-        }
-        if sub_tab == 3 {
-            super::cluster::render_overview_nodes(frame, &mut rows, model, context, &mut output);
             return output.finish();
         }
         if view.rows.is_empty() {
@@ -296,14 +292,14 @@ fn render_sub_tabs(
 ) {
     let Some(strip) = rows.next_row() else { return };
     let mut x = strip.x.saturating_add(1);
-    let compact_labels = ["GPU", "Services", "Power", "LAN"];
+    let compact_labels = ["GPU", "Services", "Power"];
     let labels = if strip.width < 54 {
         &compact_labels
     } else {
         &SUB_TABS
     };
     for (index, label) in labels.iter().enumerate() {
-        let active = index == usize::from(active_tab.min(3));
+        let active = index == usize::from(active_tab.min(2));
         let width = display_width(label).min(usize::from(strip.width.saturating_sub(x - strip.x)));
         if width == 0 {
             break;
@@ -324,22 +320,11 @@ fn render_sub_tabs(
         let control = match index {
             1 => controls::OVERVIEW_SUB_SERVICES,
             2 => controls::OVERVIEW_SUB_POWER,
-            3 => controls::OVERVIEW_SUB_NODES,
             _ => controls::OVERVIEW_SUB_PROCESSES,
         };
         output.target(model, manifest, control, rect);
         output.label(format!("overview sub-tab {label}"));
         x = rect.x.saturating_add(rect.width).saturating_add(1);
-    }
-}
-
-fn nodes_title(model: &ViewModel) -> String {
-    match model.modules.cluster.as_deref() {
-        Some(cluster) => {
-            let online = cluster.nodes.iter().filter(|node| node.online).count();
-            format!("LAN Machines · {online}/{} online", cluster.nodes.len())
-        }
-        None => "LAN Machines".to_owned(),
     }
 }
 

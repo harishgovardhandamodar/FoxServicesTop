@@ -111,6 +111,11 @@ pub trait DisplayModule: Send {
         frame: &mut Frame<'_>,
     ) -> RenderOutput;
 
+    /// Whether this module has an Overview panel for the current projection.
+    fn include_in_overview(&self, _model: &ViewModel) -> bool {
+        true
+    }
+
     /// Height this module would like at `width` columns in `slot`; `None`
     /// means "take spare rows". A layout hint only: the default keeps a
     /// module at its manifest minimum plus its share of spare rows.
@@ -154,8 +159,6 @@ pub mod controls {
     pub const OVERVIEW_SUB_SERVICES: &str = "overview.subtab.services";
     /// The Overview's Power sub-tab: shows the power summary.
     pub const OVERVIEW_SUB_POWER: &str = "overview.subtab.power";
-    /// The Overview's LAN Machines sub-tab: shows configured remote nodes.
-    pub const OVERVIEW_SUB_NODES: &str = "overview.subtab.nodes";
 }
 
 /// Why a module was not registered.
