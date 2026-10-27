@@ -154,6 +154,8 @@ pub mod controls {
     pub const OVERVIEW_SUB_SERVICES: &str = "overview.subtab.services";
     /// The Overview's Power sub-tab: shows the power summary.
     pub const OVERVIEW_SUB_POWER: &str = "overview.subtab.power";
+    /// The Overview's LAN Machines sub-tab: shows configured remote nodes.
+    pub const OVERVIEW_SUB_NODES: &str = "overview.subtab.nodes";
 }
 
 /// Why a module was not registered.

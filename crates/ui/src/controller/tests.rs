@@ -860,6 +860,19 @@ fn the_overview_sub_tabs_switch_by_click_without_a_command() {
         2,
         "Power sub-tab selected"
     );
+    let nodes = harness
+        .hit_map
+        .targets()
+        .iter()
+        .find(|target| target.control_id == controls::OVERVIEW_SUB_NODES)
+        .expect("the LAN Machines sub-tab is clickable")
+        .clone();
+    harness.keys(&[click(nodes.rect.x, nodes.rect.y)]);
+    assert_eq!(
+        harness.controller.ui_state(harness.now).tabs[&processes],
+        3,
+        "LAN Machines sub-tab selected"
+    );
     assert_eq!(harness.submitted().len(), sent, "no command is sent");
 }
 

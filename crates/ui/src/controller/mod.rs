@@ -866,9 +866,11 @@ impl Controller {
             controls::MODULE_TOGGLE => self.toggle_expanded(target.module_id),
             controls::OVERVIEW_SUB_PROCESSES
             | controls::OVERVIEW_SUB_SERVICES
-            | controls::OVERVIEW_SUB_POWER => self.show_overview_sub_tab(match target.control_id {
+            | controls::OVERVIEW_SUB_POWER
+            | controls::OVERVIEW_SUB_NODES => self.show_overview_sub_tab(match target.control_id {
                 controls::OVERVIEW_SUB_SERVICES => 1,
                 controls::OVERVIEW_SUB_POWER => 2,
+                controls::OVERVIEW_SUB_NODES => 3,
                 _ => 0,
             }),
             controls::PROCESS_ROW | controls::PROCESS_ROW_SELECTED => {
@@ -899,14 +901,13 @@ impl Controller {
         }
     }
 
-    /// Shows the Overview process panel's sub-tab: the GPU process table,
-    /// the Fox-Services tables or the power summary. A pure presentation
-    /// toggle like the history pages: nothing is sent to the Manager.
+    /// Shows an Overview process-panel sub-tab. A pure presentation toggle
+    /// like the history pages: nothing is sent to the Manager.
     fn show_overview_sub_tab(&mut self, tab: u8) {
         let Ok(processes) = ModuleId::new(crate::modules::PROCESSES_MODULE_ID) else {
             return;
         };
-        self.tabs.insert(processes, tab.min(2));
+        self.tabs.insert(processes, tab.min(3));
         self.bump();
     }
 

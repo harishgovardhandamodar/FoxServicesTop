@@ -84,37 +84,93 @@ impl DisplayModule for ClusterModule {
             NODES_KEYS,
             context,
         );
-        if !cluster.enabled {
+        let mut rows = RowCursor::new(inner);
+        let filter = model.session.filter.to_lowercase();
+        render_cluster_content(
+            frame,
+            &mut rows,
+            cluster,
+            &filter,
+            context,
+            &mut output,
+            true,
+        );
+        output.finish()
+    }
+}
+
+pub(super) fn render_overview_nodes(
+    frame: &mut Frame<'_>,
+    rows: &mut RowCursor,
+    model: &ViewModel,
+    context: &DisplayContext,
+    output: &mut Output,
+) {
+    let Some(cluster) = model.modules.cluster.as_deref() else {
+        if let Some(area) = rows.rest() {
             message(
                 frame,
-                inner,
+                area,
+                &no_data("cluster"),
+                context.theme.muted_style(),
+            );
+        }
+        output.label("nodes: no data");
+        return;
+    };
+    render_cluster_content(
+        frame,
+        rows,
+        cluster,
+        &model.session.filter.to_lowercase(),
+        context,
+        output,
+        false,
+    );
+}
+
+fn render_cluster_content(
+    frame: &mut Frame<'_>,
+    rows: &mut RowCursor,
+    cluster: &ClusterView,
+    filter: &str,
+    context: &DisplayContext,
+    output: &mut Output,
+    include_peers: bool,
+) {
+    if !cluster.enabled {
+        if let Some(area) = rows.rest() {
+            message(
+                frame,
+                area,
                 "remote monitoring is disabled (config remote.enabled)",
                 context.theme.muted_style(),
             );
-            output.label("nodes: disabled");
-            return output.finish();
         }
-        let mut rows = RowCursor::new(inner);
-        let filter = model.session.filter.to_lowercase();
-        let nodes: Vec<&ClusterNodeView> = cluster
-            .nodes
-            .iter()
-            .filter(|node| filter.is_empty() || node.name.to_lowercase().contains(&filter))
-            .collect();
-        if nodes.is_empty() {
+        output.label("nodes: disabled");
+        return;
+    }
+    let nodes: Vec<&ClusterNodeView> = cluster
+        .nodes
+        .iter()
+        .filter(|node| filter.is_empty() || node.name.to_lowercase().contains(filter))
+        .collect();
+    if nodes.is_empty() {
+        if let Some(area) = rows.rest() {
             message(
                 frame,
-                inner,
+                area,
                 "no nodes configured (config remote.nodes)",
                 context.theme.muted_style(),
             );
-            output.label("nodes: none configured");
-            return output.finish();
         }
-        render_node_table(frame, &mut rows, &nodes, context, &mut output);
-        render_offline(frame, &mut rows, &nodes, context, &mut output);
-        render_peers(frame, &mut rows, cluster, context, &mut output);
-        output.finish()
+        output.label("nodes: none configured");
+        return;
+    }
+    render_node_table(frame, rows, &nodes, context, output);
+    render_offline(frame, rows, &nodes, context, output);
+    if include_peers {
+        render_peers(frame, rows, cluster, context, output);
     }
 }
 

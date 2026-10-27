@@ -163,6 +163,16 @@ fn power_sub_tab() -> UiState {
     ui
 }
 
+/// Overview with the process panel's LAN Machines sub-tab selected.
+fn nodes_sub_tab() -> UiState {
+    let mut ui = UiState::default();
+    ui.tabs.insert(
+        ModuleId::new(crate::modules::PROCESSES_MODULE_ID).unwrap(),
+        3,
+    );
+    ui
+}
+
 /// Row index of the first line containing `needle`.
 fn row_index(rendered: &Rendered, needle: &str) -> usize {
     rendered
@@ -738,6 +748,7 @@ fn the_overview_fox_services_sub_tab_shows_the_services_tables() {
     assert_eq!(map.count(controls::OVERVIEW_SUB_PROCESSES), 1);
     assert_eq!(map.count(controls::OVERVIEW_SUB_SERVICES), 1);
     assert_eq!(map.count(controls::OVERVIEW_SUB_POWER), 1);
+    assert_eq!(map.count(controls::OVERVIEW_SUB_NODES), 1);
 }
 
 #[test]
@@ -760,6 +771,42 @@ fn the_overview_power_sub_tab_summarizes_watts_and_kwh() {
     assert_eq!(map.count(controls::OVERVIEW_SUB_PROCESSES), 1);
     assert_eq!(map.count(controls::OVERVIEW_SUB_SERVICES), 1);
     assert_eq!(map.count(controls::OVERVIEW_SUB_POWER), 1);
+    assert_eq!(map.count(controls::OVERVIEW_SUB_NODES), 1);
+}
+
+#[test]
+fn the_overview_lan_machines_sub_tab_shows_all_configured_nodes() {
+    let mut fixture = model(ViewKind::Overview);
+    fixture.modules.cluster = Some(Arc::new(test_fixtures::cluster_view()));
+    let rendered = render_with(
+        &Viewer::builtin(),
+        Some(&fixture),
+        &nodes_sub_tab(),
+        (200, 60),
+    );
+    for text in [
+        "LAN Machines",
+        "1/2 online",
+        "axiom",
+        "axiom-dgx",
+        "cuda 80%",
+        "offline",
+    ] {
+        assert!(
+            rendered.contains(text),
+            "missing {text:?}\n{}",
+            rendered.text()
+        );
+    }
+    let map = &rendered.report.hit_map;
+    for control in [
+        controls::OVERVIEW_SUB_PROCESSES,
+        controls::OVERVIEW_SUB_SERVICES,
+        controls::OVERVIEW_SUB_POWER,
+        controls::OVERVIEW_SUB_NODES,
+    ] {
+        assert_eq!(map.count(control), 1, "{control}");
+    }
 }
 
 #[test]

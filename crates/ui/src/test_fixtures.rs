@@ -17,12 +17,12 @@ pub(crate) use fox_services_top_core::testing::entity_id as entity;
 pub(crate) use fox_services_top_core::testing::metric_key;
 use fox_services_top_core::testing::test_process_key;
 use fox_services_top_core::view::{
-    ActionsView, CellState, ConfirmationView, ConflictView, CoreView, CpuView, DiskDeviceView,
-    DiskHistory, DiskView, FilesystemView, FrequencyGroup, GpuCard, GpuDetails, GpuView,
-    HeaderView, HistoryChartKind, HistoryChartView, HistoryPointView, HistoryView,
-    HistoryWindowSummary, HostState, HostStatus, InterfaceView, LabeledCell, LastGoodView,
-    MemoryView, MetricCell, ModuleViews, NetworkView, OverloadState, PowerRowView, PowerView,
-    PowerWindowView, ProcessGpuView, ProcessRowView, ProcessesView, RecentRequestView,
+    ActionsView, CellState, ClusterNodeView, ClusterView, ConfirmationView, ConflictView, CoreView,
+    CpuView, DiskDeviceView, DiskHistory, DiskView, FilesystemView, FrequencyGroup, GpuCard,
+    GpuDetails, GpuView, HeaderView, HistoryChartKind, HistoryChartView, HistoryPointView,
+    HistoryView, HistoryWindowSummary, HostState, HostStatus, InterfaceView, LabeledCell,
+    LastGoodView, MemoryView, MetricCell, ModuleViews, NetworkView, OverloadState, PowerRowView,
+    PowerView, PowerWindowView, ProcessGpuView, ProcessRowView, ProcessesView, RecentRequestView,
     ServiceModelView, ServiceRowView, ServicesView, SessionState, SettingField, SettingsView,
     Trend, ViewModel,
 };
@@ -63,6 +63,66 @@ pub(crate) fn services_view() -> ServicesView {
         window_label: "24h".into(),
         idle: false,
         stale: false,
+    }
+}
+
+/// Two configured nodes: one reporting metrics and one offline.
+pub(crate) fn cluster_view() -> ClusterView {
+    ClusterView {
+        enabled: true,
+        nodes: vec![
+            ClusterNodeView {
+                name: "axiom".into(),
+                base_url: "http://axiom:8420".into(),
+                node_id: Some("node-1".into()),
+                machine: Some("Grace Hopper".into()),
+                online: true,
+                error: None,
+                uptime_s: Some(86_400),
+                cpu_busy_pct: Some(42.5),
+                cpu_cores: Some(16),
+                memory_used_bytes: Some(32 * 1024 * 1024 * 1024),
+                memory_total_bytes: Some(64 * 1024 * 1024 * 1024),
+                memory_busy_pct: Some(50.0),
+                gpu_kind: Some("cuda".into()),
+                gpu_util_pct: Some(80.0),
+                gpu_mem_used_bytes: Some(4 * 1024 * 1024 * 1024),
+                gpu_mem_total_bytes: Some(16 * 1024 * 1024 * 1024),
+                net_rx_bytes_s: Some(1024 * 1024),
+                net_tx_bytes_s: Some(512 * 1024),
+                tokens_per_sec: Some(24.5),
+                projects_running: Some(2),
+                projects_total: Some(3),
+                containers_running: Some(4),
+                containers_total: Some(5),
+            },
+            ClusterNodeView {
+                name: "axiom-dgx".into(),
+                base_url: "http://axiom-dgx:8420".into(),
+                node_id: Some("node-2".into()),
+                machine: Some("DGX".into()),
+                online: false,
+                error: Some("connection timed out".into()),
+                uptime_s: None,
+                cpu_busy_pct: None,
+                cpu_cores: None,
+                memory_used_bytes: None,
+                memory_total_bytes: None,
+                memory_busy_pct: None,
+                gpu_kind: None,
+                gpu_util_pct: None,
+                gpu_mem_used_bytes: None,
+                gpu_mem_total_bytes: None,
+                net_rx_bytes_s: None,
+                net_tx_bytes_s: None,
+                tokens_per_sec: None,
+                projects_running: None,
+                projects_total: None,
+                containers_running: None,
+                containers_total: None,
+            },
+        ],
+        peers: Vec::new(),
     }
 }
 
