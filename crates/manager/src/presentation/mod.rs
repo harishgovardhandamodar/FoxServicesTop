@@ -170,7 +170,19 @@ pub fn build_view_model_measured(context: &PresentationContext<'_>) -> (ViewMode
     } else {
         0
     };
-    let visible_process_rows = processes::visible_process_rows(layout.rows, gpu_count);
+    let gpu_process_legend_count = directory
+        .gpus()
+        .iter()
+        .filter(|gpu| {
+            context
+                .processes
+                .tracked
+                .iter()
+                .any(|process| process.bytes_on(|id| id == &gpu.entity_id) > 0)
+        })
+        .count();
+    let visible_process_rows =
+        processes::visible_process_rows(layout.rows, gpu_count, gpu_process_legend_count);
     let inputs = ModuleInputs {
         reader: &reader,
         directory: &directory,
@@ -433,6 +445,7 @@ fn build_gpu(context: &PresentationContext<'_>, inputs: &ModuleInputs<'_>) -> Gp
     gpu::build_gpu_view(
         inputs.reader,
         inputs.directory,
+        &inputs.processes.tracked,
         context.session.selected_entity_id.as_ref(),
         environment,
         widths,

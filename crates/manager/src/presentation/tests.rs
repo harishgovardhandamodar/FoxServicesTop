@@ -432,7 +432,7 @@ fn reference_load_projection_stays_under_one_mebibyte() {
     let processes = model.modules.processes.as_ref().unwrap();
     assert_eq!(processes.total_rows, 256);
     // Only the estimated window plus overscan is copied, never all rows.
-    let window = super::processes::visible_process_rows(50, 8);
+    let window = super::processes::visible_process_rows(50, 8, 0);
     assert!(processes.rows.len() <= window + PROCESS_OVERSCAN_ROWS);
     assert!(processes.rows.len() < 256);
 }
@@ -447,13 +447,20 @@ fn the_process_table_copies_only_the_window() {
     fixture.session.selected_process = Some(process_key(256, 1000));
     let model = build_view_model_measured(&fixture.context()).0;
     let processes = model.modules.processes.as_ref().unwrap();
-    let visible = super::processes::visible_process_rows(30, 4);
+    let visible = super::processes::visible_process_rows(30, 4, 0);
     assert!(processes.rows.len() <= visible + PROCESS_OVERSCAN_ROWS);
     assert_eq!(processes.selected_index, Some(255));
     assert_eq!(processes.rows.last().unwrap().key, process_key(256, 1000));
     assert_eq!(processes.rows[0].gpus[1].gpu_label, "GPU 1");
     let table_bytes = serde_json::to_vec(processes.as_ref()).unwrap().len();
     assert!(table_bytes < 64 * 1024, "{table_bytes}");
+}
+
+#[test]
+fn overview_process_window_accounts_for_gpu_process_legends() {
+    let without_legends = super::processes::visible_process_rows(80, 8, 0);
+    let with_legends = super::processes::visible_process_rows(80, 8, 2);
+    assert_eq!(with_legends, without_legends - 2);
 }
 
 /// The bound replaces writing the JSON only where that changes nothing: a

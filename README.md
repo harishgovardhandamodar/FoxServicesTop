@@ -98,8 +98,11 @@ GPUs first, shows which job holds how much of their memory, and keeps a record o
 of the whole machine.
 
 - **Every GPU at a glance.** Utilization, memory, temperature, power, clocks and fans for each GPU,
-  with live charts. Gauges, chart columns and temperatures shade in 100 steps from green at 0 %
-  through amber at 50 % to red at 100 % (a temperature on a 0–100 °C scale).
+  with live charts. The Overview's VRAM bars segment tracked process allocations into their stable
+  process colors, with a matching process-name/allocation legend; remaining usage retains the
+  GPU's memory-level color.
+  Gauges, chart columns and temperatures shade in 100 steps from green at 0 % through amber at
+  50 % to red at 100 % (a temperature on a 0–100 °C scale).
 - **Memory by process.** The eight processes holding the most GPU memory each get a color, the same
   in the memory bars, the charts and the process table, so you see which job holds how much. The
   color comes from the process name, so a job keeps it when the job or fox-services-top restarts, unless another listed process already has it.

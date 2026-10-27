@@ -11,7 +11,7 @@ use fox_services_top_core::identity::EntityId;
 use fox_services_top_core::process_model::ProcessHistoryModel;
 use fox_services_top_core::text::{MAX_BASENAME_BYTES, sanitize_display};
 use fox_services_top_core::view::{
-    ProcessGpuView, ProcessRowView, ProcessesView, SessionState, overview_gpus_rows,
+    ProcessGpuView, ProcessRowView, ProcessesView, SessionState, overview_gpus_rows_with_legends,
 };
 
 use super::gpu_directory::{GpuDirectory, is_gpu_entity};
@@ -35,20 +35,25 @@ const GPU_PANEL_BORDER_ROWS: u16 = 2;
 /// and the overview grid: the table takes the rows the other rows and the
 /// GPU panel of `gpu_count` GPUs leave. The overscan absorbs small
 /// differences from the viewer's real layout.
-pub(crate) fn visible_process_rows(viewport_rows: u16, gpu_count: usize) -> usize {
+pub(crate) fn visible_process_rows(
+    viewport_rows: u16,
+    gpu_count: usize,
+    gpu_process_legend_count: usize,
+) -> usize {
     let rows = viewport_rows
         .saturating_sub(OVERVIEW_RESERVED_ROWS)
-        .saturating_sub(gpu_panel_rows(gpu_count));
+        .saturating_sub(gpu_panel_rows(gpu_count, gpu_process_legend_count));
     usize::from(rows.max(1))
 }
 
 /// Rows the overview GPU panel asks for with `gpu_count` GPUs (none without).
-fn gpu_panel_rows(gpu_count: usize) -> u16 {
+fn gpu_panel_rows(gpu_count: usize, gpu_process_legend_count: usize) -> u16 {
     if gpu_count == 0 {
         return 0;
     }
     let count = u16::try_from(gpu_count).unwrap_or(u16::MAX);
-    GPU_PANEL_BORDER_ROWS.saturating_add(overview_gpus_rows(count))
+    let legend_count = u16::try_from(gpu_process_legend_count).unwrap_or(u16::MAX);
+    GPU_PANEL_BORDER_ROWS.saturating_add(overview_gpus_rows_with_legends(count, legend_count))
 }
 
 /// Copied slice `[start, end)` of the ordered rows.

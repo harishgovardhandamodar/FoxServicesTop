@@ -10,8 +10,8 @@ use fox_services_top_core::identity::ModuleId;
 use fox_services_top_core::quality::SampleKind;
 use fox_services_top_core::view::{
     Banner, BannerLevel, CellState, ClusterNodeView, ClusterView, DiskHistory, ModuleViews,
-    OVERVIEW_GPU_CHART_ROWS, OverloadState, ViewModel, ZombieGroupView, ZombieProcessView,
-    ZombiesView,
+    OVERVIEW_GPU_CHART_ROWS, OverloadState, ProcessShare, ViewModel, ZombieGroupView,
+    ZombieProcessView, ZombiesView,
 };
 use ratatui::Frame;
 use ratatui::Terminal;
@@ -307,6 +307,28 @@ fn chart_under(rendered: &Rendered, bar: usize, rows: usize) -> bool {
     rendered.rows[bar + 1..=bar + rows]
         .iter()
         .any(|row| has_sparkline(row))
+}
+
+#[test]
+fn overview_shows_per_process_gpu_memory_legend() {
+    let mut fixture = model(ViewKind::Overview);
+    let mut gpu = (*fixture.modules.gpu.as_deref().unwrap()).clone();
+    gpu.cards[0].process_memory = vec![ProcessShare {
+        slot: 2,
+        pid: 421,
+        name: "vram-worker".into(),
+        bytes: 3 * (1 << 30),
+    }];
+    fixture.modules.gpu = Some(Arc::new(gpu));
+
+    let rendered = render(&fixture, (200, 50));
+    for text in ["12.3 GiB / 80.0 GiB", "vram-worker 3.0 GiB"] {
+        assert!(
+            rendered.contains(text),
+            "missing {text:?}\n{}",
+            rendered.text()
+        );
+    }
 }
 
 #[test]

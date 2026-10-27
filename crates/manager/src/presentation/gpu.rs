@@ -6,6 +6,7 @@ use fox_services_top_core::identity::EntityId;
 use fox_services_top_core::metric::{CanonicalUnit, Scalar, ids, native};
 use fox_services_top_core::naming::{attributes, entity};
 use fox_services_top_core::observation::EntityRecord;
+use fox_services_top_core::process_model::TrackedProcess;
 use fox_services_top_core::view::{
     CellState, GpuCard, GpuDetails, GpuView, HostState, HostStatus, LabeledCell, MetricCell,
 };
@@ -13,6 +14,7 @@ use fox_services_top_core::view::{
 use super::gpu_derived::{memory_bandwidth, pcie_bandwidth};
 use super::gpu_directory::{GpuDirectory, GpuIdentity};
 use super::labels::{host_state_text, label_text};
+use super::process_shares;
 use super::reader::MetricReader;
 
 pub(crate) const GPU_DISABLED_REASON: &str =
@@ -101,6 +103,7 @@ pub(crate) struct GpuEnvironment<'a> {
 pub(crate) fn build_gpu_view(
     reader: &MetricReader<'_>,
     directory: &GpuDirectory<'_>,
+    tracked_processes: &[TrackedProcess],
     requested: Option<&EntityId>,
     environment: GpuEnvironment<'_>,
     widths: GpuTrendWidths,
@@ -123,7 +126,7 @@ pub(crate) fn build_gpu_view(
                 utilization: width,
                 memory_temperature_and_power: if widths.detail { width } else { 0 },
             };
-            let mut card = build_card(reader, gpu, card_widths);
+            let mut card = build_card(reader, gpu, card_widths, tracked_processes);
             if widths.detail && is_selected {
                 card.details = Some(Box::new(build_details(reader, gpu, &card)));
             }
@@ -142,6 +145,7 @@ fn build_card(
     reader: &MetricReader<'_>,
     gpu: &GpuIdentity<'_>,
     widths: CardTrendWidths,
+    tracked_processes: &[TrackedProcess],
 ) -> GpuCard {
     let entity_id = gpu.entity_id.as_str();
     let cell = |metric: &str| reader.cell_preferring(metric, entity_id, entity::SCOPE_GPU);
@@ -166,6 +170,9 @@ fn build_card(
         framebuffer_total: cell(ids::GPU_MEMORY_FB_TOTAL),
         framebuffer_reserved: cell(ids::GPU_MEMORY_FB_RESERVED),
         process_allocated: cell(ids::GPU_MEMORY_PROCESS_ALLOCATED),
+        process_memory: process_shares::process_shares(tracked_processes, |id| {
+            id == &gpu.entity_id
+        }),
         system_ram_total: system_ram_total(reader, gpu),
         pcie_tx: cell(ids::GPU_PCIE_TX),
         pcie_rx: cell(ids::GPU_PCIE_RX),
@@ -400,7 +407,7 @@ mod tests {
     use super::*;
     use crate::presentation::index::SnapshotLookup;
     use crate::presentation::testkit::{
-        Fixture, NOW, candidate, entity_record, explanation_for, host_status, sample,
+        Fixture, NOW, candidate, entity_record, explanation_for, host_status, process_key, sample,
     };
     use fox_services_top_core::canonical::{CandidateDisposition, RejectReason};
     use fox_services_top_core::metric::CanonicalUnit;
@@ -440,10 +447,58 @@ mod tests {
         build_gpu_view(
             &reader,
             &directory,
+            &fixture.processes.tracked,
             requested.as_ref(),
             environment,
             widths(),
         )
+    }
+
+    #[test]
+    fn cards_include_tracked_process_memory_for_their_own_gpu() {
+        let mut fixture = two_gpus();
+        fixture.processes.tracked = vec![
+            TrackedProcess {
+                slot: 2,
+                key: process_key(42, 1),
+                pid: 42,
+                name: "train".into(),
+                current: vec![(EntityId::new(GPU_A).unwrap(), 6 * 1024 * 1024 * 1024)],
+            },
+            TrackedProcess {
+                slot: 4,
+                key: process_key(43, 1),
+                pid: 43,
+                name: "serve".into(),
+                current: vec![(EntityId::new(GPU_B).unwrap(), 2 * 1024 * 1024 * 1024)],
+            },
+        ];
+
+        let view = build(&fixture, None, enabled());
+        let a = view
+            .cards
+            .iter()
+            .find(|card| card.entity_id.as_str() == GPU_A)
+            .unwrap();
+        let b = view
+            .cards
+            .iter()
+            .find(|card| card.entity_id.as_str() == GPU_B)
+            .unwrap();
+        assert_eq!(
+            a.process_memory
+                .iter()
+                .map(|share| (share.slot, share.pid, share.name.as_str(), share.bytes))
+                .collect::<Vec<_>>(),
+            vec![(2, 42, "train", 6 * 1024 * 1024 * 1024)]
+        );
+        assert_eq!(
+            b.process_memory
+                .iter()
+                .map(|share| (share.slot, share.pid, share.name.as_str(), share.bytes))
+                .collect::<Vec<_>>(),
+            vec![(4, 43, "serve", 2 * 1024 * 1024 * 1024)]
+        );
     }
 
     fn two_gpus() -> Fixture {

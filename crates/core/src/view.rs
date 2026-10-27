@@ -82,10 +82,9 @@ pub const TEMPERATURE_SCALE_C: f64 = 100.0;
 
 /// Rows of each overview GPU's utilization chart (D-43).
 pub const OVERVIEW_GPU_CHART_ROWS: u16 = 2;
-/// Overview GPU panel geometry (D-38, D-43), shared so the Viewer lays the
-/// panel out and the Manager sizes the copied process window from the same
-/// rows: per GPU a headline, the utilization bar with its chart under it,
-/// and the memory bar.
+/// Overview GPU panel base geometry (D-38, D-43), shared so the Viewer lays
+/// the panel out and the Manager sizes the copied process window from the
+/// same rows: headline, utilization bar/chart and memory bar.
 pub const OVERVIEW_GPU_ROWS: u16 = 3 + OVERVIEW_GPU_CHART_ROWS;
 
 /// Rows `count` GPUs take inside the overview GPU panel: each GPU's rows
@@ -94,6 +93,16 @@ pub const fn overview_gpus_rows(count: u16) -> u16 {
     count
         .saturating_mul(OVERVIEW_GPU_ROWS)
         .saturating_add(count.saturating_sub(1))
+}
+
+/// Rows for GPU cards with a process-allocation legend, plus GPU dividers.
+pub const fn overview_gpus_rows_with_legends(count: u16, legend_count: u16) -> u16 {
+    let legend_count = if legend_count < count {
+        legend_count
+    } else {
+        count
+    };
+    overview_gpus_rows(count).saturating_add(legend_count)
 }
 
 /// One displayable metric value with its evidence.
@@ -244,6 +253,9 @@ pub struct GpuCard {
     pub framebuffer_total: MetricCell,
     pub framebuffer_reserved: MetricCell,
     pub process_allocated: MetricCell,
+    /// Current memory attributed to tracked processes on this GPU.
+    #[serde(default)]
+    pub process_memory: Vec<ProcessShare>,
     /// On a unified-memory GPU the system RAM its allocations come from,
     /// the scale of its memory bar; unsupported on a GPU with a framebuffer.
     pub system_ram_total: MetricCell,

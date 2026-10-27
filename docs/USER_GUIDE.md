@@ -207,7 +207,10 @@ clickable with the mouse.
 
 - **Overview** — every GPU (utilization, memory, temperature, power), CPU,
   memory (split by GPU-process share on unified memory), busiest disks and
-  network interfaces, and the GPU process table in per-process colors. The
+  network interfaces. GPU memory bars split the tracked process shares into
+  their stable process colors; the legend names each process and shows its
+  allocation; remaining usage retains the GPU's memory-level color. The GPU process table uses the
+  same colors. The
   process panel has a second sub-tab, **Fox services**, showing the
   Fox-Services tables in place — click it (or the `GPU Processes` sub-tab
   to go back).

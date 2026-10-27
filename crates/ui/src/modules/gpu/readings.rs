@@ -8,15 +8,16 @@
 //! each tracked process holds in its color (D-64), the rest of the memory
 //! in use in the color of the bar's level.
 
-use fox_services_top_core::view::{GpuCard, MetricCell, Trend};
+use fox_services_top_core::view::{GpuCard, MetricCell, ProcessShare, Trend};
 use ratatui::Frame;
 use ratatui::layout::Rect;
 
 use super::facts::{has_value, reported};
 use crate::format::{display_width, format_value, pad_left, value_text};
 use crate::modules::common::{BarRow, RowCursor, render_bar_row, render_chart, under_bar};
+use crate::modules::process_memory::{legend_lines, share_segments};
 use crate::registry::DisplayContext;
-use crate::widgets::Gauge;
+use crate::widgets::{Gauge, Segment, StackedBar};
 
 /// Fixed top of the temperature scale, so small changes stay small.
 const TEMPERATURE_SCALE_C: f64 = 100.0;
@@ -58,6 +59,96 @@ impl GpuReading<'_> {
 /// The overview's bars: utilization and memory.
 pub(super) fn overview_readings<'a>(card: &'a GpuCard) -> [GpuReading<'a>; OVERVIEW_READINGS] {
     [utilization(card), memory(card)]
+}
+
+/// Memory gauge with tracked-process segments and a neutral segment for
+/// memory in use that the tracked processes do not account for.
+pub(super) fn render_memory_bar(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    card: &GpuCard,
+    (kind_width, column): (u16, u16),
+    context: &DisplayContext,
+) {
+    let reading = memory(card);
+    let Some(row) = RowCursor::new(area).next_row() else {
+        return;
+    };
+    let ratio = reading.ratio();
+    let padded = usize::from(kind_width).max(display_width(&reading.value));
+    let gauge = render_bar_row(
+        frame,
+        row,
+        &BarRow {
+            label: reading.label,
+            ratio,
+            value: &pad_left(&reading.value, padded),
+            value_width: column,
+        },
+        context,
+    );
+    if card.process_memory.is_empty() {
+        frame.render_widget(Gauge::new(ratio, "", &context.theme), gauge);
+    } else {
+        let segments = process_memory_segments(&reading, &card.process_memory, context);
+        if segments.is_empty() {
+            frame.render_widget(Gauge::new(ratio, "", &context.theme), gauge);
+        } else {
+            frame.render_widget(StackedBar::new(&segments, context.theme.gauge_track), gauge);
+        }
+    }
+}
+
+pub(super) fn process_memory_legend(
+    card: &GpuCard,
+    width: usize,
+    context: &DisplayContext,
+) -> Vec<ratatui::text::Line<'static>> {
+    let other = other_process_memory(card);
+    legend_lines(&card.process_memory, other, width, 1, context)
+}
+
+fn process_memory_segments(
+    reading: &GpuReading<'_>,
+    shares: &[ProcessShare],
+    context: &DisplayContext,
+) -> Vec<Segment> {
+    let Some(scale) = reading
+        .max
+        .filter(|scale| scale.is_finite() && *scale > 0.0)
+    else {
+        return Vec::new();
+    };
+    let Some(used) = reading.current.value_f64().filter(|used| used.is_finite()) else {
+        return Vec::new();
+    };
+    let (mut segments, covered) = share_segments(shares, scale, used.max(0.0), context);
+    let other = (used - covered).max(0.0);
+    if other > 0.0 {
+        segments.push(Segment {
+            fraction: other / scale,
+            color: context.theme.level_color((used / scale).clamp(0.0, 1.0)),
+        });
+    }
+    segments
+}
+
+fn other_process_memory(card: &GpuCard) -> Option<u64> {
+    let used = if card.unified_memory {
+        card.process_allocated.value_f64()?
+    } else {
+        card.framebuffer_used.value_f64()?
+    };
+    #[allow(clippy::cast_precision_loss)]
+    let tracked: f64 = card
+        .process_memory
+        .iter()
+        .map(|share| share.bytes as f64)
+        .sum();
+    let other = (used - tracked).max(0.0);
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let bytes = other.round() as u64;
+    Some(bytes)
 }
 
 /// The GPU view's status: utilization, memory, temperature and power; a
@@ -203,9 +294,9 @@ pub(super) fn render_bar(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_fixtures::{gpu_view, missing};
+    use crate::test_fixtures::{display_context, gpu_view, missing};
     use fox_services_top_core::metric::CanonicalUnit;
-    use fox_services_top_core::view::CellState;
+    use fox_services_top_core::view::{CellState, ProcessShare};
 
     fn labels_and_values(readings: &[GpuReading<'_>]) -> Vec<(&'static str, String)> {
         readings
@@ -250,6 +341,36 @@ mod tests {
             (no_total.value.as_str(), no_total.ratio()),
             ("12.3 GiB", None)
         );
+    }
+
+    #[test]
+    fn overview_vram_segments_use_process_colors_and_keep_other_usage() {
+        const GIB: u64 = 1 << 30;
+        let context = display_context();
+        let mut card = gpu_view().cards.remove(0);
+        card.process_memory = vec![
+            ProcessShare {
+                slot: 1,
+                pid: 40,
+                name: "train".into(),
+                bytes: 4 * GIB,
+            },
+            ProcessShare {
+                slot: 3,
+                pid: 41,
+                name: "serve".into(),
+                bytes: 2 * GIB,
+            },
+        ];
+
+        let segments = process_memory_segments(&memory(&card), &card.process_memory, &context);
+        assert_eq!(segments.len(), 3);
+        assert_eq!(segments[0].color, context.theme.process_color(1));
+        assert_eq!(segments[1].color, context.theme.process_color(3));
+        assert!((segments[0].fraction - 0.05).abs() < 1e-12);
+        assert!((segments[1].fraction - 0.025).abs() < 1e-12);
+        assert!((segments[2].fraction - (6.3 / 80.0)).abs() < 1e-12);
+        assert_eq!(segments[2].color, context.theme.level_color(12.3 / 80.0));
     }
 
     /// A GPU's memory bar turns from green through amber to red as it

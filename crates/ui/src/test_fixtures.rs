@@ -339,6 +339,7 @@ fn gpu_card(index: u32) -> GpuCard {
         framebuffer_total: framebuffer(80.0 * GIB),
         framebuffer_reserved: framebuffer(0.5 * GIB),
         process_allocated: ok(10.0 * GIB, CanonicalUnit::Bytes),
+        process_memory: Vec::new(),
         system_ram_total: if unified {
             ok(64.0 * GIB, CanonicalUnit::Bytes)
         } else {

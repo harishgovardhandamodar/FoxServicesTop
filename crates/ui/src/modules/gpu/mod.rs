@@ -1,5 +1,6 @@
 //! GPU module: in the overview one panel with, per GPU, a headline, the
-//! utilization bar with its chart under it and the memory bar (D-38, D-43);
+//! utilization bar with its chart under it, the memory bar and its
+//! process-allocation legend (D-38, D-43);
 //! the GPU view shows one GPU: four live bars over its live and deep
 //! information in blocks of rows, laid out in columns (D-50, [`view`]).
 
@@ -10,14 +11,17 @@ mod readings;
 mod view;
 
 use fox_services_top_core::view::{
-    GpuCard, GpuView, OVERVIEW_GPU_CHART_ROWS, OVERVIEW_GPU_ROWS, ViewModel, overview_gpus_rows,
+    GpuCard, GpuView, OVERVIEW_GPU_CHART_ROWS, OVERVIEW_GPU_ROWS, ViewModel,
+    overview_gpus_rows_with_legends,
 };
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::text::{Line, Span};
 
 use self::facts::reported;
-use self::readings::{OVERVIEW_READINGS, overview_readings, render_bar};
+use self::readings::{
+    OVERVIEW_READINGS, overview_readings, process_memory_legend, render_bar, render_memory_bar,
+};
 use super::ModuleBuildError;
 use super::common::{
     ManifestSpec, Output, RowCursor, build_manifest, cell_label, cell_spans, draw_line,
@@ -74,7 +78,7 @@ impl DisplayModule for GpuModule {
         }
         let reason = u16::from(gpu.unavailable_reason.is_some());
         let count = saturate_u16(gpu.cards.len());
-        Some(2 + reason + overview_gpus_rows(count))
+        Some(2 + reason + overview_gpus_rows_with_legends(count, Self::process_legend_count(gpu)))
     }
 
     fn render(
@@ -128,14 +132,20 @@ impl GpuModule {
         let inner = panel(frame, area, &title, context);
         let mut rows = RowCursor::new(inner);
         self.render_partial_reason(gpu, &mut rows, frame, context);
-        if rows.remaining() / saturate_u16(count).max(1) < OVERVIEW_GPU_ROWS {
+        let count = saturate_u16(count);
+        let legend_count = Self::process_legend_count(gpu);
+        let required = overview_gpus_rows_with_legends(count, legend_count);
+        let card_rows = count
+            .saturating_mul(OVERVIEW_GPU_ROWS)
+            .saturating_add(legend_count);
+        if rows.remaining() < card_rows {
             if let Some(list) = rows.rest() {
                 self.render_card_list(context, model, gpu, list, frame, output);
             }
             return;
         }
         let widths = ReadingWidths::of(gpu);
-        let dividers = rows.remaining() >= overview_gpus_rows(saturate_u16(count));
+        let dividers = rows.remaining() >= required;
         for (index, card) in gpu.cards.iter().enumerate() {
             if index > 0
                 && dividers
@@ -143,7 +153,8 @@ impl GpuModule {
             {
                 draw_divider(frame, row, context);
             }
-            let Some(block) = rows.take(OVERVIEW_GPU_ROWS) else {
+            let card_rows = OVERVIEW_GPU_ROWS + u16::from(!card.process_memory.is_empty());
+            let Some(block) = rows.take(card_rows) else {
                 break;
             };
             render_overview_gpu(frame, block, card, widths, context);
@@ -156,6 +167,15 @@ impl GpuModule {
             );
             add_card_labels(output, card, context);
         }
+    }
+
+    fn process_legend_count(gpu: &GpuView) -> u16 {
+        saturate_u16(
+            gpu.cards
+                .iter()
+                .filter(|card| !card.process_memory.is_empty())
+                .count(),
+        )
     }
 
     /// `partial: <reason>` when some GPUs could not be read.
@@ -276,7 +296,7 @@ fn render_overview_gpu(
     if let Some(row) = rows.next_row() {
         draw_line(frame.buffer_mut(), row, &overview_headline(card, context));
     }
-    let [utilization, memory] = overview_readings(card);
+    let [utilization, _] = overview_readings(card);
     let [utilization_width, memory_width] = widths.kinds;
     if let Some(bar) = rows.take(1 + OVERVIEW_GPU_CHART_ROWS) {
         render_bar(
@@ -288,7 +308,14 @@ fn render_overview_gpu(
         );
     }
     if let Some(bar) = rows.next_row() {
-        render_bar(frame, bar, &memory, (memory_width, widths.column), context);
+        render_memory_bar(frame, bar, card, (memory_width, widths.column), context);
+    }
+    if let Some(row) = rows.next_row()
+        && let Some(line) = process_memory_legend(card, usize::from(row.width), context)
+            .into_iter()
+            .next()
+    {
+        draw_line(frame.buffer_mut(), row, &line);
     }
 }
 
