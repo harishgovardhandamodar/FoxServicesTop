@@ -257,11 +257,16 @@ Read-only — it only watches. `/` filters both tables by service or model;
 
 Shows zombie processes found on the machine running fox-services-top, grouped by parent PID.
 Each group lists zombie PIDs, process names and any available command lines. `/` filters by
-parent PID, child PID, name or command; `j`/`k` scroll the list.
+parent PID, child PID, name or command; `j`/`k` scroll the list. Distribution charts summarize
+the displayed entries by parent process name and inferred reaping context: whether the parent was
+visible, missing from the scan, or its PID was unavailable. If the projection budget shortens the
+list, the charts describe the displayed entries, not the full scan.
 
 The local process scan covers up to 4,096 PIDs per poll. This tab does not aggregate processes
 from the configured LAN nodes. A zombie has already exited and cannot be killed with a signal;
-identify and address the parent process so it can reap its children.
+the parent must reap it. The displayed reaping context is an inference from the current scan, not
+proof of why the parent has not reaped the child; a missing parent may be outside the scan or
+otherwise unavailable.
 
 ## Monitoring your nodes
 

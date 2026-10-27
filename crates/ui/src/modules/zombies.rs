@@ -1,5 +1,7 @@
 //! Zombie process table, grouped by parent process ID.
 
+use std::collections::BTreeMap;
+
 use fox_services_top_core::view::{ViewModel, ZombieGroupView, ZombieProcessView, ZombiesView};
 use ratatui::Frame;
 use ratatui::layout::Rect;
@@ -119,17 +121,62 @@ fn zombie_lines(
     filter: &str,
     context: &DisplayContext,
 ) -> Vec<Line<'static>> {
+    let matching_groups: Vec<(&ZombieGroupView, Vec<&ZombieProcessView>)> = zombies
+        .groups
+        .iter()
+        .filter_map(|group| {
+            let parent_matches = parent_matches(group, filter);
+            let processes: Vec<&ZombieProcessView> = group
+                .processes
+                .iter()
+                .filter(|process| parent_matches || process_matches(process, filter))
+                .collect();
+            (!processes.is_empty()).then_some((group, processes))
+        })
+        .collect();
+    if matching_groups.is_empty() {
+        return Vec::new();
+    }
+
+    let total = matching_groups
+        .iter()
+        .map(|(_, processes)| processes.len())
+        .sum();
+    let mut sources = BTreeMap::<String, usize>::new();
+    let mut reaping_contexts = BTreeMap::<String, usize>::new();
+    for (group, processes) in &matching_groups {
+        let source = group
+            .parent_name
+            .as_deref()
+            .map(clean)
+            .filter(|name| !name.is_empty())
+            .unwrap_or_else(|| "(unknown parent)".to_owned());
+        *sources.entry(source).or_default() += processes.len();
+
+        let context = match (group.parent_pid, group.parent_name.is_some()) {
+            (None, _) => "PPID unavailable",
+            (Some(_), true) => "parent visible in scan",
+            (Some(_), false) => "parent not in scan",
+        };
+        *reaping_contexts.entry(context.to_owned()).or_default() += processes.len();
+    }
+
     let mut lines = Vec::new();
-    for group in &zombies.groups {
-        let parent_matches = parent_matches(group, filter);
-        let processes: Vec<&ZombieProcessView> = group
-            .processes
-            .iter()
-            .filter(|process| parent_matches || process_matches(process, filter))
-            .collect();
-        if processes.is_empty() {
-            continue;
-        }
+    lines.push(Line::from(Span::styled(
+        "Parent source (displayed entries)",
+        context.theme.title_style(),
+    )));
+    append_distribution(&mut lines, sources, total);
+    lines.push(Line::from(Span::styled(
+        "Reaping context (inferred; displayed entries)",
+        context.theme.title_style(),
+    )));
+    append_distribution(&mut lines, reaping_contexts, total);
+    lines.push(Line::from(
+        "Cause: child exited; exact reason the parent has not reaped it is unknown.",
+    ));
+
+    for (group, processes) in matching_groups {
         let parent_id = group
             .parent_pid
             .map_or_else(|| "unknown".to_owned(), |pid| pid.to_string());
@@ -160,6 +207,40 @@ fn zombie_lines(
         }
     }
     lines
+}
+
+fn append_distribution(
+    lines: &mut Vec<Line<'static>>,
+    distribution: BTreeMap<String, usize>,
+    total: usize,
+) {
+    let mut categories: Vec<(String, usize)> = distribution.into_iter().collect();
+    categories.sort_by(|left, right| right.1.cmp(&left.1).then_with(|| left.0.cmp(&right.0)));
+
+    let omitted = categories.len().saturating_sub(3);
+    let displayed: Vec<(String, usize)> = categories.into_iter().take(3).collect();
+    let displayed_count: usize = displayed.iter().map(|(_, count)| count).sum();
+    for (label, count) in displayed {
+        lines.push(distribution_line(&label, count, total));
+    }
+    if omitted > 0 {
+        let other_count = total.saturating_sub(displayed_count);
+        lines.push(distribution_line("other categories", other_count, total));
+    }
+}
+
+fn distribution_line(label: &str, count: usize, total: usize) -> Line<'static> {
+    const BAR_WIDTH: usize = 8;
+    let largest = total.max(1);
+    let filled = count
+        .saturating_mul(BAR_WIDTH)
+        .div_ceil(largest)
+        .min(BAR_WIDTH);
+    let percentage = count.saturating_mul(100) / largest;
+    Line::from(format!(
+        "{label} {} {count} ({percentage}%)",
+        "█".repeat(filled)
+    ))
 }
 
 fn parent_matches(group: &ZombieGroupView, filter: &str) -> bool {

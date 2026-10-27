@@ -823,32 +823,51 @@ fn overview_shows_the_local_machine_when_remote_monitoring_is_disabled() {
 fn zombies_tab_groups_processes_by_parent_pid() {
     let mut fixture = model(ViewKind::Zombies);
     fixture.modules.zombies = Some(Arc::new(ZombiesView {
-        groups: vec![ZombieGroupView {
-            parent_pid: Some(1),
-            parent_name: Some("systemd".into()),
-            processes: vec![
-                ZombieProcessView {
-                    pid: 44,
-                    name: "worker-a".into(),
-                    command: "worker --queue a".into(),
-                },
-                ZombieProcessView {
-                    pid: 45,
-                    name: "worker-b".into(),
-                    command: "worker --queue b".into(),
-                },
-            ],
-        }],
-        total_processes: 2,
+        groups: vec![
+            ZombieGroupView {
+                parent_pid: Some(1),
+                parent_name: Some("systemd".into()),
+                processes: vec![
+                    ZombieProcessView {
+                        pid: 44,
+                        name: "worker-a".into(),
+                        command: "worker --queue a".into(),
+                    },
+                    ZombieProcessView {
+                        pid: 45,
+                        name: "worker-b".into(),
+                        command: "worker --queue b".into(),
+                    },
+                ],
+            },
+            ZombieGroupView {
+                parent_pid: Some(88),
+                parent_name: None,
+                processes: vec![ZombieProcessView {
+                    pid: 46,
+                    name: "orphaned-worker".into(),
+                    command: String::new(),
+                }],
+            },
+        ],
+        total_processes: 3,
         truncated: false,
     }));
 
-    let rendered = render(&fixture, (120, 24));
+    let rendered = render(&fixture, (120, 30));
     for text in [
-        "Zombie Processes · 2 in 1 parent groups",
+        "Zombie Processes · 3 in 2 parent groups",
+        "Parent source (displayed entries)",
+        "systemd ██████ 2 (66%)",
+        "Reaping context (inferred; displayed entries)",
+        "parent visible in scan ██████ 2 (66%)",
+        "parent not in scan ███ 1 (33%)",
+        "Cause: child exited; exact reason the parent has not reaped it is unknown.",
         "PPID 1 · systemd · 2 zombie(s)",
         "PID     44  worker-a · worker --queue a",
         "PID     45  worker-b · worker --queue b",
+        "PPID 88 · 1 zombie(s)",
+        "PID     46  orphaned-worker",
     ] {
         assert!(
             rendered.contains(text),
