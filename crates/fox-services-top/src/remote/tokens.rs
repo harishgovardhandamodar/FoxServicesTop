@@ -69,8 +69,10 @@ impl TokenPoll {
                 }
                 let app = text(row, "service").unwrap_or_else(|| "unknown".to_owned());
                 let model = text(row, "model").unwrap_or_else(|| "unknown".to_owned());
-                let ingress = f64_at(row, "prompt_tokens").unwrap_or(0.0).max(0.0) as u64;
-                let egress = f64_at(row, "completion_tokens").unwrap_or(0.0).max(0.0) as u64;
+                let ingress =
+                    super::nonnegative_f64_to_u64(f64_at(row, "prompt_tokens").unwrap_or(0.0));
+                let egress =
+                    super::nonnegative_f64_to_u64(f64_at(row, "completion_tokens").unwrap_or(0.0));
                 let duration_ms = f64_at(row, "duration_ms");
                 apps.entry(app)
                     .or_default()
@@ -105,7 +107,7 @@ impl TokenPoll {
 /// Which bucket a request at `ts` falls into, oldest first.
 fn bucket_index(ts: f64, now: f64, bucket_seconds: f64) -> usize {
     let elapsed = (now - ts).max(0.0);
-    let from_end = (elapsed / bucket_seconds).floor() as usize;
+    let from_end = super::nonnegative_f64_to_usize((elapsed / bucket_seconds).floor());
     (TIMELINE_POINTS - 1).saturating_sub(from_end.min(TIMELINE_POINTS - 1))
 }
 
@@ -128,15 +130,21 @@ pub struct NodeTokens {
 
 impl NodeTokens {
     pub fn ingress(&self) -> u64 {
-        self.apps.iter().map(|app| app.ingress_tokens).sum()
+        self.apps
+            .iter()
+            .fold(0u64, |sum, app| sum.saturating_add(app.ingress_tokens))
     }
 
     pub fn egress(&self) -> u64 {
-        self.apps.iter().map(|app| app.egress_tokens).sum()
+        self.apps
+            .iter()
+            .fold(0u64, |sum, app| sum.saturating_add(app.egress_tokens))
     }
 
     pub fn requests(&self) -> u32 {
-        self.apps.iter().map(|app| app.requests).sum()
+        self.apps
+            .iter()
+            .fold(0u32, |sum, app| sum.saturating_add(app.requests))
     }
 }
 
@@ -174,8 +182,8 @@ pub fn merge(into: &mut TokensView, node: &str, tokens: NodeTokens) {
         {
             Some(held) => {
                 held.available = held.available || engine.available;
-                held.loaded_count += engine.loaded_count;
-                held.model_count += engine.model_count;
+                held.loaded_count = held.loaded_count.saturating_add(engine.loaded_count);
+                held.model_count = held.model_count.saturating_add(engine.model_count);
                 held.vram_total_bytes = held
                     .vram_total_bytes
                     .saturating_add(engine.vram_total_bytes);
@@ -204,16 +212,15 @@ fn merge_timeline(into: &[TokenBucketView], other: &[TokenBucketView]) -> Vec<To
     if other.is_empty() {
         return into.to_vec();
     }
-    let width = (other[1].at_s as i64 - other[0].at_s as i64).max(1);
+    let width = other
+        .get(1)
+        .map_or(1, |next| next.at_s.abs_diff(other[0].at_s).max(1));
     let merged: Vec<TokenBucketView> = other
         .iter()
         .map(|bucket| {
             let matching = into
                 .iter()
-                .find(|held| {
-                    let held_at = held.at_s as i64;
-                    (bucket.at_s as i64 - held_at).abs() <= width / 2
-                })
+                .find(|held| bucket.at_s.abs_diff(held.at_s) <= width / 2)
                 .cloned();
             match matching {
                 Some(held) => TokenBucketView {
@@ -314,7 +321,8 @@ fn finish_apps(apps: BTreeMap<String, AppAccumulator>) -> Vec<TokenAppView> {
                 egress_tps: rate(acc.egress, acc.durations),
                 avg_duration_ms: (acc.durations_seen > 0)
                     .then(|| acc.durations / f64::from(acc.durations_seen)),
-                last_seen_s: (acc.last_seen > 0.0).then_some(acc.last_seen as u64),
+                last_seen_s: (acc.last_seen > 0.0)
+                    .then(|| super::nonnegative_f64_to_u64(acc.last_seen)),
                 models,
             }
         })
@@ -337,7 +345,9 @@ fn finish_buckets(
         .into_iter()
         .enumerate()
         .map(|(index, bucket)| TokenBucketView {
-            at_s: (newest_start + index as f64 * bucket_seconds).max(0.0) as u64,
+            at_s: super::nonnegative_f64_to_u64(
+                (newest_start + index as f64 * bucket_seconds).max(0.0),
+            ),
             requests: bucket.requests,
             ingress_tps: rate(bucket.ingress, bucket_seconds * 1000.0),
             egress_tps: rate(bucket.egress, bucket_seconds * 1000.0),
@@ -367,8 +377,8 @@ fn ollama_engine(stats: &Value) -> TokenEngineView {
                     .get("running")
                     .and_then(Value::as_bool)
                     .unwrap_or(false),
-                size_bytes: f64_at(model, "size").unwrap_or(0.0).max(0.0) as u64,
-                size_vram_bytes: f64_at(model, "size_vram").map(|bytes| bytes.max(0.0) as u64),
+                size_bytes: super::nonnegative_f64_to_u64(f64_at(model, "size").unwrap_or(0.0)),
+                size_vram_bytes: f64_at(model, "size_vram").map(super::nonnegative_f64_to_u64),
                 parameter_size: details
                     .and_then(|d| text(d, "parameter_size"))
                     .unwrap_or_default(),
@@ -381,7 +391,8 @@ fn ollama_engine(stats: &Value) -> TokenEngineView {
         .collect();
     engine.loaded_count = u32::try_from(engine.models.iter().filter(|model| model.running).count())
         .unwrap_or(u32::MAX);
-    engine.vram_total_bytes = f64_at(stats, "total_vram_bytes").unwrap_or(0.0).max(0.0) as u64;
+    engine.vram_total_bytes =
+        super::nonnegative_f64_to_u64(f64_at(stats, "total_vram_bytes").unwrap_or(0.0));
     engine
 }
 
@@ -467,6 +478,38 @@ mod tests {
         assert!(tokens.apps.is_empty(), "2h old, outside 1h");
         let wide = TokenPoll::new(24, 500).apply(&usage(&rows), None);
         assert_eq!(wide.apps.len(), 1, "inside 24h");
+    }
+
+    #[test]
+    fn token_totals_saturate_and_single_bucket_timelines_merge() {
+        let tokens = NodeTokens {
+            apps: vec![
+                TokenAppView {
+                    ingress_tokens: u64::MAX,
+                    egress_tokens: u64::MAX,
+                    requests: u32::MAX,
+                    ..TokenAppView::default()
+                },
+                TokenAppView {
+                    ingress_tokens: 1,
+                    egress_tokens: 1,
+                    requests: 1,
+                    ..TokenAppView::default()
+                },
+            ],
+            ..NodeTokens::default()
+        };
+        assert_eq!(tokens.ingress(), u64::MAX);
+        assert_eq!(tokens.egress(), u64::MAX);
+        assert_eq!(tokens.requests(), u32::MAX);
+
+        let bucket = TokenBucketView {
+            at_s: u64::MAX,
+            ..TokenBucketView::default()
+        };
+        let merged = merge_timeline(std::slice::from_ref(&bucket), std::slice::from_ref(&bucket));
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].at_s, u64::MAX);
     }
 
     #[test]

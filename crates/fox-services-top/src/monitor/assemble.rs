@@ -10,6 +10,7 @@ use fox_services_top_collectors::registry::default_collectors;
 use fox_services_top_core::budget::{ByteLedger, Partition, QueueGate};
 use fox_services_top_core::clock::TimeProvider;
 use fox_services_top_core::config::Config;
+#[cfg(target_os = "macos")]
 use fox_services_top_core::identity::PidNamespace;
 use fox_services_top_core::ports::{ConfigRepository, Logger};
 use fox_services_top_core::quality::Namespace;
@@ -186,7 +187,7 @@ impl Wiring {
         let (specs, manifests) = host_specs(cli, effective, self.namespace, &self.clock, &host_id)?;
         // The Nodes and Docker tabs read this monitor's latest snapshot;
         // polling lives on its own thread, never on the control thread.
-        let cluster = ClusterMonitor::start(&effective.remote);
+        let cluster = ClusterMonitor::start(&effective.remote)?;
         let supervisor = Supervisor::start(
             SupervisorConfig::from_config(effective),
             specs,

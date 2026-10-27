@@ -52,16 +52,20 @@ impl ServicePoll {
                 let service = text(row, "service").unwrap_or_else(|| "unknown".to_owned());
                 grouped.entry(service).or_default().push(ServiceModelView {
                     model: text(row, "model").unwrap_or_else(|| "unknown".to_owned()),
-                    requests: u64_at(row, "count") as u32,
+                    requests: u32::try_from(u64_at(row, "count")).unwrap_or(u32::MAX),
                     tokens: u64_at(row, "tokens"),
                     avg_ms: f64_at(row, "avg_ms"),
                 });
             }
             for (service, mut models) in grouped {
                 models.sort_by(|a, b| b.tokens.cmp(&a.tokens));
+                let requests = models
+                    .iter()
+                    .fold(0u32, |sum, model| sum.saturating_add(model.requests));
+                let tokens = models
+                    .iter()
+                    .fold(0u64, |sum, model| sum.saturating_add(model.tokens));
                 models.truncate(MAX_MODELS_PER_SERVICE);
-                let requests = models.iter().map(|model| model.requests).sum();
-                let tokens = models.iter().map(|model| model.tokens).sum();
                 let last_ts = matrix
                     .iter()
                     .filter(|row| text(row, "service").as_deref() == Some(service.as_str()))
@@ -78,7 +82,7 @@ impl ServicePoll {
                     tokens,
                     ago_s: last_ts
                         .zip(now)
-                        .map(|(then, now)| (now - then).max(0.0) as u64),
+                        .map(|(then, now)| super::nonnegative_f64_to_u64((now - then).max(0.0))),
                 });
             }
         }
@@ -94,11 +98,11 @@ impl ServicePoll {
                 service: service.clone(),
                 status: text(info, "status").unwrap_or_else(|| "Unknown".to_owned()),
                 models: Vec::new(),
-                requests: u64_at(info, "request_count") as u32,
+                requests: u32::try_from(u64_at(info, "request_count")).unwrap_or(u32::MAX),
                 tokens: u64_at(info, "total_tokens"),
                 ago_s: last_seen
                     .zip(now)
-                    .map(|(then, now)| (now - then).max(0.0) as u64),
+                    .map(|(then, now)| super::nonnegative_f64_to_u64((now - then).max(0.0))),
             });
         }
         sort_services(&mut services);
@@ -163,7 +167,9 @@ fn recent_requests(live_map: &Value, now: Option<f64>) -> Vec<RecentRequestView>
                 query_type: text(row, "query_type").unwrap_or_default(),
                 requestor: text(row, "requestor").unwrap_or_default(),
                 prompt: truncate_prompt(&text(row, "prompt").unwrap_or_default()),
-                ago_s: now.map(|now| (now - ts).max(0.0) as u64).unwrap_or(0),
+                ago_s: now
+                    .map(|now| super::nonnegative_f64_to_u64((now - ts).max(0.0)))
+                    .unwrap_or(0),
             })
         })
         .collect();
@@ -233,7 +239,7 @@ fn f64_at(value: &Value, key: &str) -> Option<f64> {
 }
 
 fn u64_at(value: &Value, key: &str) -> u64 {
-    f64_at(value, key).unwrap_or(0.0).max(0.0) as u64
+    super::nonnegative_f64_to_u64(f64_at(value, key).unwrap_or(0.0))
 }
 
 #[cfg(test)]
@@ -266,6 +272,46 @@ mod tests {
                  "prompt": "Model: what adversarial scenarios", "ts": 1791979200.0},
             ],
         })
+    }
+
+    #[test]
+    fn service_totals_include_models_beyond_the_display_limit() {
+        let matrix: Vec<_> = (0..=MAX_MODELS_PER_SERVICE)
+            .map(|index| {
+                serde_json::json!({
+                    "service": "demo",
+                    "model": format!("model-{index}"),
+                    "count": 1,
+                    "tokens": 1
+                })
+            })
+            .collect();
+        let services = ServicePoll::new(24).apply(&serde_json::json!({"matrix": matrix}));
+
+        assert_eq!(services.services[0].models.len(), MAX_MODELS_PER_SERVICE);
+        assert_eq!(
+            services.services[0].requests,
+            u32::try_from(MAX_MODELS_PER_SERVICE + 1).unwrap()
+        );
+        assert_eq!(
+            services.services[0].tokens,
+            u64::try_from(MAX_MODELS_PER_SERVICE + 1).unwrap()
+        );
+    }
+
+    #[test]
+    fn integer_counters_saturate_at_their_view_type_limit() {
+        let services = ServicePoll::new(24).apply(&serde_json::json!({
+            "matrix": [{
+                "service": "demo",
+                "model": "model",
+                "count": 18446744073709551615_u64,
+                "tokens": 18446744073709551615_u64
+            }]
+        }));
+
+        assert_eq!(services.services[0].requests, u32::MAX);
+        assert_eq!(services.services[0].tokens, u64::MAX);
     }
 
     #[test]

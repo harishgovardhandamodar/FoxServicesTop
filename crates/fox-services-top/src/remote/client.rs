@@ -115,14 +115,14 @@ impl FoxServicesClient {
 fn apply_hardware(node: &mut ClusterNodeView, hardware: &Value) {
     node.node_id = str_at(hardware, "node_id");
     node.machine = str_at(hardware, "machine");
-    node.uptime_s = f64_at(hardware, "uptime_s").map(|uptime| uptime.max(0.0) as u64);
+    node.uptime_s = f64_at(hardware, "uptime_s").map(super::nonnegative_f64_to_u64);
     if let Some(cpu) = hardware.get("cpu") {
         node.cpu_busy_pct = f64_at(cpu, "busy_pct");
-        node.cpu_cores = f64_at(cpu, "cores").map(|cores| cores.max(0.0) as u32);
+        node.cpu_cores = f64_at(cpu, "cores").map(super::nonnegative_f64_to_u32);
     }
     if let Some(memory) = hardware.get("memory") {
-        node.memory_used_bytes = f64_at(memory, "used_bytes").map(|bytes| bytes.max(0.0) as u64);
-        node.memory_total_bytes = f64_at(memory, "total_bytes").map(|bytes| bytes.max(0.0) as u64);
+        node.memory_used_bytes = f64_at(memory, "used_bytes").map(super::nonnegative_f64_to_u64);
+        node.memory_total_bytes = f64_at(memory, "total_bytes").map(super::nonnegative_f64_to_u64);
         node.memory_busy_pct = f64_at(memory, "busy_pct");
     }
     if let Some(gpu) = hardware.get("gpu") {
@@ -135,12 +135,16 @@ fn apply_hardware(node: &mut ClusterNodeView, hardware: &Value) {
                 if let Some(percent) = f64_at(card, "util_pct") {
                     util = Some(util.map_or(percent, |best: f64| best.max(percent)));
                 }
-                used += f64_at(card, "mem_used_bytes")
-                    .map(|bytes| bytes.max(0.0) as u64)
-                    .unwrap_or(0);
-                total += f64_at(card, "mem_total_bytes")
-                    .map(|bytes| bytes.max(0.0) as u64)
-                    .unwrap_or(0);
+                used = used.saturating_add(
+                    f64_at(card, "mem_used_bytes")
+                        .map(super::nonnegative_f64_to_u64)
+                        .unwrap_or(0),
+                );
+                total = total.saturating_add(
+                    f64_at(card, "mem_total_bytes")
+                        .map(super::nonnegative_f64_to_u64)
+                        .unwrap_or(0),
+                );
             }
         }
         node.gpu_util_pct = util;
@@ -151,9 +155,9 @@ fn apply_hardware(node: &mut ClusterNodeView, hardware: &Value) {
     }
     if let Some(network) = hardware.get("network") {
         node.net_rx_bytes_s =
-            f64_at(network, "total_rx_bytes_s").map(|bytes| bytes.max(0.0) as u64);
+            f64_at(network, "total_rx_bytes_s").map(super::nonnegative_f64_to_u64);
         node.net_tx_bytes_s =
-            f64_at(network, "total_tx_bytes_s").map(|bytes| bytes.max(0.0) as u64);
+            f64_at(network, "total_tx_bytes_s").map(super::nonnegative_f64_to_u64);
     }
     if let Some(tokens) = hardware.get("tokens") {
         node.tokens_per_sec = f64_at(tokens, "tokens_per_sec");
@@ -187,7 +191,8 @@ fn apply_project_counts(node: &mut ClusterNodeView, projects: &Value) {
         containers_total += total;
     }
     node.projects_running = Some(projects_running);
-    node.projects_total = Some(entries.len().min(MAX_PROJECTS_PER_NODE) as u32);
+    node.projects_total =
+        Some(u32::try_from(entries.len().min(MAX_PROJECTS_PER_NODE)).unwrap_or(u32::MAX));
     node.containers_running = Some(containers_running);
     node.containers_total = Some(containers_total);
 }

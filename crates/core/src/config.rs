@@ -199,9 +199,9 @@ pub struct RemoteConfig {
     pub nodes: Vec<RemoteNodeConfig>,
 }
 
-impl RemoteConfig {
+impl Default for RemoteConfig {
     /// The example cluster: `axiom` and `axiom-dgx`, polled every 5 s.
-    pub fn default() -> Self {
+    fn default() -> Self {
         Self {
             enabled: true,
             poll_interval_ms: 5000,
@@ -223,7 +223,9 @@ impl RemoteConfig {
             ],
         }
     }
+}
 
+impl RemoteConfig {
     fn is_default(&self) -> bool {
         self == &Self::default()
     }
@@ -813,10 +815,9 @@ impl Config {
             check(
                 !node.base_url.is_empty()
                     && node.base_url.len() <= 256
-                    && (node.base_url.starts_with("http://")
-                        || node.base_url.starts_with("https://")),
+                    && node.base_url.starts_with("http://"),
                 &format!("{path}.base_url"),
-                "must be an http(s) URL of at most 256 bytes",
+                "must be an http:// URL of at most 256 bytes",
             );
         }
 
@@ -1590,6 +1591,18 @@ mod tests {
             Config::from_json(&value.to_string()),
             Err(ConfigError::Parse { .. })
         ));
+    }
+
+    #[test]
+    fn remote_urls_must_match_the_supported_http_transport() {
+        let mut config = defaults();
+        config.remote.nodes[0].base_url = "https://example.com".to_owned();
+
+        let issues = config.validate().unwrap_err();
+        assert!(issues.iter().any(|issue| {
+            issue.path == "remote.nodes[0].base_url"
+                && issue.message == "must be an http:// URL of at most 256 bytes"
+        }));
     }
 
     #[test]

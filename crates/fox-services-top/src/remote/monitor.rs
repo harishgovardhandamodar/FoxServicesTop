@@ -31,7 +31,9 @@ pub struct ClusterMonitor {
 impl ClusterMonitor {
     /// Starts polling `config`'s nodes. Disabled configs (or an empty node
     /// list) publish a disabled snapshot and spawn no thread.
-    pub fn start(config: &RemoteConfig) -> Self {
+    ///
+    /// Returns the operating-system error if the polling thread cannot start.
+    pub fn start(config: &RemoteConfig) -> std::io::Result<Self> {
         let state = Arc::new(Mutex::new(Arc::new(ClusterSnapshot {
             cluster: Arc::new(ClusterView {
                 enabled: config.enabled,
@@ -53,15 +55,15 @@ impl ClusterMonitor {
                 config.clone(),
                 Arc::clone(&state),
                 Arc::clone(&shutdown),
-            ))
+            )?)
         } else {
             None
         };
-        Self {
+        Ok(Self {
             state,
             shutdown,
             thread,
-        }
+        })
     }
 
     /// What the Manager reads every frame.
@@ -110,7 +112,7 @@ fn spawn(
     config: RemoteConfig,
     state: Arc<Mutex<Arc<ClusterSnapshot>>>,
     shutdown: Arc<AtomicBool>,
-) -> JoinHandle<()> {
+) -> std::io::Result<JoinHandle<()>> {
     thread::Builder::new()
         .name("fox-services-top-cluster".to_owned())
         .spawn(move || {
@@ -121,7 +123,6 @@ fn spawn(
                 sleep_slice(interval, &shutdown);
             }
         })
-        .expect("cluster monitor thread spawns")
 }
 
 fn poll_once(config: &RemoteConfig, state: &Mutex<Arc<ClusterSnapshot>>, timeout: Duration) {
@@ -227,6 +228,7 @@ mod tests {
             service_window_hours: 24,
             nodes,
         })
+        .unwrap()
     }
 
     #[test]

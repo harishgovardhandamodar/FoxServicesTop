@@ -128,7 +128,7 @@ pub enum CliError {
     RelativePath { flag: &'static str, path: String },
     #[error("--replay-slice must look like INDEX/COUNT with INDEX < COUNT (got {0})")]
     ReplaySlice(String),
-    #[error("--remote-node must look like NAME=URL with an http(s) URL (got {0})")]
+    #[error("--remote-node must look like NAME=URL with an http:// URL (got {0})")]
     RemoteNode(String),
 }
 
@@ -201,9 +201,7 @@ fn parse_remote_nodes(entries: &[String]) -> Result<Option<Vec<RemoteNodeConfig>
         .map(|entry| {
             let (name, url) = entry
                 .split_once('=')
-                .filter(|(name, url)| {
-                    !name.is_empty() && (url.starts_with("http://") || url.starts_with("https://"))
-                })
+                .filter(|(name, url)| !name.is_empty() && url.starts_with("http://"))
                 .ok_or_else(|| CliError::RemoteNode(entry.clone()))?;
             Ok(RemoteNodeConfig {
                 name: name.to_owned(),
@@ -356,6 +354,10 @@ mod tests {
         ));
         assert!(matches!(
             parse(&["--remote-node", "axiom=gopher://x"]).overrides(),
+            Err(CliError::RemoteNode(_))
+        ));
+        assert!(matches!(
+            parse(&["--remote-node", "axiom=https://example.com"]).overrides(),
             Err(CliError::RemoteNode(_))
         ));
     }
