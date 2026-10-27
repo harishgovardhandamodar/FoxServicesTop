@@ -170,6 +170,25 @@ showing the Fox-Services tables in place. `c` expands the CPU into per-core bars
 
 <img src="docs/images/screenshots/workstation-overview.png" alt="fox-services-top Overview on a workstation with an RTX 5080 at 97 % and an RTX 3060, the disk and network tables, and four GPU processes, each with its color" width="100%">
 
+#### Show LAN machines
+
+1. Start `fox-services-top` on the machine where you want to view the cluster.
+2. Press `1` to open **Overview**. The **LAN Machines** panel appears alongside the local
+   monitoring panels; this machine is included automatically.
+3. To show other machines, make sure each has a reachable fox-services HTTP API, then add its
+   name and LAN address. For a one-time launch, repeat `--remote-node` for every remote you want
+   listed:
+
+   ```bash
+   fox-services-top \
+     --remote-node axiom=http://192.168.1.63:8210 \
+     --remote-node axiom-dgx=http://192.168.1.200:8210
+   ```
+
+   Replace the example addresses with the API addresses for your machines. Remote hosts are not
+   discovered just because they run the same binary; configure them explicitly. For permanent
+   settings and the default node list, see the [User Guide](docs/USER_GUIDE.md#the-nodes-tab-6).
+
 ### GPU
 
 One GPU at a time: four live bars, then everything the driver reports. `h` / `l` switches between
