@@ -37,10 +37,12 @@ pub enum ViewKind {
     Tokens,
     /// Energy / power consumption: watts timeline and kWh per query window.
     Power,
+    /// Zombie processes grouped by their parent process ID.
+    Zombies,
 }
 
 impl ViewKind {
-    pub const ALL: [ViewKind; 11] = [
+    pub const ALL: [ViewKind; 12] = [
         ViewKind::Overview,
         ViewKind::GpuDetail,
         ViewKind::Processes,
@@ -52,6 +54,7 @@ impl ViewKind {
         ViewKind::Docker,
         ViewKind::Tokens,
         ViewKind::Power,
+        ViewKind::Zombies,
     ];
 
     pub const fn title(self) -> &'static str {
@@ -67,6 +70,7 @@ impl ViewKind {
             Self::Docker => "Fox-Services",
             Self::Tokens => "Tokens",
             Self::Power => "Power",
+            Self::Zombies => "Zombies",
         }
     }
 

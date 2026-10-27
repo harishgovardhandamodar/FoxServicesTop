@@ -16,6 +16,7 @@ mod process_memory;
 mod processes;
 mod settings;
 mod tokens;
+mod zombies;
 
 use fox_services_top_core::identity::IdentityError;
 use thiserror::Error;
@@ -34,6 +35,7 @@ pub use power::PowerModule;
 pub use processes::{PROCESSES_MODULE_ID, ProcessesModule};
 pub use settings::SettingsModule;
 pub use tokens::TokensModule;
+pub use zombies::ZombiesModule;
 
 use crate::registry::{DisplayModule, ManifestError};
 
@@ -65,5 +67,6 @@ pub fn builtin_modules() -> Vec<Result<Box<dyn DisplayModule>, ModuleBuildError>
         DockerModule::new().map(boxed),
         TokensModule::new().map(boxed),
         PowerModule::new().map(boxed),
+        ZombiesModule::new().map(boxed),
     ]
 }

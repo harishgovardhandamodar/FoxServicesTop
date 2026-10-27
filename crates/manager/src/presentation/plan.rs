@@ -16,6 +16,7 @@ pub(crate) const CLUSTER: &str = "cluster";
 pub(crate) const DOCKER: &str = "docker";
 pub(crate) const TOKENS: &str = "tokens";
 pub(crate) const POWER: &str = "power";
+pub(crate) const ZOMBIES: &str = "zombies";
 
 /// Viewport assumed until the session reports its terminal size.
 const DEFAULT_VIEWPORT: (u16, u16) = (80, 24);
@@ -42,6 +43,7 @@ pub fn visible_modules(view: ViewKind) -> &'static [&'static str] {
         ViewKind::Docker => &[DOCKER],
         ViewKind::Tokens => &[TOKENS],
         ViewKind::Power => &[POWER],
+        ViewKind::Zombies => &[ZOMBIES],
         // Retired views: the wire keeps their values, nothing is shown (D-91).
         ViewKind::Processes | ViewKind::Sources | ViewKind::Actions => &[],
     }
@@ -56,9 +58,10 @@ pub(crate) struct ViewPlan {
 
 impl ViewPlan {
     pub(crate) fn new(view: ViewKind, enabled: &[String]) -> Self {
-        let (shown, disabled) = visible_modules(view)
-            .iter()
-            .partition(|module| enabled.iter().any(|entry| entry == *module));
+        let (shown, disabled) = visible_modules(view).iter().partition(|module| {
+            enabled.iter().any(|entry| entry == *module)
+                || (view == ViewKind::Zombies && **module == ZOMBIES)
+        });
         Self { shown, disabled }
     }
 
@@ -150,6 +153,17 @@ mod tests {
         let without_cpu = ViewPlan::new(ViewKind::Overview, &[GPU.to_owned()]);
         assert!(without_cpu.shows(GPU));
         assert!(without_cpu.disabled().contains(&CPU));
+    }
+
+    #[test]
+    fn zombies_tab_remains_available_to_existing_configs() {
+        let enabled: Vec<String> = all_enabled()
+            .into_iter()
+            .filter(|module| module != ZOMBIES)
+            .collect();
+        let plan = ViewPlan::new(ViewKind::Zombies, &enabled);
+        assert!(plan.shows(ZOMBIES));
+        assert!(!plan.disabled().contains(&ZOMBIES));
     }
 
     #[test]

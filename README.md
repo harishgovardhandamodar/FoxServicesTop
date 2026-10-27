@@ -88,7 +88,7 @@ cargo build --release --locked
 ./target/release/fox-services-top
 ```
 
-New here? Start with the [User Guide](docs/USER_GUIDE.md): running it, all seven
+New here? Start with the [User Guide](docs/USER_GUIDE.md): running it, all ten
 tabs, and pointing the Nodes and Fox-Services tabs at your own fox-services nodes.
 
 ## Features
@@ -114,6 +114,10 @@ of the whole machine.
   stopped from fox-services-top, most likely the OOM killer, or still running. Open a run for its full
   command line, working folder and charts of its CPU, memory, GPU, threads, open files, disk and
   network.
+- **Zombie Processes.** The Zombies tab collects zombie processes from the local process scan and
+  groups them by parent PID, with process names and command lines to help identify which parent
+  needs attention. Zombies have already exited and cannot be killed; the parent must reap them.
+  Press `0`; use `/` to filter and `j` / `k` to scroll. The scan covers up to 4,096 PIDs per poll.
 - **Overview History.** CPU, memory, each GPU's utilization, memory, temperature and power, disks
   and network as bars of 1 minute to 24 hours on the local clock, with now, average and maximum on
   every chart, and each GPU's averages, peaks and energy. Where the CPU's power can be read, the
@@ -218,6 +222,13 @@ it), working folder and charts.
 <img src="docs/images/screenshots/workstation-process-run.png" alt="An opened run: PID, name, GPU, start, end, runtime and user, then charts of its CPU, memory, GPU utilization, GPU memory, threads and open files, disk and network" width="100%">
 
 <sub>The run's folder, program, cgroup and command line are masked.</sub>
+
+### Zombie Processes
+
+Press `0` to see zombies found on the machine running fox-services-top, grouped by parent PID.
+Each group lists its zombie PIDs, names and available command lines; `/` filters and `j` / `k`
+scroll. The process scan is capped at 4,096 PIDs per poll.
+Zombies have already exited, so signals cannot remove them; the parent process must reap them.
 
 ### Nodes
 
@@ -369,7 +380,7 @@ Each panel names its own keys at the right of its title; the footer keeps the gl
 | `q`, `Ctrl-C` | Quit (`q` is text while typing a filter; `Ctrl-C` always quits) |
 | `?`, `F1` | Help |
 | `+` / `-` | Faster / slower sampling |
-| `j`/`k`, arrows, `PgUp`/`PgDn`, `Home`/`End` | Move the selection (scroll on the Nodes and Fox-Services tabs) |
+| `j`/`k`, arrows, `PgUp`/`PgDn`, `Home`/`End` | Move the selection (scroll on the Nodes, Fox-Services and Zombies tabs) |
 | `c` | Show or hide the CPU sensors and per-core bars (or click the CPU panel) |
 | `[` / `]` | Scroll the GPU processes of the memory panel |
 | `s` / `r` | Next sort column / reverse order |

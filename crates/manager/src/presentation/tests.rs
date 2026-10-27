@@ -4,6 +4,7 @@
 use std::sync::Arc;
 
 use fox_services_top_core::action::Signal;
+use fox_services_top_core::canonical::{ProcessTable, ZombieProcess};
 use fox_services_top_core::commands::{SortKey, ViewKind};
 use fox_services_top_core::config::BUILTIN_MODULES;
 use fox_services_top_core::metric::{CanonicalUnit, ids};
@@ -204,6 +205,7 @@ fn filled(model: &ViewModel) -> Vec<&'static str> {
         ("docker", modules.docker.is_some()),
         ("tokens", modules.tokens.is_some()),
         ("power", modules.power.is_some()),
+        ("zombies", modules.zombies.is_some()),
         ("actions", modules.actions.is_some()),
     ]
     .into_iter()
@@ -324,6 +326,69 @@ fn overview_keeps_configured_remote_nodes_beside_local_machine() {
     assert_eq!(nodes.len(), 2, "the local host should not be duplicated");
     assert_eq!(nodes[0].name, "dgx-test (local)");
     assert_eq!(nodes[1].name, "axiom-dgx");
+}
+
+#[test]
+fn zombies_view_projects_the_latest_parent_groups() {
+    let mut fixture = Fixture::new();
+    fixture.session.view = ViewKind::Zombies;
+    fixture.enabled_modules.retain(|module| module != "zombies");
+    fixture.snapshot.process_table = Arc::new(ProcessTable {
+        zombies: vec![ZombieProcess {
+            pid: 44,
+            parent_pid: Some(1),
+            name: "worker".into(),
+            command: "worker --queue".into(),
+            parent_name: Some("systemd".into()),
+        }],
+        ..ProcessTable::default()
+    });
+
+    let model = build_view_model_measured(&fixture.context()).0;
+    assert!(
+        model
+            .enabled_modules
+            .iter()
+            .any(|module| module.as_str() == "zombies")
+    );
+    let zombies = model.modules.zombies.as_deref().unwrap();
+    assert_eq!(zombies.total_processes, 1);
+    assert_eq!(zombies.groups.len(), 1);
+    assert_eq!(zombies.groups[0].parent_pid, Some(1));
+    assert_eq!(zombies.groups[0].parent_name.as_deref(), Some("systemd"));
+    assert_eq!(zombies.groups[0].processes[0].pid, 44);
+    assert_eq!(zombies.groups[0].processes[0].command, "worker --queue");
+}
+
+#[test]
+fn large_zombie_view_is_bounded_by_the_projection_budget() {
+    let mut fixture = Fixture::new();
+    fixture.session.view = ViewKind::Zombies;
+    fixture.effective.runtime.max_projection_bytes = 8 * 1024;
+    fixture.snapshot.process_table = Arc::new(ProcessTable {
+        zombies: (1..=1024)
+            .map(|pid| ZombieProcess {
+                pid,
+                parent_pid: Some(1),
+                name: format!("zombie-{pid}"),
+                command: "x".repeat(240),
+                parent_name: Some("systemd".into()),
+            })
+            .collect(),
+        ..ProcessTable::default()
+    });
+
+    let (model, measured) = build_view_model_measured(&fixture.context());
+    let zombies = model.modules.zombies.as_deref().unwrap();
+    let shown = zombies
+        .groups
+        .iter()
+        .map(|group| group.processes.len())
+        .sum::<usize>();
+    assert!(measured <= 8 * 1024, "projection is {measured} bytes");
+    assert_eq!(zombies.total_processes, 1024);
+    assert!(shown < 1024);
+    assert!(zombies.truncated);
 }
 
 #[test]

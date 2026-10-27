@@ -784,11 +784,11 @@ fn tab_clicks_and_keys_switch_views() {
         ViewKind::History,
         "bursts build on the staged view and skip hidden views"
     );
-    // 0 is not a view key, and Tab wraps from the last offered tab,
-    // Power, to the overview (D-75).
+    // 0 selects the tenth tab; Tab wraps from it to the overview (D-75).
     let sent = harness.submitted().len();
     harness.keys(&[key('0')]);
-    assert_eq!(harness.submitted().len(), sent, "0 is not a view key");
+    assert!(harness.submitted().len() > sent);
+    assert_eq!(harness.last_session().0, ViewKind::Zombies);
     harness.keys(&[key('6')]);
     assert_eq!(harness.last_session().0, ViewKind::Nodes);
     harness.keys(&[key('7')]);
@@ -797,6 +797,8 @@ fn tab_clicks_and_keys_switch_views() {
     assert_eq!(harness.last_session().0, ViewKind::Tokens);
     harness.keys(&[key('9')]);
     assert_eq!(harness.last_session().0, ViewKind::Power);
+    harness.keys(&[key('0')]);
+    assert_eq!(harness.last_session().0, ViewKind::Zombies);
     harness.keys(&[code(KeyCode::Tab)]);
     assert_eq!(harness.last_session().0, ViewKind::Overview, "Tab wraps");
     harness.keys(&[key('5'), code(KeyCode::Tab)]);

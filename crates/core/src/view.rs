@@ -1227,6 +1227,32 @@ pub struct PowerView {
     pub disk: DiskHistory,
 }
 
+/// One zombie group, identified by its parent process ID.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct ZombieGroupView {
+    pub parent_pid: Option<i32>,
+    pub parent_name: Option<String>,
+    pub processes: Vec<ZombieProcessView>,
+}
+
+/// One zombie process shown under its parent group.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ZombieProcessView {
+    pub pid: i32,
+    pub name: String,
+    pub command: String,
+}
+
+/// Zombie processes found in the latest process scan, grouped by parent PID.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct ZombiesView {
+    pub groups: Vec<ZombieGroupView>,
+    pub total_processes: u32,
+    /// The projection budget shortened this list; total_processes remains
+    /// the number found in the complete process scan.
+    pub truncated: bool,
+}
+
 /// The latest polled snapshot of the whole cluster: what the Manager reads
 /// from its [`crate::ports::ClusterSource`] every frame. Bounded (the
 /// poller caps nodes, services, requests and prompt snippets), so
@@ -1261,6 +1287,8 @@ pub struct ModuleViews {
     pub tokens: Option<Arc<TokensView>>,
     /// Built from the history and the live snapshot, for the Power tab.
     pub power: Option<Arc<PowerView>>,
+    /// Built from the live process table for the Zombies tab.
+    pub zombies: Option<Arc<ZombiesView>>,
 }
 
 /// One immutable projection for one session.

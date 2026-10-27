@@ -298,16 +298,16 @@ fn draw_tabs(
     }
     let full: Vec<String> = OFFERED_TABS
         .iter()
-        .enumerate()
-        .map(|(index, tab)| format!(" {} {} ", index + 1, tab.title()))
+        .map(|tab| format!(" {} {} ", tab.shortcut(), tab.title()))
         .collect();
     let total: usize = full.iter().map(|label| display_width(label) + 1).sum();
-    let compact = total > usize::from(area.width);
+    // Keep room for the host and health summary that follows the tabs.
+    let compact = total.saturating_add(100) > usize::from(area.width);
     let mut x = area.x;
     for (index, tab) in OFFERED_TABS.iter().enumerate() {
         let active = Some(*tab) == current;
         let label = if compact && !active {
-            format!(" {} ", index + 1)
+            format!(" {} ", tab.shortcut())
         } else {
             full.get(index).cloned().unwrap_or_default()
         };
@@ -371,16 +371,13 @@ pub fn render_selector(
         Span::styled(
             format!(
                 " ◀ {}/{} {} ▶",
-                tab.number(),
+                tab.shortcut(),
                 OFFERED_TABS.len(),
                 tab.title()
             ),
             palette.title_style(),
         ),
-        Span::styled(
-            format!("  Tab/Shift-Tab · 1-{}", OFFERED_TABS.len()),
-            palette.muted_style(),
-        ),
+        Span::styled("  Tab/Shift-Tab · 1-9,0", palette.muted_style()),
     ]);
     frame
         .buffer_mut()

@@ -28,7 +28,7 @@ const MINIMAL_CORES: usize = 16;
 type TrimStep = fn(&mut ModuleViews, &BudgetHints) -> bool;
 
 /// Ordered from least to most information loss.
-const TRIM_STEPS: [TrimStep; 11] = [
+const TRIM_STEPS: [TrimStep; 23] = [
     halve_trends,
     halve_trends,
     drop_process_overscan,
@@ -40,6 +40,18 @@ const TRIM_STEPS: [TrimStep; 11] = [
     drop_secondary_modules,
     |modules, _| limit_cores(modules, MINIMAL_CORES),
     strip_gpu_details,
+    halve_zombies,
+    halve_zombies,
+    halve_zombies,
+    halve_zombies,
+    halve_zombies,
+    halve_zombies,
+    halve_zombies,
+    halve_zombies,
+    halve_zombies,
+    halve_zombies,
+    halve_zombies,
+    halve_zombies,
 ];
 
 /// Returns the size the projection is accounted at ([`ViewModel::accounted_bytes`]):
@@ -267,11 +279,35 @@ fn strip_gpu_details(modules: &mut ModuleViews, _: &BudgetHints) -> bool {
     changed
 }
 
+fn halve_zombies(modules: &mut ModuleViews, _: &BudgetHints) -> bool {
+    let Some(zombies) = modules.zombies.as_mut() else {
+        return false;
+    };
+    let view = Arc::make_mut(zombies);
+    let count: usize = view.groups.iter().map(|group| group.processes.len()).sum();
+    if count <= 1 {
+        return false;
+    }
+
+    let mut remaining = count / 2;
+    for group in &mut view.groups {
+        let keep = remaining.min(group.processes.len());
+        group.processes.truncate(keep);
+        remaining -= keep;
+    }
+    view.groups.retain(|group| !group.processes.is_empty());
+    view.truncated = true;
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use fox_services_top_core::metric::CanonicalUnit;
-    use fox_services_top_core::view::{CellState, MemoryView, MetricCell, ProcessTrend};
+    use fox_services_top_core::view::{
+        CellState, MemoryView, MetricCell, ProcessTrend, ZombieGroupView, ZombieProcessView,
+        ZombiesView,
+    };
 
     fn trend(points: usize) -> Trend {
         Trend {
@@ -311,6 +347,7 @@ mod tests {
         for step in TRIM_STEPS {
             assert!(!step(&mut modules, &hints));
         }
+
         let missing = MetricCell::missing(CanonicalUnit::Bytes, CellState::Unavailable);
         modules.memory = Some(Arc::new(MemoryView {
             total: missing.clone(),
@@ -335,5 +372,38 @@ mod tests {
         assert_eq!(memory.gpu_resident_trend.points.len(), 32);
         assert_eq!(memory.gpu_process_trends[0].trend.points.len(), 32);
         assert!(clear_trends(&mut modules, &hints));
+    }
+
+    #[test]
+    fn zombie_reduction_keeps_the_found_count_and_marks_the_shortened_list() {
+        let mut modules = ModuleViews {
+            zombies: Some(Arc::new(ZombiesView {
+                groups: vec![ZombieGroupView {
+                    parent_pid: Some(1),
+                    parent_name: Some("init".into()),
+                    processes: (1..=16)
+                        .map(|pid| ZombieProcessView {
+                            pid,
+                            name: format!("zombie-{pid}"),
+                            command: String::new(),
+                        })
+                        .collect(),
+                }],
+                total_processes: 16,
+                truncated: false,
+            })),
+            ..ModuleViews::default()
+        };
+
+        assert!(halve_zombies(
+            &mut modules,
+            &BudgetHints {
+                visible_process_rows: 0,
+            }
+        ));
+        let view = modules.zombies.as_deref().unwrap();
+        assert_eq!(view.total_processes, 16);
+        assert_eq!(view.groups[0].processes.len(), 8);
+        assert!(view.truncated);
     }
 }

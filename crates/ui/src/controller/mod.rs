@@ -526,6 +526,7 @@ impl Controller {
             | ViewKind::Docker
             | ViewKind::Tokens
             | ViewKind::Power
+            | ViewKind::Zombies
             | ViewKind::Processes
             | ViewKind::Sources
             | ViewKind::Actions => {}
@@ -646,6 +647,7 @@ impl Controller {
                 | ViewKind::Docker
                 | ViewKind::Tokens
                 | ViewKind::Power
+                | ViewKind::Zombies
         ) {
             return;
         }

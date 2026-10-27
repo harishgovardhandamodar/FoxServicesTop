@@ -31,6 +31,7 @@ mod settings;
 mod testkit;
 #[cfg(test)]
 mod tests;
+mod zombies;
 
 pub use cell::build_metric_cell;
 pub(crate) use history_charts::history_charts;
@@ -189,7 +190,7 @@ pub fn build_view_model_measured(context: &PresentationContext<'_>) -> (ViewMode
         session: context.session.clone(),
         modules: build_modules(context, &plan, &inputs),
         banners: banners::build_banners(context, &facts),
-        enabled_modules: enabled_module_ids(context.enabled_modules),
+        enabled_modules: enabled_module_ids(context.enabled_modules, context.session.view),
         permit: None,
     };
     let max_bytes = usize::try_from(context.settings.effective.runtime.max_projection_bytes)
@@ -323,6 +324,11 @@ fn build_modules(
     if plan.shows(plan::POWER) {
         modules.power = power::build_power_view(reader, &context.history).map(Arc::new);
     }
+    if plan.shows(plan::ZOMBIES) {
+        modules.zombies = Some(Arc::new(zombies::build_zombies_view(
+            &context.snapshot.process_table,
+        )));
+    }
     // The process actions' state is the session's, not a module's: every
     // projection carries it, so a pending confirmation is a banner in
     // every view (D-91).
@@ -435,10 +441,17 @@ fn build_gpu(context: &PresentationContext<'_>, inputs: &ModuleInputs<'_>) -> Gp
 
 /// The enabled built-in modules; a retired id a saved file still enables
 /// is left out (D-91).
-fn enabled_module_ids(enabled: &[String]) -> Vec<ModuleId> {
-    enabled
+fn enabled_module_ids(enabled: &[String], view: ViewKind) -> Vec<ModuleId> {
+    let mut ids: Vec<ModuleId> = enabled
         .iter()
         .filter(|module| BUILTIN_MODULES.contains(&module.as_str()))
         .filter_map(|module| ModuleId::new(module.as_str()).ok())
-        .collect()
+        .collect();
+    if view == ViewKind::Zombies
+        && !ids.iter().any(|module| module.as_str() == plan::ZOMBIES)
+        && let Ok(module) = ModuleId::new(plan::ZOMBIES)
+    {
+        ids.push(module);
+    }
+    ids
 }

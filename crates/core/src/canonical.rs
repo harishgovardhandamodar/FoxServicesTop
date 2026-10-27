@@ -358,12 +358,26 @@ pub struct ProcessDescendants {
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct ProcessTable {
     pub rows: Vec<ProcessRow>,
+    /// Zombie processes found in the process scan, independent of the
+    /// configured limit on the regular process rows.
+    #[serde(default)]
+    pub zombies: Vec<ZombieProcess>,
     /// More processes existed than `max_processes`; a stable-priority subset is kept.
     pub truncated: bool,
     pub gpu_links_truncated: bool,
     pub total_seen: u32,
     pub read_finished_boot_ns: u64,
     pub cycle_id: u64,
+}
+
+/// One zombie process and the parent identity available in the same scan.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ZombieProcess {
+    pub pid: i32,
+    pub parent_pid: Option<i32>,
+    pub name: String,
+    pub command: String,
+    pub parent_name: Option<String>,
 }
 
 /// Previous counter reading for exact delta computation.

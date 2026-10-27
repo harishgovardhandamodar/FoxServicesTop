@@ -10,7 +10,8 @@ use fox_services_top_core::identity::ModuleId;
 use fox_services_top_core::quality::SampleKind;
 use fox_services_top_core::view::{
     Banner, BannerLevel, CellState, ClusterNodeView, ClusterView, DiskHistory, ModuleViews,
-    OVERVIEW_GPU_CHART_ROWS, OverloadState, ViewModel,
+    OVERVIEW_GPU_CHART_ROWS, OverloadState, ViewModel, ZombieGroupView, ZombieProcessView,
+    ZombiesView,
 };
 use ratatui::Frame;
 use ratatui::Terminal;
@@ -816,6 +817,52 @@ fn overview_shows_the_local_machine_when_remote_monitoring_is_disabled() {
     );
     assert!(rendered.contains("dgx-test (local)"), "{}", rendered.text());
     assert!(rendered.contains("41.0"), "{}", rendered.text());
+}
+
+#[test]
+fn zombies_tab_groups_processes_by_parent_pid() {
+    let mut fixture = model(ViewKind::Zombies);
+    fixture.modules.zombies = Some(Arc::new(ZombiesView {
+        groups: vec![ZombieGroupView {
+            parent_pid: Some(1),
+            parent_name: Some("systemd".into()),
+            processes: vec![
+                ZombieProcessView {
+                    pid: 44,
+                    name: "worker-a".into(),
+                    command: "worker --queue a".into(),
+                },
+                ZombieProcessView {
+                    pid: 45,
+                    name: "worker-b".into(),
+                    command: "worker --queue b".into(),
+                },
+            ],
+        }],
+        total_processes: 2,
+        truncated: false,
+    }));
+
+    let rendered = render(&fixture, (120, 24));
+    for text in [
+        "Zombie Processes · 2 in 1 parent groups",
+        "PPID 1 · systemd · 2 zombie(s)",
+        "PID     44  worker-a · worker --queue a",
+        "PID     45  worker-b · worker --queue b",
+    ] {
+        assert!(
+            rendered.contains(text),
+            "missing {text:?}\n{}",
+            rendered.text()
+        );
+    }
+    assert!(
+        rendered
+            .report
+            .rendered_modules
+            .contains(&"zombies".to_owned()),
+        "the Zombies tab should render its detail module"
+    );
 }
 
 #[test]

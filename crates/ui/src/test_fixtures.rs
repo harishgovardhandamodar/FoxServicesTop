@@ -24,7 +24,7 @@ use fox_services_top_core::view::{
     LastGoodView, MemoryView, MetricCell, ModuleViews, NetworkView, OverloadState, PowerRowView,
     PowerView, PowerWindowView, ProcessGpuView, ProcessRowView, ProcessesView, RecentRequestView,
     ServiceModelView, ServiceRowView, ServicesView, SessionState, SettingField, SettingsView,
-    Trend, ViewModel,
+    Trend, ViewModel, ZombiesView,
 };
 
 /// Fox-Services rows: one live service with a model, one recent request.
@@ -1086,6 +1086,7 @@ pub(crate) fn full_modules(with_confirmation: bool) -> ModuleViews {
         docker: None,
         tokens: None,
         power: Some(Arc::new(power_view())),
+        zombies: Some(Arc::new(ZombiesView::default())),
     }
 }
 

@@ -215,6 +215,7 @@ const FILTER_VIEWS: &[ViewKind] = &[
     ViewKind::Docker,
     ViewKind::Tokens,
     ViewKind::Power,
+    ViewKind::Zombies,
 ];
 /// The single-page polled views, scrolled with `j`/`k`.
 const SCROLL_VIEWS: &[ViewKind] = &[
@@ -222,6 +223,7 @@ const SCROLL_VIEWS: &[ViewKind] = &[
     ViewKind::Docker,
     ViewKind::Tokens,
     ViewKind::Power,
+    ViewKind::Zombies,
 ];
 /// Views whose charts follow the history bar sizes (`w`/`W`).
 const BAR_VIEWS: &[ViewKind] = &[ViewKind::History, ViewKind::Power];
@@ -270,6 +272,7 @@ pub static KEYMAP: &[KeyBinding] = &[
     binding("7", "Fox-Services (all nodes)", None, Section::Views, ModeSet::NORMAL, ViewScope::All, &[KeyPattern::char('7')], KeyAction::ShowTab(Tab::Docker)),
     binding("8", "Tokens (ingress / egress by app and model)", None, Section::Views, ModeSet::NORMAL, ViewScope::All, &[KeyPattern::char('8')], KeyAction::ShowTab(Tab::Tokens)),
     binding("9", "Power (watts timeline and kWh)", None, Section::Views, ModeSet::NORMAL, ViewScope::All, &[KeyPattern::char('9')], KeyAction::ShowTab(Tab::Power)),
+    binding("0", "Zombie processes grouped by parent PID", None, Section::Views, ModeSet::NORMAL, ViewScope::All, &[KeyPattern::char('0')], KeyAction::ShowTab(Tab::Zombies)),
     binding("j/↓", "scroll down", None, Section::Views, ModeSet::NORMAL, ViewScope::Only(SCROLL_VIEWS), &[KeyPattern::char('j'), KeyPattern::key(KeyCode::Down)], KeyAction::ScrollDetailDown),
     binding("k/↑", "scroll up", None, Section::Views, ModeSet::NORMAL, ViewScope::Only(SCROLL_VIEWS), &[KeyPattern::char('k'), KeyPattern::key(KeyCode::Up)], KeyAction::ScrollDetailUp),
     binding("j/↓", "select next", None, Section::Navigation, ModeSet::NORMAL, ViewScope::Only(LIST_VIEWS), &[KeyPattern::char('j'), KeyPattern::key(KeyCode::Down)], KeyAction::MoveDown),

@@ -371,7 +371,11 @@ fn validate_view(
         // series to validate, and the filter narrows their tables.
         // The Power tab draws the history's power charts: the filter
         // narrows its tables like the cluster tabs'.
-        ViewKind::Nodes | ViewKind::Docker | ViewKind::Tokens | ViewKind::Power => Ok(()),
+        ViewKind::Nodes
+        | ViewKind::Docker
+        | ViewKind::Tokens
+        | ViewKind::Power
+        | ViewKind::Zombies => Ok(()),
         ViewKind::Processes | ViewKind::Sources | ViewKind::Actions => Err(ErrorDetail::new(
             ErrorCode::Unsupported,
             format!(

@@ -8,7 +8,7 @@
 //! The view kinds are fixed by the command contract, so the two history
 //! tabs are one view, `History`, on two pages of its module: the overview's
 //! resources and the GPU processes (D-75). The Nodes and Docker tabs show
-//! the fox-services cluster (one view each, single page).
+//! the fox-services cluster; Zombies has its own single-page process table.
 
 use fox_services_top_core::commands::ViewKind;
 
@@ -24,10 +24,11 @@ pub enum Tab {
     Docker,
     Tokens,
     Power,
+    Zombies,
 }
 
-/// Offered tabs in order; the digit keys 1–9 follow this order.
-pub const OFFERED_TABS: [Tab; 9] = [
+/// Offered tabs in order; digit keys 1–9 and 0 follow this order.
+pub const OFFERED_TABS: [Tab; 10] = [
     Tab::Overview,
     Tab::Gpu,
     Tab::OverviewHistory,
@@ -37,6 +38,7 @@ pub const OFFERED_TABS: [Tab; 9] = [
     Tab::Docker,
     Tab::Tokens,
     Tab::Power,
+    Tab::Zombies,
 ];
 
 /// Page of the history module the process history opens on (the list).
@@ -53,6 +55,7 @@ impl Tab {
             Self::Docker => ViewKind::Docker,
             Self::Tokens => ViewKind::Tokens,
             Self::Power => ViewKind::Power,
+            Self::Zombies => ViewKind::Zombies,
         }
     }
 
@@ -67,6 +70,7 @@ impl Tab {
             Self::Docker => "Fox-Services",
             Self::Tokens => "Tokens",
             Self::Power => "Power",
+            Self::Zombies => "Zombies",
         }
     }
 
@@ -82,6 +86,7 @@ impl Tab {
             Self::Docker => "tab.docker",
             Self::Tokens => "tab.tokens",
             Self::Power => "tab.power",
+            Self::Zombies => "tab.zombies",
         }
     }
 
@@ -104,16 +109,36 @@ impl Tab {
             ViewKind::Docker => Some(Self::Docker),
             ViewKind::Tokens => Some(Self::Tokens),
             ViewKind::Power => Some(Self::Power),
+            ViewKind::Zombies => Some(Self::Zombies),
             ViewKind::Processes | ViewKind::Sources | ViewKind::Actions => None,
         }
     }
 
-    /// 1-based tab number.
+    /// 1-based tab number, with the tenth tab selected by `0`.
     pub fn number(self) -> usize {
         OFFERED_TABS
             .iter()
             .position(|offered| *offered == self)
             .map_or(1, |index| index + 1)
+    }
+
+    /// Keyboard shortcut shown in the tab strip.
+    pub fn shortcut(self) -> &'static str {
+        match self {
+            Self::Zombies => "0",
+            _ => match self.number() {
+                1 => "1",
+                2 => "2",
+                3 => "3",
+                4 => "4",
+                5 => "5",
+                6 => "6",
+                7 => "7",
+                8 => "8",
+                9 => "9",
+                _ => "",
+            },
+        }
     }
 }
 
@@ -146,7 +171,10 @@ mod tests {
         assert_eq!(Tab::Docker.number(), 7);
         assert_eq!(Tab::Tokens.number(), 8);
         assert_eq!(Tab::Power.number(), 9);
+        assert_eq!(Tab::Zombies.number(), 10);
+        assert_eq!(Tab::Zombies.shortcut(), "0");
         assert_eq!(Tab::of(ViewKind::Power, 0), Some(Tab::Power));
+        assert_eq!(Tab::of(ViewKind::Zombies, 0), Some(Tab::Zombies));
         assert_eq!(Tab::Power.view(), ViewKind::Power);
         assert_eq!(Tab::of(ViewKind::Tokens, 0), Some(Tab::Tokens));
         assert_eq!(Tab::Tokens.view(), ViewKind::Tokens);
@@ -155,8 +183,9 @@ mod tests {
         assert_eq!(Tab::Nodes.view(), ViewKind::Nodes);
         assert_eq!(Tab::Docker.view(), ViewKind::Docker);
         assert_eq!(next_tab(Some(Tab::Tokens)), Tab::Power);
-        assert_eq!(next_tab(Some(Tab::Power)), Tab::Overview);
-        assert_eq!(previous_tab(Some(Tab::Overview)), Tab::Power);
+        assert_eq!(next_tab(Some(Tab::Power)), Tab::Zombies);
+        assert_eq!(next_tab(Some(Tab::Zombies)), Tab::Overview);
+        assert_eq!(previous_tab(Some(Tab::Overview)), Tab::Zombies);
     }
 
     /// The two history tabs are one view on two pages (D-75).

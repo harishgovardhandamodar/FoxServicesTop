@@ -20,7 +20,7 @@ use std::collections::BTreeMap;
 
 use fox_services_top_core::canonical::{
     CollectionBatch, CollectionPlan, CounterBase, DescendantTicks, GpuUsageKind, ProcessBase,
-    ProcessDescendants, ProcessGpuLink, ProcessRow, ProcessTable, RejectReason,
+    ProcessDescendants, ProcessGpuLink, ProcessRow, ProcessTable, RejectReason, ZombieProcess,
 };
 use fox_services_top_core::clock::NANOS_PER_SECOND;
 use fox_services_top_core::identity::{
@@ -93,6 +93,7 @@ fn collect_processes(session: &mut Session<'_>) {
     }
     let clk_tck = clk_tck(session);
     let samples = host_samples(session);
+    let zombies = zombie_processes(&samples);
     let tree = ProcessTree::of(
         samples
             .iter()
@@ -110,7 +111,7 @@ fn collect_processes(session: &mut Session<'_>) {
     attach_descendants(session, &mut rows, &tree, clk_tck);
     rows.sort_by(priority);
     prune_bases(session, &rows);
-    let table = bounded_table(session, rows);
+    let table = bounded_table(session, rows, zombies);
     session.set_process_table(table);
 }
 
@@ -182,6 +183,36 @@ fn host_samples<'a>(session: &mut Session<'a>) -> BTreeMap<ProcessKey, HostSampl
         }
     }
     samples
+}
+
+fn zombie_processes(samples: &BTreeMap<ProcessKey, HostSample<'_>>) -> Vec<ZombieProcess> {
+    let names_by_pid: BTreeMap<i32, String> = samples
+        .iter()
+        .map(|(key, sample)| {
+            let (name, _) =
+                naming::split_process_channel(&sample.record.observation.provenance.channel);
+            (key.pid.get(), sanitize_command_name(name))
+        })
+        .collect();
+
+    samples
+        .iter()
+        .filter(|&(_, sample)| sample.stat.state == Some('Z'))
+        .map(|(key, sample)| {
+            let (name, command) =
+                naming::split_process_channel(&sample.record.observation.provenance.channel);
+            ZombieProcess {
+                pid: key.pid.get(),
+                parent_pid: sample.stat.ppid,
+                name: sanitize_command_name(name),
+                command: sanitize_display(command, naming::MAX_CHANNEL_BYTES),
+                parent_name: sample
+                    .stat
+                    .ppid
+                    .and_then(|parent_pid| names_by_pid.get(&parent_pid).cloned()),
+            }
+        })
+        .collect()
 }
 
 /// One host row plus the next CPU tick base of the process.
@@ -570,7 +601,11 @@ fn prune_bases(session: &mut Session<'_>, rows: &[ProcessRow]) {
     }
 }
 
-fn bounded_table(session: &Session<'_>, mut rows: Vec<ProcessRow>) -> ProcessTable {
+fn bounded_table(
+    session: &Session<'_>,
+    mut rows: Vec<ProcessRow>,
+    zombies: Vec<ZombieProcess>,
+) -> ProcessTable {
     let limits = session.plan().limits;
     let max_rows = usize::try_from(limits.max_processes).unwrap_or(usize::MAX);
     let max_links = usize::try_from(limits.max_process_gpu_links).unwrap_or(usize::MAX);
@@ -594,6 +629,7 @@ fn bounded_table(session: &Session<'_>, mut rows: Vec<ProcessRow>) -> ProcessTab
             .max()
             .unwrap_or(0),
         rows,
+        zombies,
         truncated,
         gpu_links_truncated,
         total_seen,

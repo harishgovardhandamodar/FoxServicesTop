@@ -660,7 +660,8 @@
                 "nodes",
                 "docker",
                 "tokens",
-                "power"
+                "power",
+                "zombies"
               ]
             },
             "selected_entity_id": {

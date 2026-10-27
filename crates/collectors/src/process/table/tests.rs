@@ -10,6 +10,8 @@ use fox_services_top_core::quality::{Quality, ReadStatus, SampleKind};
 use fox_services_top_core::testing::metric_key;
 
 use super::*;
+
+mod zombies;
 use crate::testkit::{PlanBuilder, SECOND, catalog, collect, host_entity, limits, reading};
 
 const NS: &str = "pid:[4026531836]";

@@ -322,6 +322,7 @@ pub const fn detail_module_id(view: ViewKind) -> Option<&'static str> {
         ViewKind::Docker => Some("docker"),
         ViewKind::Tokens => Some("tokens"),
         ViewKind::Power => Some("power"),
+        ViewKind::Zombies => Some("zombies"),
         ViewKind::Overview | ViewKind::Processes | ViewKind::Sources | ViewKind::Actions => None,
     }
 }

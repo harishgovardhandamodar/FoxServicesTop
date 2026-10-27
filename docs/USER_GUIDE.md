@@ -183,7 +183,7 @@ path. `install.sh` installs neither unit.
 
 | Key | Action |
 |---|---|
-| `1`–`7`, `Tab`, `Shift-Tab` | Overview, GPU, Overview History, Process History, Settings, Nodes, Docker |
+| `1`–`9`, `0`, `Tab`, `Shift-Tab` | Overview, GPU, Overview History, Process History, Settings, Nodes, Fox-Services, Tokens, Power, Zombies |
 | `q`, `Ctrl-C` | Quit (`q` is text while typing a filter) |
 | `?`, `F1` | Help |
 | `+` / `-` | Faster / slower sampling |
@@ -252,6 +252,16 @@ Read-only — it only watches. `/` filters both tables by service or model;
 `j`/`k` scroll the recent requests.
 
 <img src="images/screenshots/workstation-services.png" alt="Fox-Services tab: live service-to-model table with request and token counts, then recent LLM requests with attribution" width="100%">
+
+## The Zombies tab (0)
+
+Shows zombie processes found on the machine running fox-services-top, grouped by parent PID.
+Each group lists zombie PIDs, process names and any available command lines. `/` filters by
+parent PID, child PID, name or command; `j`/`k` scroll the list.
+
+The local process scan covers up to 4,096 PIDs per poll. This tab does not aggregate processes
+from the configured LAN nodes. A zombie has already exited and cannot be killed with a signal;
+identify and address the parent process so it can reap its children.
 
 ## Monitoring your nodes
 
