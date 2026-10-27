@@ -33,20 +33,22 @@ The socket lives at `$XDG_STATE_HOME/fox-services-top/v2/attach.sock`
 (`~/.local/state/fox-services-top/v2/attach.sock` by default), mode `0600`
 inside the `0700` state directory — only your own user can attach.
 
-## Option A: a systemd user service (recommended)
+## Option A: a user service (recommended)
 
-The unit template ships at
-[`packaging/systemd/fox-services-top.service`](../packaging/systemd/fox-services-top.service).
-It starts the collector on login, and at boot once lingering is on. No root,
-no terminal.
+On Linux that is a systemd **user** service; on macOS a launchd agent. The
+templates ship at
+[`packaging/systemd/fox-services-top.service`](../packaging/systemd/fox-services-top.service)
+and
+[`packaging/macos/me.harishgovardhandamodar.fox-services-top.plist`](../packaging/macos/me.harishgovardhandamodar.fox-services-top.plist).
+They start the collector on login. No root, no terminal.
 
-The unit runs `%h/.local/bin/fox-services-top --daemon` — `install.sh`'s
+The Linux unit runs `%h/.local/bin/fox-services-top --daemon` — `install.sh`'s
 default location. If your binary lives elsewhere, edit `ExecStart=` first.
 `install.sh` does not install this file; it is a manual template. The source
 installer does it for you:
 
 ```bash
-./install-from-source.sh --service     # build, install and enable the unit
+./install-from-source.sh --service     # build, install and enable the unit (Linux) or agent (macOS)
 ```
 
 Or by hand:
@@ -92,9 +94,32 @@ The unit runs as your user, so the kernel's root-only powercap/RAPL energy
 counters are not read — the CPU power and the CPU + GPU total stay hidden. Grant
 read access once with the udev rule described under "CPU power without root" in
 the [user guide](USER_GUIDE.md) (`install-from-source.sh --cpu-power` does it for
-you); the running collector picks the counters up on its own. The app's own log,
+you); the running collector picks the counters up on its own. On macOS,
+`powermetrics` samplers also require root and remain unavailable to the user
+service. The app's own log,
 `~/.local/state/fox-services-top/v2/fox-services-top.log`, records what the
 collector does.
+
+### On macOS: the launchd agent
+
+```bash
+mkdir -p ~/Library/LaunchAgents
+curl -fsSL https://raw.githubusercontent.com/harishgovardhandamodar/FoxServicesTop/master/packaging/macos/me.harishgovardhandamodar.fox-services-top.plist \
+  -o ~/Library/LaunchAgents/me.harishgovardhandamodar.fox-services-top.plist
+# If the binary is not in ~/.local/bin, edit ProgramArguments in that file first.
+
+launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/me.harishgovardhandamodar.fox-services-top.plist
+```
+
+| Task | Command |
+|---|---|
+| Is it running? | `launchctl print "gui/$(id -u)/me.harishgovardhandamodar.fox-services-top"` |
+| Stop | `launchctl bootout "gui/$(id -u)/me.harishgovardhandamodar.fox-services-top"` |
+| Start again | `launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/me.harishgovardhandamodar.fox-services-top.plist` |
+
+The agent starts at login (`RunAtLoad` + `KeepAlive`) and appends the
+collector's output to `~/Library/Logs/fox-services-top.log`.
+`install.sh` does not install the agent.
 
 ## Option B: run it by hand
 

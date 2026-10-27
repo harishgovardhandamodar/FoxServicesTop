@@ -469,10 +469,13 @@ mod tests {
 
     impl Scratch {
         fn new(label: &str) -> Self {
+            // Short directory: macOS unix sockets are limited to 104 bytes
+            // (`sun_path`), so the label and a short unique suffix must
+            // leave room for the socket file name.
             let dir = std::env::temp_dir().join(format!(
-                "fox-services-top-attach-{}-{label}-{}",
+                "fst-a-{}-{label}-{}",
                 std::process::id(),
-                uuid::Uuid::new_v4().simple()
+                &uuid::Uuid::new_v4().simple().to_string()[..8]
             ));
             std::fs::create_dir_all(&dir).unwrap();
             Self(dir)

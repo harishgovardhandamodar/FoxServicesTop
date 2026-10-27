@@ -2,7 +2,11 @@
 //! (`sleep`). No other process is ever signalled: PID 1 and our own PID are
 //! refused by policy before any system call, and every child is killed and
 //! reaped by its guard even when an assertion fails.
-
+//!
+//! Linux-only: pidfd(2), `/proc/<pid>` identity files and PID namespaces do
+//! not exist on macOS, where the adapter degrades to `ENOSYS`/unsupported
+//! (covered by the `pidfd` unit tests instead).
+#![cfg(target_os = "linux")]
 // Test-only crate: a broken fixture must panic loudly, also in helpers.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 

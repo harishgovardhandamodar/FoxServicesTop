@@ -1,4 +1,5 @@
-//! Registry: manifests and construction of the seven live adapters.
+//! Registry: manifests and construction of the live adapters (seven on
+//! Linux, the single native `macos` adapter on Apple Silicon).
 
 use fox_services_top_adapters::registry::{
     AdapterOptions, LIVE_ADAPTERS, RegistryError, build_live_adapter, live_manifest,
@@ -8,10 +9,25 @@ use fox_services_top_core::observation::{AdapterOperation, Isolation};
 use fox_services_top_core::quality::Namespace;
 use fox_services_top_core::testing::{FakeClock, host_id};
 
+/// Live adapters per target: seven kernel/driver adapters on Linux, the
+/// single native adapter on macOS.
+#[cfg(target_os = "macos")]
+const EXPECTED_LIVE: [&str; 1] = [adapters::MACOS];
+#[cfg(not(target_os = "macos"))]
+const EXPECTED_LIVE: [&str; 7] = [
+    adapters::PROCFS,
+    adapters::HWMON,
+    adapters::THERMAL,
+    adapters::POWERCAP,
+    adapters::NVML,
+    adapters::NETWORK,
+    adapters::FILESYSTEM,
+];
+
 #[test]
 fn live_adapter_list_is_the_naming_contract() {
     assert_eq!(LIVE_ADAPTERS, adapters::LIVE);
-    assert_eq!(LIVE_ADAPTERS.len(), 7);
+    assert_eq!(LIVE_ADAPTERS, EXPECTED_LIVE);
 }
 
 #[test]
@@ -24,7 +40,13 @@ fn every_live_manifest_is_valid_and_kernel_adapters_follow_the_contract() {
         assert_eq!(manifest.max_inflight, 1);
         assert_eq!(manifest.sample_namespace, Namespace::Live);
     }
-    for (adapter, minimum) in [("procfs", 100), ("network", 100), ("filesystem", 1000)] {
+    for (adapter, minimum) in [
+        ("procfs", 100),
+        ("network", 100),
+        ("filesystem", 1000),
+        #[cfg(target_os = "macos")]
+        ("macos", 1000),
+    ] {
         let manifest = live_manifest(adapter).unwrap();
         assert_eq!(manifest.minimum_sample_ms, minimum, "{adapter}");
         assert_eq!(manifest.runtime_library, None);

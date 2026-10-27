@@ -155,7 +155,9 @@ fn the_current_frequency_is_the_averaged_one_where_the_kernel_offers_it() {
         "{:?}",
         current.reason_codes
     );
-    files.inject(&average(1), 11);
+    // `EAGAIN` by number: an idle CPU has no recent counter sample. The
+    // libc constant keeps the test portable (11 on Linux, 35 on macOS).
+    files.inject(&average(1), libc::EAGAIN);
     clock.advance_ms(1_000);
     let batches = read_all(&mut adapter, ADAPTER, "cpu", 2);
     assert_eq!(batches[0].status, BatchStatus::Ok);

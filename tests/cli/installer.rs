@@ -16,10 +16,21 @@ use super::BINARY;
 const INSTALLER: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../install.sh");
 
 fn release_target() -> &'static str {
+    match (std::env::consts::OS, std::env::consts::ARCH) {
+        ("linux", "x86_64") => "x86_64-unknown-linux-gnu",
+        ("linux", "aarch64") => "aarch64-unknown-linux-gnu",
+        ("macos", "aarch64") => "aarch64-apple-darwin",
+        (os, arch) => panic!("no release target for {os}/{arch}"),
+    }
+}
+
+/// The Linux build for this CPU: the pinned-Linux tests (musl, WSL) fake
+/// `uname -s`, so the archive must use the Linux triple even on macOS.
+fn linux_target() -> &'static str {
     match std::env::consts::ARCH {
         "x86_64" => "x86_64-unknown-linux-gnu",
         "aarch64" => "aarch64-unknown-linux-gnu",
-        other => panic!("no release target for {other}"),
+        arch => panic!("no linux target for {arch}"),
     }
 }
 
@@ -64,16 +75,20 @@ impl Sandbox {
         self.install_dir().join("fox-services-top.previous")
     }
 
-    fn archive_path(&self, tag: &str) -> PathBuf {
-        self.release_dir().join(format!(
-            "fox-services-top-{tag}-{}.tar.gz",
-            release_target()
-        ))
+    fn archive_path_as(&self, tag: &str, target: &str) -> PathBuf {
+        self.release_dir()
+            .join(format!("fox-services-top-{tag}-{target}.tar.gz"))
     }
 
     /// Publishes `binary` (plus `extra` entries) as the archive of `tag`,
     /// with a matching `SHA256SUMS`.
     fn publish(&self, tag: &str, binary: &Path, extra: &[&str]) {
+        self.publish_as(tag, binary, extra, release_target());
+    }
+
+    /// Like [`Sandbox::publish`] with an explicit target triple (the
+    /// pinned-Linux tests fake `uname -s` on every host).
+    fn publish_as(&self, tag: &str, binary: &Path, extra: &[&str], target: &str) {
         let staging = self.root.join("staging");
         std::fs::copy(binary, staging.join("fox-services-top")).unwrap();
         let mut entries = vec!["fox-services-top".to_owned()];
@@ -81,7 +96,7 @@ impl Sandbox {
             std::fs::write(staging.join(name), b"extra").unwrap();
             entries.push((*name).to_owned());
         }
-        let archive = self.archive_path(tag);
+        let archive = self.archive_path_as(tag, target);
         let status = Command::new("tar")
             .arg("-czf")
             .arg(&archive)
@@ -91,13 +106,24 @@ impl Sandbox {
             .status()
             .unwrap();
         assert!(status.success(), "tar failed");
+        // `sha256sum` on Linux, `shasum -a 256` on stock macOS.
         let sums = Command::new("sha256sum")
             .arg(archive.file_name().unwrap())
             .current_dir(self.release_dir())
             .output()
             .unwrap();
-        assert!(sums.status.success(), "sha256sum failed");
-        std::fs::write(self.release_dir().join("SHA256SUMS"), sums.stdout).unwrap();
+        let sums = if sums.status.success() {
+            sums.stdout
+        } else {
+            let fallback = Command::new("shasum")
+                .args(["-a", "256", &archive.file_name().unwrap().to_string_lossy()])
+                .current_dir(self.release_dir())
+                .output()
+                .unwrap();
+            assert!(fallback.status.success(), "shasum failed");
+            fallback.stdout
+        };
+        std::fs::write(self.release_dir().join("SHA256SUMS"), sums).unwrap();
     }
 
     /// Places an executable script named `name` first on PATH.
@@ -116,19 +142,27 @@ impl Sandbox {
         );
     }
 
-    /// A fake `uname` that answers `flag` with `value` and passes every other
-    /// question to the real `uname`.
-    fn pretend_uname(&self, flag: &str, value: &str) {
+    /// A fake `uname` that answers each `flag` in `answers` with its value
+    /// and passes every other question to the real `uname`.
+    fn pretend_unames(&self, answers: &[(&str, &str)]) {
         let real = ["/usr/bin/uname", "/bin/uname"]
             .into_iter()
             .find(|path| Path::new(path).exists())
             .expect("a real uname");
-        self.add_tool(
-            "uname",
-            &format!(
-                "#!/bin/sh\nif [ \"$1\" = '{flag}' ]; then echo '{value}'; exit 0; fi\nexec {real} \"$@\"\n"
-            ),
-        );
+        let mut script = String::from("#!/bin/sh\n");
+        for (flag, value) in answers {
+            script.push_str(&format!(
+                "if [ \"$1\" = '{flag}' ]; then echo '{value}'; exit 0; fi\n"
+            ));
+        }
+        script.push_str(&format!("exec {real} \"$@\"\n"));
+        self.add_tool("uname", &script);
+    }
+
+    /// A fake `uname` that answers `flag` with `value` and passes every other
+    /// question to the real `uname`.
+    fn pretend_uname(&self, flag: &str, value: &str) {
+        self.pretend_unames(&[(flag, value)]);
     }
 
     /// A "binary" that reports this version and target, then far more lines
@@ -209,6 +243,21 @@ impl Drop for Sandbox {
     fn drop(&mut self) {
         let _ = std::fs::remove_dir_all(&self.root);
     }
+}
+
+/// A script standing in for a Linux binary's `--version --verbose` report
+/// (used where the pinned-Linux branch runs on a non-Linux host).
+#[cfg(not(target_os = "linux"))]
+fn linux_report_stub(sandbox: &Sandbox) -> PathBuf {
+    let path = sandbox.root.join("linux-report-stub");
+    let script = format!(
+        "#!/bin/sh\nif [ \"$1\" = '--version' ] && [ \"$2\" = '--verbose' ]; then\n  echo 'fox-services-top {v}'\n  echo 'target: {t}'\nelse\n  echo 'fox-services-top {v}'\nfi\n",
+        v = env!("CARGO_PKG_VERSION"),
+        t = linux_target()
+    );
+    std::fs::write(&path, script).unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+    path
 }
 
 fn reported_version(binary: &Path) -> String {
@@ -380,8 +429,10 @@ fn an_archive_with_more_than_the_binary_is_refused() {
 #[test]
 fn musl_hosts_are_refused_without_a_fallback() {
     let sandbox = Sandbox::new("musl");
+    // musl is a Linux-only concept: pin the Linux branch on every host.
+    sandbox.pretend_unames(&[("-s", "Linux")]);
     sandbox.pretend_musl();
-    sandbox.publish(&current_tag(), Path::new(BINARY), &[]);
+    sandbox.publish_as(&current_tag(), Path::new(BINARY), &[], linux_target());
     let refused = sandbox.install(&current_tag());
     assert!(!refused.status.success());
     assert!(
@@ -419,13 +470,16 @@ fn rollback_without_a_previous_binary_fails_cleanly() {
 
 #[test]
 fn non_linux_hosts_are_refused_before_anything_is_installed() {
-    let sandbox = Sandbox::new("darwin");
-    sandbox.pretend_uname("-s", "Darwin");
+    let sandbox = Sandbox::new("unsupported-os");
+    // Neither the Linux nor the macOS branch accepts this system; Darwin
+    // itself is a supported host and is covered by every other test on it.
+    sandbox.pretend_uname("-s", "FreeBSD");
     sandbox.publish(&current_tag(), Path::new(BINARY), &[]);
     let refused = sandbox.install(&current_tag());
     assert!(!refused.status.success());
     assert!(
-        stderr_of(&refused).contains("fox-services-top supports Linux only (found Darwin)"),
+        stderr_of(&refused)
+            .contains("supports Linux and macOS (Apple Silicon) only (found FreeBSD)"),
         "{}",
         stderr_of(&refused)
     );
@@ -435,8 +489,9 @@ fn non_linux_hosts_are_refused_before_anything_is_installed() {
 #[test]
 fn wsl1_hosts_are_refused() {
     let sandbox = Sandbox::new("wsl1");
-    sandbox.pretend_uname("-r", "4.4.0-19041-Microsoft");
-    sandbox.publish(&current_tag(), Path::new(BINARY), &[]);
+    // WSL is a Linux-only concept: pin the Linux branch on every host.
+    sandbox.pretend_unames(&[("-s", "Linux"), ("-r", "4.4.0-19041-Microsoft")]);
+    sandbox.publish_as(&current_tag(), Path::new(BINARY), &[], linux_target());
     let refused = sandbox.install(&current_tag());
     assert!(!refused.status.success());
     assert!(
@@ -450,12 +505,43 @@ fn wsl1_hosts_are_refused() {
 #[test]
 fn wsl2_hosts_get_the_linux_build_and_a_driver_note() {
     let sandbox = Sandbox::new("wsl2");
-    sandbox.pretend_uname("-r", "5.15.153.1-microsoft-standard-WSL2");
-    sandbox.publish(&current_tag(), Path::new(BINARY), &[]);
+    // WSL is a Linux-only concept: pin the Linux branch on every host.
+    sandbox.pretend_unames(&[
+        ("-s", "Linux"),
+        ("-r", "5.15.153.1-microsoft-standard-WSL2"),
+    ]);
+    // The archived binary must report the pinned Linux target: the real
+    // binary on Linux, a script with the matching report on macOS (where the
+    // real binary reports the Darwin target).
+    #[cfg(target_os = "linux")]
+    let published: &Path = Path::new(BINARY);
+    #[cfg(not(target_os = "linux"))]
+    let published: &Path = &linux_report_stub(&sandbox);
+    sandbox.publish_as(&current_tag(), published, &[], linux_target());
     let installed = sandbox.install(&current_tag());
     assert!(installed.status.success(), "{}", stderr_of(&installed));
     assert!(
         String::from_utf8_lossy(&installed.stdout).contains("WSL 2 detected"),
+        "{}",
+        String::from_utf8_lossy(&installed.stdout)
+    );
+    assert_eq!(
+        reported_version(&sandbox.installed()),
+        format!("fox-services-top {}", env!("CARGO_PKG_VERSION"))
+    );
+}
+
+/// Apple Silicon hosts install the `aarch64-apple-darwin` build through the
+/// same verified path (macOS-only: the Darwin branch is unreachable on Linux).
+#[test]
+#[cfg(target_os = "macos")]
+fn macos_hosts_install_the_apple_silicon_build() {
+    let sandbox = Sandbox::new("darwin-target");
+    sandbox.publish(&current_tag(), Path::new(BINARY), &[]);
+    let installed = sandbox.install(&current_tag());
+    assert!(installed.status.success(), "{}", stderr_of(&installed));
+    assert!(
+        String::from_utf8_lossy(&installed.stdout).contains("aarch64-apple-darwin"),
         "{}",
         String::from_utf8_lossy(&installed.stdout)
     );

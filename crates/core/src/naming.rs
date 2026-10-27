@@ -21,6 +21,13 @@
 //! | nvml | `process` | 1 s | `process.gpu.memory_allocated` (bytes) and `process.gpu.utilization` (percent): entity `gpupid:UUID:PID`, scope `gpu:UUID` (the PID is joined to a ProcessKey by the process collector) |
 //! | network | `fast` | 1 s | `network.{rx,tx}.bytes` (bytes counters), `network.{rx,tx}.{packets,errors,drops}` (count counters): entity `netif:NETNS:IFINDEX`, scope `interface` |
 //! | filesystem | `capacity` | 5 s | `filesystem.{total,free,available}` (bytes): entity `fs:MNTNS:MOUNT_ID`, scope `filesystem` |
+//! | macos | `cpu` | 1 s | `cpu.time.*` (Mach ticks counters; Linux-only states as zero counters; entity `cpu`, scope `host`, and `cpu.core.N`, scope `core:N`), `cpu.load.{1m,5m,15m}` and `cpu.tasks.{running,total}` (count; entity `host`, scope `host`) |
+//! | macos | `memory` | 1 s | `memory.{total,available,swap_total,swap_free}` (KiB; entity `memory`, scope `system`) |
+//! | macos | `process` | 1 s, paged | one `process.cpu.ticks` record (ticks counter) per `ProcessKey` entity (`process:macos:PID:START`, scope `process`), RSS/uid/state/ppid as `proc.*` tags |
+//! | macos | `net` | 1 s, paged | `network.{rx,tx}.{bytes,packets,errors}` (drops have no macOS counter and are not emitted): entity `netif:macos:IFID`, scope `interface` |
+//! | macos | `capacity` | 5 s | `filesystem.{total,free,available}` (bytes): entity `fs:macos:MOUNT_ID`, scope `filesystem` |
+//! | macos | `gpu_fast` | 1 s | Apple GPU utilization (`gpu.utilization.compute`, percent) and unified memory (`gpu.memory.framebuffer.{used,free,total}`, bytes) from IOKit: entity `gpu:APPLE-MODEL`, scope `gpu` |
+//! | macos | `gpu_health` | 5 s | Apple GPU static facts (`gpu.cores`, count) |
 
 use crate::identity::{AdapterId, CollectorId, EntityId, IdentityError, Scope};
 
@@ -61,8 +68,15 @@ pub mod adapters {
     pub const NETWORK: &str = "network";
     pub const FILESYSTEM: &str = "filesystem";
     pub const REPLAY: &str = "replay";
+    /// Apple Silicon telemetry (`sysctl` + Mach + IOKit + `sysinfo`).
+    pub const MACOS: &str = "macos";
 
-    /// The seven live adapters, in host start order.
+    /// The live adapters, in host start order. Linux reads seven kernel and
+    /// driver interfaces; macOS reads one native adapter covering the same
+    /// collectors, so the two builds never schedule each other's adapters.
+    #[cfg(target_os = "macos")]
+    pub const LIVE: [&str; 1] = [MACOS];
+    #[cfg(not(target_os = "macos"))]
     pub const LIVE: [&str; 7] = [PROCFS, HWMON, THERMAL, POWERCAP, NVML, NETWORK, FILESYSTEM];
 }
 
@@ -87,6 +101,13 @@ pub mod groups {
     pub const FAST: &str = "fast";
     pub const SLOW_HEALTH: &str = "slow_health";
     pub const CAPACITY: &str = "capacity";
+    /// Apple Silicon network counters (the `macos` adapter's `fast`).
+    pub const NET: &str = "net";
+    /// Apple Silicon GPU utilization and unified memory (the `macos`
+    /// adapter's per-second GPU group).
+    pub const GPU_FAST: &str = "gpu_fast";
+    /// Apple Silicon GPU static facts (the `macos` adapter's slow group).
+    pub const GPU_HEALTH: &str = "gpu_health";
 }
 
 /// Which period class a read group follows.
@@ -204,6 +225,59 @@ pub const READ_GROUPS: &[ReadGroupSpec] = &[
         period: PeriodClass::Capacity,
         paged: true,
         collectors: &[collectors::DISK],
+    },
+    // Apple Silicon telemetry: one native adapter feeds the same collectors
+    // as the seven Linux adapters. The entries exist on every target so
+    // replay fixtures and routing stay identical; only `LIVE` decides which
+    // adapters a build starts.
+    ReadGroupSpec {
+        adapter: adapters::MACOS,
+        group: groups::CPU,
+        period: PeriodClass::Fast,
+        paged: true,
+        collectors: &[collectors::CPU],
+    },
+    ReadGroupSpec {
+        adapter: adapters::MACOS,
+        group: groups::MEMORY,
+        period: PeriodClass::Fast,
+        paged: false,
+        collectors: &[collectors::MEMORY],
+    },
+    ReadGroupSpec {
+        adapter: adapters::MACOS,
+        group: groups::PROCESS,
+        period: PeriodClass::Fast,
+        paged: true,
+        collectors: &[collectors::PROCESS],
+    },
+    ReadGroupSpec {
+        adapter: adapters::MACOS,
+        group: groups::NET,
+        period: PeriodClass::Fast,
+        paged: true,
+        collectors: &[collectors::NETWORK],
+    },
+    ReadGroupSpec {
+        adapter: adapters::MACOS,
+        group: groups::CAPACITY,
+        period: PeriodClass::Capacity,
+        paged: true,
+        collectors: &[collectors::DISK],
+    },
+    ReadGroupSpec {
+        adapter: adapters::MACOS,
+        group: groups::GPU_FAST,
+        period: PeriodClass::Fast,
+        paged: true,
+        collectors: &[collectors::GPU],
+    },
+    ReadGroupSpec {
+        adapter: adapters::MACOS,
+        group: groups::GPU_HEALTH,
+        period: PeriodClass::SlowHealth,
+        paged: false,
+        collectors: &[collectors::GPU],
     },
 ];
 

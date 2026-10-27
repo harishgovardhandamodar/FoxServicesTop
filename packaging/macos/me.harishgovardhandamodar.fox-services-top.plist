@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  fox-services-top headless collector, as a launchd user agent.
+
+  The collector keeps sampling and persisting in the background with no
+  terminal; any `fox-services-top` you start attaches to it over the state
+  directory's attach socket and acts as the viewer. See "Run it as a service"
+  in docs/USER_GUIDE.md for the install steps (`launchctl bootstrap` starts
+  it at login).
+
+  This file is a manual-install template; `install.sh` does not install it.
+  launchd agents do not expand `~`, so the binary and the log go through a
+  shell that expands `$HOME`. This is install.sh's default install directory;
+  change it if you installed the binary elsewhere.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>me.harishgovardhandamodar.fox-services-top</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>-c</string>
+        <string>exec "$HOME/.local/bin/fox-services-top" --daemon &gt;&gt;"$HOME/Library/Logs/fox-services-top.log" 2&gt;&amp;1</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+</dict>
+</plist>

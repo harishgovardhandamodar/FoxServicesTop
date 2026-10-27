@@ -18,9 +18,10 @@ use fox_services_top_core::overview_history::{
     ArchivedMinutes, ArchivedMinutesRead, ArchivedSeriesList,
 };
 use fox_services_top_core::ports::ArchiveReader;
+use rusqlite::Connection;
 use rusqlite::config::DbConfig;
-use rusqlite::{Connection, OpenFlags};
 
+use crate::sqlite::open_flags_read_only;
 use crate::sqlite::{FaultKind, SchemaKind, SchemaPlan, describe, fault_kind, plan};
 
 /// The writer holds the lock only for its short batches.
@@ -69,10 +70,7 @@ fn open(path: &Path) -> rusqlite::Result<Opened> {
     if !path.exists() {
         return Ok(Opened::NotYet);
     }
-    let flags = OpenFlags::SQLITE_OPEN_READ_ONLY
-        | OpenFlags::SQLITE_OPEN_NO_MUTEX
-        | OpenFlags::SQLITE_OPEN_NOFOLLOW
-        | OpenFlags::SQLITE_OPEN_EXRESCODE;
+    let flags = open_flags_read_only();
     let connection = Connection::open_with_flags(path, flags)?;
     connection.set_db_config(DbConfig::SQLITE_DBCONFIG_DEFENSIVE, true)?;
     connection.set_db_config(DbConfig::SQLITE_DBCONFIG_TRUSTED_SCHEMA, false)?;

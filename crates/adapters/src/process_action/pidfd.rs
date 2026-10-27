@@ -5,11 +5,16 @@
 //! single thread or a process group.
 #![allow(unsafe_code)]
 
-use std::os::fd::{AsRawFd, BorrowedFd, FromRawFd, OwnedFd, RawFd};
+use std::os::fd::{BorrowedFd, OwnedFd};
+
+#[cfg(target_os = "linux")]
+use std::os::fd::{AsRawFd, FromRawFd, RawFd};
 
 use nix::errno::Errno;
+#[cfg(target_os = "linux")]
 use nix::poll::{PollFd, PollFlags, PollTimeout, poll};
 
+#[cfg(target_os = "linux")]
 const NO_FLAGS: libc::c_long = 0;
 
 /// Readiness of a pidfd: readable once the process has terminated.
@@ -33,6 +38,7 @@ pub trait PidfdSyscalls: Send {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct LinuxPidfd;
 
+#[cfg(target_os = "linux")]
 impl PidfdSyscalls for LinuxPidfd {
     fn open(&self, pid: i32) -> Result<OwnedFd, Errno> {
         // SAFETY: pidfd_open takes two integers by value and either returns a
@@ -82,16 +88,37 @@ impl PidfdSyscalls for LinuxPidfd {
     }
 }
 
+/// Stub for systems without `pidfd(2)` (macOS): every operation reports
+/// `ENOSYS` so the action adapter degrades to its non-pidfd path instead of
+/// failing to compile. The struct keeps its Linux name so the call sites
+/// need no platform split.
+#[cfg(not(target_os = "linux"))]
+impl PidfdSyscalls for LinuxPidfd {
+    fn open(&self, _pid: i32) -> Result<OwnedFd, Errno> {
+        Err(Errno::ENOSYS)
+    }
+
+    fn send_signal(&self, _pidfd: BorrowedFd<'_>, _signal: i32) -> Result<(), Errno> {
+        Err(Errno::ENOSYS)
+    }
+
+    fn readiness(&self, _pidfd: BorrowedFd<'_>) -> Result<PidfdReadiness, Errno> {
+        Err(Errno::ENOSYS)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    #[cfg(target_os = "linux")]
     #[test]
     fn open_reports_errno_for_missing_process() {
         // PID i32::MAX is above pid_max on every Linux configuration.
         assert_eq!(LinuxPidfd.open(i32::MAX).unwrap_err(), Errno::ESRCH);
     }
 
+    #[cfg(target_os = "linux")]
     #[test]
     fn own_process_is_running_and_descriptor_is_cloexec() {
         let pid = i32::try_from(std::process::id()).unwrap();
@@ -102,5 +129,13 @@ mod tests {
         );
         let flags = nix::fcntl::fcntl(&fd, nix::fcntl::FcntlArg::F_GETFD).unwrap();
         assert_ne!(flags & libc::FD_CLOEXEC, 0);
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    #[test]
+    fn pidfd_reports_enosys_without_the_syscall() {
+        assert_eq!(LinuxPidfd.open(1).unwrap_err(), Errno::ENOSYS);
+        let pid = i32::try_from(std::process::id()).unwrap();
+        assert_eq!(LinuxPidfd.open(pid).unwrap_err(), Errno::ENOSYS);
     }
 }

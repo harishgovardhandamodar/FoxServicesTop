@@ -10,13 +10,14 @@ use fox_services_top_collectors::registry::default_collectors;
 use fox_services_top_core::budget::{ByteLedger, Partition, QueueGate};
 use fox_services_top_core::clock::TimeProvider;
 use fox_services_top_core::config::Config;
+use fox_services_top_core::identity::PidNamespace;
 use fox_services_top_core::ports::{ConfigRepository, Logger};
 use fox_services_top_core::quality::Namespace;
 use fox_services_top_manager::presentation::HostFacts;
 use fox_services_top_manager::{Manager, ManagerChannels, ManagerPorts, ManagerSetup};
-use fox_services_top_runtime::clock::{
-    current_euid, host_identity, host_name, kernel_release, pid_namespace_of,
-};
+#[cfg(not(target_os = "macos"))]
+use fox_services_top_runtime::clock::pid_namespace_of;
+use fox_services_top_runtime::clock::{current_euid, host_identity, host_name, kernel_release};
 use fox_services_top_runtime::logger::FileLogger;
 use fox_services_top_runtime::supervisor::{Supervisor, SupervisorConfig};
 use fox_services_top_runtime::timezone::local_utc_offset_s;
@@ -104,6 +105,13 @@ impl Wiring {
         let boot_id = self.clock.boot_id();
         let self_pid = i32::try_from(std::process::id())
             .map_err(|_| StartError::failure("pid out of range"))?;
+        // macOS has no PID namespaces: every process shares the one
+        // namespace the adapter also reports, so cross-namespace checks
+        // compare equal instead of failing startup.
+        #[cfg(target_os = "macos")]
+        let pid_namespace = PidNamespace::new("macos")
+            .map_err(|error| StartError::failure(format!("pid namespace rejected: {error}")))?;
+        #[cfg(not(target_os = "macos"))]
         let pid_namespace = pid_namespace_of(self_pid)?;
         let channels = ManagerChannels::create();
         let inboxes = channels.inboxes();

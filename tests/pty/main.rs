@@ -29,14 +29,17 @@ struct Sandbox {
 
 impl Sandbox {
     fn new(label: &str) -> Self {
-        let unique = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|elapsed| elapsed.as_nanos())
-            .unwrap_or_default();
-        let root = std::env::temp_dir().join(format!(
-            "fox-services-top-pty-{label}-{}-{unique}",
-            std::process::id()
-        ));
+        // Short root: the attach socket lives rows deep under the state
+        // directory, and macOS unix sockets are limited to 104 bytes while
+        // its TMPDIR alone is ~50 bytes, so the sandbox lives in /tmp
+        // there (`/tmp` resolves to `/private/tmp` for both ends alike).
+        let base = if cfg!(target_os = "macos") {
+            std::path::PathBuf::from("/tmp")
+        } else {
+            std::env::temp_dir()
+        };
+        let unique = format!("{:x}", uuid::Uuid::new_v4().as_u128() & 0xffff);
+        let root = base.join(format!("fpt-{label}-{}-{unique}", std::process::id()));
         for sub in ["home", "config", "state"] {
             std::fs::create_dir_all(root.join(sub)).unwrap();
         }
@@ -99,7 +102,7 @@ impl PtySession {
                 if libc::setsid() < 0 {
                     return Err(std::io::Error::last_os_error());
                 }
-                if libc::ioctl(0, libc::TIOCSCTTY, 0) < 0 {
+                if libc::ioctl(0, libc::TIOCSCTTY as libc::c_ulong, 0) < 0 {
                     return Err(std::io::Error::last_os_error());
                 }
                 Ok(())

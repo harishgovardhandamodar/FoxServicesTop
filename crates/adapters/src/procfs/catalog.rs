@@ -193,6 +193,18 @@ pub(crate) enum Selected<'a, L> {
     Removed(&'a SourceDescriptor),
 }
 
+impl<L> Selected<'_, L> {
+    /// The descriptor of whichever variant this is (used by the macOS
+    /// adapter; the Linux adapters match on the variants directly).
+    #[cfg(target_os = "macos")]
+    pub(crate) fn descriptor(&self) -> &SourceDescriptor {
+        match self {
+            Selected::Live(source) => &source.descriptor,
+            Selected::Removed(descriptor) => descriptor,
+        }
+    }
+}
+
 /// Sources chosen by a read plan plus slots this catalog does not know.
 #[derive(Debug)]
 pub(crate) struct Selection<'a, L> {

@@ -35,6 +35,10 @@ impl FakeSysfs {
         ));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
+        // `canonicalize` compares device links against the root: the temp
+        // directory is a symlink on macOS (`/var` -> `/private/var`), so the
+        // root itself must be canonical or every link escapes it.
+        let root = std::fs::canonicalize(&root).unwrap_or(root);
         Self { root }
     }
 

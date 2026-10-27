@@ -17,7 +17,11 @@
 //! adapter calls and every pidfd system call (spies that delegate to the
 //! real code unchanged); the child's own exit status; and the audit
 //! database read back through the store's public API.
-
+//!
+//! Linux-only: the suite drives the real pidfd(2) action adapter with
+//! `/proc/<pid>` identity checks, neither of which exists on macOS (where
+//! process actions degrade to unsupported).
+#![cfg(target_os = "linux")]
 // Test helpers may unwrap: a broken fixture must fail loudly.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 

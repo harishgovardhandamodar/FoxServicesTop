@@ -135,7 +135,11 @@ mod tests {
             Some(("fox-services-top-manager".to_owned(), 30))
         );
         assert_eq!(parse_named_cpu_ticks("10 no-name S 1"), None);
-        let threads = process_thread_ticks();
-        assert!(!threads.is_empty(), "this test runs on at least one thread");
+        // `/proc/self/task` exists only on Linux.
+        #[cfg(target_os = "linux")]
+        {
+            let threads = process_thread_ticks();
+            assert!(!threads.is_empty(), "this test runs on at least one thread");
+        }
     }
 }

@@ -7,7 +7,9 @@
 //!   the tiers and the process history), `cache_size` -2048 / -4096 KiB,
 //!   `busy_timeout` 100 / 50 ms, foreign keys
 //!   on, defensive mode, untrusted schema, no URI parsing, no extension
-//!   loading, `O_NOFOLLOW` on the database path, and only prepared
+//!   loading, `O_NOFOLLOW` on the database path (Linux-only: the flag refuses
+//!   every SQLite open on macOS, where symlinked databases are still refused
+//!   up front by `open_database`), and only prepared
 //!   statements with bound parameters for data.
 //! * Schema: the DDL is applied verbatim and idempotently and the file is
 //!   stamped with its partition's format version
@@ -52,6 +54,7 @@ pub(crate) use capacity::{
     CapacityPolicy, CapacityView, PageUsage, Refusal, WriteClass, pages_and_backlog,
 };
 pub(crate) use connection::ConnectionProfile;
+pub(crate) use connection::open_flags_read_only;
 pub(crate) use database::{DatabaseSpec, Unusable, VersionGate, open_database, path_problem};
 pub(crate) use errors::{FaultKind, describe, fault_kind, fault_message, tx_sqlite_error};
 #[cfg(test)]
