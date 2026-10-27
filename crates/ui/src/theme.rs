@@ -559,8 +559,10 @@ mod tests {
     /// configuration recolors the next frame.
     #[test]
     fn the_palette_follows_the_projections_theme() {
-        let mut model =
-            crate::test_fixtures::view_model(fox_services_top_core::commands::ViewKind::Overview, 1);
+        let mut model = crate::test_fixtures::view_model(
+            fox_services_top_core::commands::ViewKind::Overview,
+            1,
+        );
         assert_eq!(ThemePalette::for_model(&model), ThemePalette::default());
         model.header.theme = Theme::Green;
         let palette = ThemePalette::for_model(&model);

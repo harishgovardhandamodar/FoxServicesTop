@@ -383,13 +383,15 @@ impl Wiring {
         workers: &mut Workers,
     ) -> Result<PoolHandle<ActionOp>, StartError> {
         let clock = Arc::clone(&self.clock);
-        let adapter = fox_services_top_adapters::process_action::PidfdActionAdapter::new(Arc::clone(&clock));
+        let adapter =
+            fox_services_top_adapters::process_action::PidfdActionAdapter::new(Arc::clone(&clock));
         let fail_stop = self.fail_stop.clone();
         workers.actor(
             "action",
             ACTION_QUEUE,
             adapter,
-            move |port: &mut fox_services_top_adapters::process_action::PidfdActionAdapter, op: ActionOp| {
+            move |port: &mut fox_services_top_adapters::process_action::PidfdActionAdapter,
+                  op: ActionOp| {
                 let halted = fail_stop.reason();
                 let completion = run_action_op(port, op, clock.as_ref(), halted.as_deref());
                 completions.control(ControlCompletion::Action(completion));

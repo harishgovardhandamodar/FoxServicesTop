@@ -23,7 +23,11 @@ use support::{
 };
 
 /// Samples the history holds of `key` up to `end`.
-fn held_samples(harness: &Harness, key: &fox_services_top_core::identity::MetricKey, end: u64) -> u32 {
+fn held_samples(
+    harness: &Harness,
+    key: &fox_services_top_core::identity::MetricKey,
+    end: u64,
+) -> u32 {
     harness.clock.set_boot_ns(end);
     harness.window(key, EVERYTHING_NS).samples
 }

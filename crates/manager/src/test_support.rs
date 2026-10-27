@@ -6,10 +6,16 @@ use crate::presentation::HostFacts;
 use crate::session::SessionHandle;
 use crate::setup::{ManagerInboxes, ManagerPorts, ManagerSetup, ProcessHistoryHandles};
 use crate::testing::inert_ports;
-use fox_services_top_core::action::{ActionOp, AuditCompletion, AuditOp, PersistenceKind, PersistenceStatus};
+use fox_services_top_core::action::{
+    ActionOp, AuditCompletion, AuditOp, PersistenceKind, PersistenceStatus,
+};
 use fox_services_top_core::budget::{ByteLedger, Partition, QueueGate};
-use fox_services_top_core::canonical::{CollectionBatch, CollectionPlan, CollectorState, ImmutableSnapshot};
-use fox_services_top_core::commands::{CommandBody, CommandEnvelope, CommandRejection, CommandResult};
+use fox_services_top_core::canonical::{
+    CollectionBatch, CollectionPlan, CollectorState, ImmutableSnapshot,
+};
+use fox_services_top_core::commands::{
+    CommandBody, CommandEnvelope, CommandRejection, CommandResult,
+};
 use fox_services_top_core::config::{Config, ValueOrigin};
 use fox_services_top_core::identity::PidNamespace;
 use fox_services_top_core::identity::{AdapterId, CollectorId};
@@ -17,7 +23,9 @@ use fox_services_top_core::identity::{MetricKey, OriginIdentity, ProfileId};
 use fox_services_top_core::metric::NativeUnit;
 use fox_services_top_core::naming::is_replay_adapter;
 use fox_services_top_core::observation::CatalogDelta;
-use fox_services_top_core::observation::{AdapterManifest, AdapterOperation, Isolation, SourceDescriptor};
+use fox_services_top_core::observation::{
+    AdapterManifest, AdapterOperation, Isolation, SourceDescriptor,
+};
 use fox_services_top_core::ports::{
     AdapterJob, ConfigJob, ControlCompletion, HistoryJob, IngestionCompletion, ProcessHistoryInput,
     ProcessHistoryReader, SessionPort, StateJob,

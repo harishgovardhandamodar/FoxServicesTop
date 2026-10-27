@@ -152,8 +152,10 @@ mod tests {
         ));
         let missing = Scenarios::load(Path::new("/nonexistent/scenarios.json"));
         assert!(matches!(missing, Err(ScenarioError::Io { .. })));
-        let directory =
-            std::env::temp_dir().join(format!("fox-services-top-scenarios-test-{}", std::process::id()));
+        let directory = std::env::temp_dir().join(format!(
+            "fox-services-top-scenarios-test-{}",
+            std::process::id()
+        ));
         std::fs::create_dir_all(&directory).unwrap();
         let bad = directory.join("bad.json");
         std::fs::write(&bad, br#"{"schema_version":1}"#).unwrap();

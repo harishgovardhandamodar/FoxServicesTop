@@ -20,7 +20,9 @@ use std::mem::size_of;
 use fox_services_top_compression::{TieredSeries, bars_in, merged_between};
 use fox_services_top_core::history::SeriesInEveryBoot;
 use fox_services_top_core::identity::MetricKey;
-use fox_services_top_core::overview_history::{ArchivePrune, OverviewBars, OverviewBucket, TierRow};
+use fox_services_top_core::overview_history::{
+    ArchivePrune, OverviewBars, OverviewBucket, TierRow,
+};
 use fox_services_top_core::tiers::Tier;
 
 use super::budget::{CACHE_BUDGET_BYTES, key_bytes, row_bytes, series_bytes};

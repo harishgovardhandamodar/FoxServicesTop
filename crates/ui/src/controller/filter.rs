@@ -23,7 +23,8 @@ pub struct FilterEdit {
 impl FilterEdit {
     /// Starts editing from the current filter (cut to the byte limit).
     pub fn new(initial: &str) -> Self {
-        let buffer = fox_services_top_core::text::truncate_utf8(initial, MAX_FILTER_BYTES).to_owned();
+        let buffer =
+            fox_services_top_core::text::truncate_utf8(initial, MAX_FILTER_BYTES).to_owned();
         let cursor = buffer.len();
         Self { buffer, cursor }
     }

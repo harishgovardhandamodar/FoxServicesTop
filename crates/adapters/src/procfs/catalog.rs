@@ -128,9 +128,12 @@ pub(crate) fn descriptor_for(
     keys: &KeyContext,
     spec: &SourceSpec<'_>,
 ) -> Option<SourceDescriptor> {
-    let source_id =
-        fox_services_top_core::naming::source_id(config.adapter_id.as_str(), spec.device_id, spec.channel)
-            .ok()?;
+    let source_id = fox_services_top_core::naming::source_id(
+        config.adapter_id.as_str(),
+        spec.device_id,
+        spec.channel,
+    )
+    .ok()?;
     let metric = MetricKey::new(
         keys.host_id.clone(),
         keys.boot_id.clone(),

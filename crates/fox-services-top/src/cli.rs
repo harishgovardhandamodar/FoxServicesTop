@@ -201,8 +201,7 @@ fn parse_remote_nodes(entries: &[String]) -> Result<Option<Vec<RemoteNodeConfig>
             let (name, url) = entry
                 .split_once('=')
                 .filter(|(name, url)| {
-                    !name.is_empty()
-                        && (url.starts_with("http://") || url.starts_with("https://"))
+                    !name.is_empty() && (url.starts_with("http://") || url.starts_with("https://"))
                 })
                 .ok_or_else(|| CliError::RemoteNode(entry.clone()))?;
             Ok(RemoteNodeConfig {

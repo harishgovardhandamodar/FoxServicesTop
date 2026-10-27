@@ -9,7 +9,9 @@ use std::collections::BTreeMap;
 use fox_services_top_core::commands::ViewKind;
 use fox_services_top_core::metric::CanonicalUnit;
 use fox_services_top_core::process_history::{RunBucket, RunInfo, RunMetric};
-use fox_services_top_core::process_model::{ProcessHistoryModel, RunBars, RunDetail, RunRequest, RunRow};
+use fox_services_top_core::process_model::{
+    ProcessHistoryModel, RunBars, RunDetail, RunRequest, RunRow,
+};
 use fox_services_top_core::tiers::BarSize;
 use fox_services_top_core::view::{
     HistoryPointView, ProcessHistoryView, RunChartView, RunDetailView, RunRowView, SessionState,

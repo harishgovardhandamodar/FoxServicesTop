@@ -702,7 +702,10 @@ mod tests {
     fn a_window_kept_on_disk_says_it_is_recorded_while_fox_services_top_runs() {
         // D-51: with the archive the gaps are the times fox-services-top was not
         // running; an archive that cannot be read is said so.
-        assert_eq!(why_partly(&DiskHistory::On), "only while fox-services-top runs");
+        assert_eq!(
+            why_partly(&DiskHistory::On),
+            "only while fox-services-top runs"
+        );
         assert_eq!(
             why_partly(&DiskHistory::Failed("locked".to_owned())),
             "disk history unavailable"

@@ -3,7 +3,9 @@
 
 use std::collections::BTreeSet;
 
-use fox_services_top_core::canonical::{CatalogSnapshot, Explanation, ImmutableSnapshot, SnapshotEntry};
+use fox_services_top_core::canonical::{
+    CatalogSnapshot, Explanation, ImmutableSnapshot, SnapshotEntry,
+};
 use fox_services_top_core::identity::{EntityId, MetricKey, ProcessKey};
 use fox_services_top_core::metric::ids;
 use fox_services_top_core::naming::entity;

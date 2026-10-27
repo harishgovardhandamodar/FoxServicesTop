@@ -6,7 +6,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use fox_services_top_core::canonical::{CatalogSnapshot, ImmutableSnapshot, ProcessTable, SnapshotEntry};
+use fox_services_top_core::canonical::{
+    CatalogSnapshot, ImmutableSnapshot, ProcessTable, SnapshotEntry,
+};
 use fox_services_top_core::identity::EntityId;
 use fox_services_top_core::metric::{Scalar, ids};
 use fox_services_top_core::naming::entity;

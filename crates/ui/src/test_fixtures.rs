@@ -4,7 +4,9 @@
 
 use std::sync::Arc;
 
-use fox_services_top_core::action::{ConfirmationToken, PersistenceKind, PersistenceStatus, Signal};
+use fox_services_top_core::action::{
+    ConfirmationToken, PersistenceKind, PersistenceStatus, Signal,
+};
 use fox_services_top_core::canonical::GpuUsageKind;
 use fox_services_top_core::commands::{SortKey, ViewKind};
 use fox_services_top_core::config::{Theme, ValueOrigin};
@@ -1059,7 +1061,9 @@ pub(crate) const RUNS_UTC: i64 = 1_791_072_000_000_000_000;
 /// running for 2 h in color 0.
 pub(crate) fn process_history_view() -> fox_services_top_core::view::ProcessHistoryView {
     use fox_services_top_core::action::Signal;
-    use fox_services_top_core::process_history::{EndCause, RunDetails, RunEnd, RunInfo, RunMetric};
+    use fox_services_top_core::process_history::{
+        EndCause, RunDetails, RunEnd, RunInfo, RunMetric,
+    };
     use fox_services_top_core::tiers::BarSize;
     use fox_services_top_core::view::{
         HistoryPointView, ProcessHistoryView, RunChartView, RunDetailView, RunRowView,

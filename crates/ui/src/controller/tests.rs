@@ -199,7 +199,12 @@ impl Harness {
     }
 
     /// The bar sizes of the last UpdateViewSession (D-80).
-    fn last_bars(&self) -> (fox_services_top_core::tiers::BarSize, fox_services_top_core::tiers::BarSize) {
+    fn last_bars(
+        &self,
+    ) -> (
+        fox_services_top_core::tiers::BarSize,
+        fox_services_top_core::tiers::BarSize,
+    ) {
         self.submitted()
             .into_iter()
             .rev()

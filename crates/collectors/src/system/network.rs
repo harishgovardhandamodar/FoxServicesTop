@@ -344,7 +344,10 @@ mod tests {
         );
         let rate = value_of(&second, &key(eth, ids::NET_RX_BPS)).unwrap();
         assert_eq!(rate.value.map(|value| value.to_f64_lossy()), Some(500.0));
-        assert_eq!(rate.sample_kind, fox_services_top_core::quality::SampleKind::Replay);
+        assert_eq!(
+            rate.sample_kind,
+            fox_services_top_core::quality::SampleKind::Replay
+        );
         assert!(!rate.eligible_for_history);
         assert!(second.counter_intervals.is_empty());
     }

@@ -16,7 +16,9 @@ use fox_services_top_core::canonical::{
     AckStatus, ArchiveState, CollectionBatch, CollectionPlan, CollectorState, ProcessRow,
     ProcessTable, StoreAck,
 };
-use fox_services_top_core::commands::{CommandBody, CommandResult, CommandStatus, SortKey, ViewKind};
+use fox_services_top_core::commands::{
+    CommandBody, CommandResult, CommandStatus, SortKey, ViewKind,
+};
 use fox_services_top_core::config::Config;
 use fox_services_top_core::errors::{ErrorCode, ResultCode};
 use fox_services_top_core::identity::{Pid, PidNamespace, ProcessKey};

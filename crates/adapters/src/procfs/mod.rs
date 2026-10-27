@@ -270,7 +270,9 @@ impl ProcfsAdapter {
 pub(crate) fn availability_of(error: Option<&io::Error>) -> Availability {
     match error.map(read_status_of) {
         None => Availability::Available,
-        Some(fox_services_top_core::quality::ReadStatus::PermissionDenied) => Availability::PermissionDenied,
+        Some(fox_services_top_core::quality::ReadStatus::PermissionDenied) => {
+            Availability::PermissionDenied
+        }
         Some(_) => Availability::Unavailable,
     }
 }

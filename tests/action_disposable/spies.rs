@@ -9,7 +9,9 @@ use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use fox_services_top_adapters::process_action::{PidfdActionAdapter, PidfdReadiness, PidfdSyscalls};
+use fox_services_top_adapters::process_action::{
+    PidfdActionAdapter, PidfdReadiness, PidfdSyscalls,
+};
 use fox_services_top_core::action::{
     ActionAttempt, ActionError, ActionHandle, ActionIntent, ActionOp, ActionOutcomeRecord,
     AuditExpiryReport, AuditFailure, CapabilityContext, DurableReceipt, ExitObservation,

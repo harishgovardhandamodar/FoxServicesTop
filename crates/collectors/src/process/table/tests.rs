@@ -1,6 +1,8 @@
 //! Process collector tests (AT09).
 
-use fox_services_top_core::canonical::{CollectionBatch, CollectionLimits, GpuUsageKind, ProcessRow};
+use fox_services_top_core::canonical::{
+    CollectionBatch, CollectionLimits, GpuUsageKind, ProcessRow,
+};
 use fox_services_top_core::metric::{ids, native};
 use fox_services_top_core::observation::BatchStatus;
 use fox_services_top_core::observation::Observation;
@@ -839,9 +841,10 @@ fn an_unread_rss_keeps_the_adapters_reason() {
         record
             .reason_codes
             .retain(|code| !code.starts_with("proc.rss:"));
-        record
-            .reason_codes
-            .insert(0, fox_services_top_core::process_stat::RSS_PARSE_ERROR.to_owned());
+        record.reason_codes.insert(
+            0,
+            fox_services_top_core::process_stat::RSS_PARSE_ERROR.to_owned(),
+        );
         vec![record]
     };
     let batch = two_cycles(

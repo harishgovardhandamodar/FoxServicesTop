@@ -124,7 +124,9 @@ fn split_base(base_url: &str) -> Result<(String, u16, String), HttpError> {
         .ok_or_else(|| HttpError::BadUrl("only http:// is supported".into()))?;
     let rest = rest.trim_end_matches('/');
     if rest.is_empty() || rest.contains('/') || rest.contains('?') || rest.contains('#') {
-        return Err(HttpError::BadUrl("path, query or fragment in base URL".into()));
+        return Err(HttpError::BadUrl(
+            "path, query or fragment in base URL".into(),
+        ));
     }
     if let Some((host, port)) = rest.rsplit_once(':')
         && !port.is_empty()
@@ -278,7 +280,9 @@ mod tests {
             let (mut socket, _) = listener.accept().unwrap();
             let mut request = [0u8; 1024];
             let _ = socket.read(&mut request);
-            socket.write_all(b"HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n").unwrap();
+            socket
+                .write_all(b"HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n")
+                .unwrap();
         });
         assert!(matches!(
             get_json(&base, "/x", Duration::from_secs(5)),
@@ -290,7 +294,11 @@ mod tests {
     fn split_base_handles_ports() {
         assert_eq!(
             split_base("http://192.168.1.63:8210").unwrap(),
-            ("192.168.1.63".to_owned(), 8210, "192.168.1.63:8210".to_owned())
+            (
+                "192.168.1.63".to_owned(),
+                8210,
+                "192.168.1.63:8210".to_owned()
+            )
         );
         assert_eq!(
             split_base("http://axiom/").unwrap(),

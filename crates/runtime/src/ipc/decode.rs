@@ -219,7 +219,9 @@ mod tests {
         IpcRequestKind, Isolation, ShutdownTag,
     };
     use fox_services_top_core::quality::Namespace;
-    use fox_services_top_core::testing::{ObservationBuilder, adapter_id, batch_of, metric_key, read_group};
+    use fox_services_top_core::testing::{
+        ObservationBuilder, adapter_id, batch_of, metric_key, read_group,
+    };
     use proptest::prelude::*;
     use uuid::Uuid;
 

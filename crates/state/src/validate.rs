@@ -3,7 +3,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use fox_services_top_core::canonical::{AckStatus, CollectionBatch, CommitGuard, MAX_CANDIDATE_IDS};
+use fox_services_top_core::canonical::{
+    AckStatus, CollectionBatch, CommitGuard, MAX_CANDIDATE_IDS,
+};
 use fox_services_top_core::identity::{CollectorId, MetricKey};
 use fox_services_top_core::metric::{CanonicalUnit, METRIC_CATALOG, MetricDescriptor, ScalarView};
 use fox_services_top_core::quality::{Namespace, RawKind};

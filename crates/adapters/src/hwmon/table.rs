@@ -18,7 +18,9 @@ use fox_services_top_core::metric::NativeUnit;
 use fox_services_top_core::observation::{
     Attribute, Capability, EntityKind, EntityRecord, MAX_ATTRIBUTES, SourceDescriptor,
 };
-use fox_services_top_core::quality::{Availability, Quality, RawKind, ReadStatus, SampleKind, Support};
+use fox_services_top_core::quality::{
+    Availability, Quality, RawKind, ReadStatus, SampleKind, Support,
+};
 
 use super::catalog::CatalogContent;
 use super::reader::{ReadFailure, ReadSpec, Reading, read_source};

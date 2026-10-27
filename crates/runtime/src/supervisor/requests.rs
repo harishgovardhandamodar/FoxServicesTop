@@ -5,7 +5,9 @@ use fox_services_top_core::observation::{
     DiscoverRequest, IPC_PROTOCOL_VERSION, IpcRequest, IpcRequestKind, ReadPlan, paged_group,
     split_page,
 };
-use fox_services_top_core::ports::{AdapterFailure, AdapterFailureKind, AdapterJob, IngestionCompletion};
+use fox_services_top_core::ports::{
+    AdapterFailure, AdapterFailureKind, AdapterJob, IngestionCompletion,
+};
 use fox_services_top_core::text::sanitize_message;
 use uuid::Uuid;
 

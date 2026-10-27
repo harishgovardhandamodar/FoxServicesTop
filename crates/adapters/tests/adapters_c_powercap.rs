@@ -13,7 +13,9 @@ use fox_services_top_adapters::registry::AdapterOptions;
 use fox_services_top_core::identity::OriginRelation;
 use fox_services_top_core::metric::ids;
 use fox_services_top_core::observation::EntityKind;
-use fox_services_top_core::quality::{Availability, Namespace, Quality, RawKind, ReadStatus, Support};
+use fox_services_top_core::quality::{
+    Availability, Namespace, Quality, RawKind, ReadStatus, Support,
+};
 use support::*;
 
 const ADAPTER: &str = "powercap";

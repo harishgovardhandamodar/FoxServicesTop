@@ -9,12 +9,16 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use fox_services_top_core::action::PersistenceState;
-use fox_services_top_core::config::{Config, ConfigError, LegacyMappingStatus, MAX_CONFIG_REVISION, Theme};
+use fox_services_top_core::config::{
+    Config, ConfigError, LegacyMappingStatus, MAX_CONFIG_REVISION, Theme,
+};
 use fox_services_top_core::digest::sha256_hex;
 use fox_services_top_core::errors::InfraError;
 use fox_services_top_core::ports::{ConfigLoadError, ConfigRepository, LoadOrigin, PersistError};
 use fox_services_top_store::config::{FileConfigRepository, LegacyImportError};
-use fox_services_top_store::fs::{Failpoint, FailpointFileSystem, FileSystemOps, RealFileSystem, Trigger};
+use fox_services_top_store::fs::{
+    Failpoint, FailpointFileSystem, FileSystemOps, RealFileSystem, Trigger,
+};
 
 struct TempDir(PathBuf);
 
@@ -35,7 +39,10 @@ impl TempDir {
     }
 
     fn config_path(&self) -> PathBuf {
-        self.0.join("fox-services-top").join("v2").join("config.json")
+        self.0
+            .join("fox-services-top")
+            .join("v2")
+            .join("config.json")
     }
 }
 

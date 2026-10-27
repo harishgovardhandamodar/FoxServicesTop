@@ -13,7 +13,9 @@ use std::collections::BTreeMap;
 
 use fox_services_top_core::canonical::{CanonicalValue, CollectionBatch, CollectionPlan};
 use fox_services_top_core::identity::{AdapterId, CollectorId, IdentityError, MetricKey};
-use fox_services_top_core::metric::{CanonicalUnit, Domain, MetricDescriptor, MetricRole, Scalar, ids};
+use fox_services_top_core::metric::{
+    CanonicalUnit, Domain, MetricDescriptor, MetricRole, Scalar, ids,
+};
 use fox_services_top_core::naming;
 use fox_services_top_core::ports::Collector;
 use fox_services_top_core::quality::Freshness;

@@ -12,7 +12,9 @@ use fox_services_top_core::metric::Scalar;
 use fox_services_top_core::metric::ids;
 use fox_services_top_core::naming::{attributes, entity};
 use fox_services_top_core::quality::SampleKind;
-use fox_services_top_core::view::{CellState, CoreView, CpuView, FrequencyGroup, LabeledCell, MetricCell};
+use fox_services_top_core::view::{
+    CellState, CoreView, CpuView, FrequencyGroup, LabeledCell, MetricCell,
+};
 
 use super::cell::missing_cell;
 use super::labels::{humanize_scope, label_text};

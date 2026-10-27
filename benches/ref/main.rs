@@ -546,7 +546,11 @@ fn restarts(composition: &RefComposition) -> u64 {
         .fold(0, u64::saturating_add)
 }
 
-type PreloadFacts<'a> = (&'a fox_services_top::perf::history_load::PreloadReport, f64, u64);
+type PreloadFacts<'a> = (
+    &'a fox_services_top::perf::history_load::PreloadReport,
+    f64,
+    u64,
+);
 
 fn run_details(
     window: &MeasuredWindow,

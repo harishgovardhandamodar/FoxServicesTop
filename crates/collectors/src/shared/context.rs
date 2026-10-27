@@ -832,8 +832,9 @@ fn mapping_of(descriptor: Option<&SourceDescriptor>, key: &MetricKey) -> Catalog
 /// their sources are catalogued once (per GPU / per adapter) without a
 /// fixed key. Every other source without a mapped key has no proven purpose.
 fn carries_dynamic_key(key: &MetricKey) -> bool {
-    metric::descriptor(key.metric_id.as_str())
-        .is_some_and(|descriptor| descriptor.domain == fox_services_top_core::metric::Domain::Process)
+    metric::descriptor(key.metric_id.as_str()).is_some_and(|descriptor| {
+        descriptor.domain == fox_services_top_core::metric::Domain::Process
+    })
 }
 
 /// Whether `observation` is a collector-built candidate carrying `formula`.

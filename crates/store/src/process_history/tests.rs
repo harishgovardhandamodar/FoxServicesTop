@@ -736,7 +736,10 @@ fn a_corrupt_database_stops_with_its_reason() {
 #[test]
 fn relative_paths_are_refused() {
     let scratch = Scratch::new("relative");
-    let missing = format!("fox-services-top-relative-{}", uuid::Uuid::new_v4().simple());
+    let missing = format!(
+        "fox-services-top-relative-{}",
+        uuid::Uuid::new_v4().simple()
+    );
     let relative_database = PathBuf::from(&missing).join("process_history.sqlite3");
     let mut store =
         ProcessHistoryFiles::open(&relative_database, &scratch.0.join("process_recent.json"));

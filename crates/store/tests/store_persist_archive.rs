@@ -25,7 +25,9 @@ use fox_services_top_core::quality::SampleKind;
 use fox_services_top_core::testing::{FakeClock, metric_key, source_id};
 use fox_services_top_core::wire::parse_fixed_width;
 use fox_services_top_store::archive::{ArchiveLimits, SqliteArchive};
-use fox_services_top_store::sqlite::{FreeSpaceProbe, StorageFootprint, format_stamp, format_utc_rfc3339};
+use fox_services_top_store::sqlite::{
+    FreeSpaceProbe, StorageFootprint, format_stamp, format_utc_rfc3339,
+};
 use rusqlite::Connection;
 use uuid::Uuid;
 

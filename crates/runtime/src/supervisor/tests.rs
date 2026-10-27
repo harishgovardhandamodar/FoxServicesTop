@@ -106,7 +106,11 @@ impl Harness {
         }
     }
 
-    fn wait_state(&self, adapter: &str, state: HostState) -> fox_services_top_core::view::HostStatus {
+    fn wait_state(
+        &self,
+        adapter: &str,
+        state: HostState,
+    ) -> fox_services_top_core::view::HostStatus {
         let completion = self.wait_for(|completion| {
             matches!(completion, IngestionCompletion::HostStatus(status)
                 if status.adapter_id == adapter && status.state == state)

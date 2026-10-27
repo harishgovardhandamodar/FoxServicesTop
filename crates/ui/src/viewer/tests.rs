@@ -596,7 +596,8 @@ fn the_header_shows_the_total_power_only_while_it_is_read() {
     let mut model = model(ViewKind::Overview);
     let header = |model: &ViewModel| render(model, (200, 50)).rows[0].clone();
     assert!(!header(&model).contains("total"), "{}", header(&model));
-    model.header.total_power = test_fixtures::ok(152.0, fox_services_top_core::metric::CanonicalUnit::Watts);
+    model.header.total_power =
+        test_fixtures::ok(152.0, fox_services_top_core::metric::CanonicalUnit::Watts);
     assert!(
         header(&model).contains("spark-01 │ ⚡ 152 W total │ 2x GPU"),
         "{}",
@@ -726,7 +727,11 @@ fn the_overview_fox_services_sub_tab_shows_the_services_tables() {
         "100/50/150",
         "chat",
     ] {
-        assert!(rendered.contains(text), "missing {text:?}\n{}", rendered.text());
+        assert!(
+            rendered.contains(text),
+            "missing {text:?}\n{}",
+            rendered.text()
+        );
     }
     // Both sub-tabs stay clickable on either page.
     let map = &rendered.report.hit_map;
@@ -968,8 +973,11 @@ fn a_panicking_module_is_isolated_as_a_module_error() {
 fn stale_values_show_the_last_good_value_with_its_age() {
     let mut model = model(ViewKind::Overview);
     let mut cpu = test_fixtures::cpu_view();
-    cpu.package_temperatures[0].cell =
-        test_fixtures::stale(fox_services_top_core::metric::CanonicalUnit::DegC, 72.0, 12_000);
+    cpu.package_temperatures[0].cell = test_fixtures::stale(
+        fox_services_top_core::metric::CanonicalUnit::DegC,
+        72.0,
+        12_000,
+    );
     model.modules.cpu = Some(Arc::new(cpu));
     let rendered = render_with(
         &Viewer::builtin(),

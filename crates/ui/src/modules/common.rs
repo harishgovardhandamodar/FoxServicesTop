@@ -1124,8 +1124,11 @@ mod tests {
             Some(theme.gauge_high),
             "red only at 100 °C"
         );
-        let stale =
-            crate::test_fixtures::stale(fox_services_top_core::metric::CanonicalUnit::DegC, 83.0, 9_000);
+        let stale = crate::test_fixtures::stale(
+            fox_services_top_core::metric::CanonicalUnit::DegC,
+            83.0,
+            9_000,
+        );
         let spans = temperature_spans(&stale, CellDetail::GLANCE, &context);
         assert_eq!(
             spans[0].style,

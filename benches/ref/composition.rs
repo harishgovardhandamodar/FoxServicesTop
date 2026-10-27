@@ -495,7 +495,10 @@ type HostPlan = (
 fn replay_hosts(inputs: &CompositionInputs<'_>) -> BenchResult<HostPlan> {
     let program = PathBuf::from(env!("CARGO_BIN_EXE_fox-services-top"));
     if !program.is_file() {
-        return Err(format!("fox-services-top binary not built at {}", program.display()));
+        return Err(format!(
+            "fox-services-top binary not built at {}",
+            program.display()
+        ));
     }
     let mut specs = Vec::new();
     let mut manifests = Vec::new();
@@ -515,7 +518,10 @@ fn replay_hosts(inputs: &CompositionInputs<'_>) -> BenchResult<HostPlan> {
                 ],
             },
         });
-        manifests.push(fox_services_top_adapters::replay::manifest(&adapter_id, false));
+        manifests.push(fox_services_top_adapters::replay::manifest(
+            &adapter_id,
+            false,
+        ));
         ids.push(name);
     }
     Ok((specs, manifests, ids))

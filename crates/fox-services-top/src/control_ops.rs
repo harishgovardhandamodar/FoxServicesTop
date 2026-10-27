@@ -4,7 +4,9 @@
 //! the production code path (including the last deadline check before a
 //! signal is sent).
 
-use fox_services_top_core::action::{ActionCompletion, ActionOp, AuditCompletion, AuditOp, SignalOutcome};
+use fox_services_top_core::action::{
+    ActionCompletion, ActionOp, AuditCompletion, AuditOp, SignalOutcome,
+};
 use fox_services_top_core::clock::TimeProvider;
 use fox_services_top_core::ports::{
     AuditRepository, ConfigJob, ConfigRepository, ControlCompletion, HistoryJob, OverviewReader,

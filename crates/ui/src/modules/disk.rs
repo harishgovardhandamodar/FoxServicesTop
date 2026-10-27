@@ -8,7 +8,9 @@
 //! narrow panel gives up.
 
 use fox_services_top_core::identity::EntityId;
-use fox_services_top_core::view::{DiskDeviceView, DiskView, FilesystemView, MetricCell, ViewModel};
+use fox_services_top_core::view::{
+    DiskDeviceView, DiskView, FilesystemView, MetricCell, ViewModel,
+};
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::Style;

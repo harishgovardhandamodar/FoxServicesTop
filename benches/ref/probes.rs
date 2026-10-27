@@ -8,7 +8,9 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
 
-use fox_services_top::perf::coverage::{COMMIT_GRACE_NS, CoverageLedger, CoverageReport, ScheduledGroup};
+use fox_services_top::perf::coverage::{
+    COMMIT_GRACE_NS, CoverageLedger, CoverageReport, ScheduledGroup,
+};
 use fox_services_top::perf::latency::{PendingRequests, ProjectionLatencyTracker, duration_us};
 use fox_services_top_core::canonical::{CollectionBatch, StoreAck};
 use fox_services_top_core::errors::{ErrorCode, ErrorDetail};

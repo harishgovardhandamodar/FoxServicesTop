@@ -161,7 +161,9 @@ mod tests {
     use fox_services_top_core::canonical::{CollectorState, CounterInterval};
     use fox_services_top_core::config::Config;
     use fox_services_top_core::identity::CollectorId;
-    use fox_services_top_core::metric::{CanonicalUnit, METRIC_CATALOG, MetricDescriptor, Scalar, ids};
+    use fox_services_top_core::metric::{
+        CanonicalUnit, METRIC_CATALOG, MetricDescriptor, Scalar, ids,
+    };
     use fox_services_top_core::quality::{Freshness, Quality};
     use fox_services_top_core::testing::{ObservationBuilder, batch_of, metric_key, source_id};
 

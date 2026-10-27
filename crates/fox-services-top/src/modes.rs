@@ -113,8 +113,10 @@ pub fn import_legacy(cli: &Cli) -> ExitCode {
     {
         return fail(EXIT_FAILURE, &error.to_string());
     }
-    let repository =
-        fox_services_top_store::config::FileConfigRepository::new(paths.config_file.clone(), filesystem);
+    let repository = fox_services_top_store::config::FileConfigRepository::new(
+        paths.config_file.clone(),
+        filesystem,
+    );
     match repository.import_legacy(legacy_path, cli.apply) {
         Ok(report) => {
             let mut text = render_import_report(&report);

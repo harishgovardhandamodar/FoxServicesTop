@@ -9,7 +9,9 @@
 use fox_services_top_core::canonical::GapRecord;
 use fox_services_top_core::digest::sha256_hex;
 use fox_services_top_core::history::HistoryMethod;
-use fox_services_top_core::ports::{ArchiveJournal, ArchivedBridge, ArchivedBucket, ArchivedSegment};
+use fox_services_top_core::ports::{
+    ArchiveJournal, ArchivedBridge, ArchivedBucket, ArchivedSegment,
+};
 use fox_services_top_core::quality::SampleKind;
 use fox_services_top_core::wire::format_fixed_width;
 

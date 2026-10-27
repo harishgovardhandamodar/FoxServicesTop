@@ -148,9 +148,9 @@ fn unknown_and_unhandled_metrics_and_failed_batches_are_reported() {
     batch.records.clear();
     batch.status = BatchStatus::Failed;
     batch.error_code = Some("HOST_TIMEOUT".to_owned());
-    failed.inputs = vec![std::sync::Arc::new(fox_services_top_core::ports::IngressBatch::new(
-        batch, None,
-    ))];
+    failed.inputs = vec![std::sync::Arc::new(
+        fox_services_top_core::ports::IngressBatch::new(batch, None),
+    )];
     let reported = collect(memory.as_ref(), &plan);
     let codes: Vec<&str> = reported
         .failures

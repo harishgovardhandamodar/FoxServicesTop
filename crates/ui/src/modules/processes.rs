@@ -165,7 +165,12 @@ impl DisplayModule for ProcessesModule {
         if sub_tab == 1 {
             let Some(services) = model.modules.docker.as_deref() else {
                 if let Some(area) = rows.rest() {
-                    message(frame, area, &no_data("services"), context.theme.muted_style());
+                    message(
+                        frame,
+                        area,
+                        &no_data("services"),
+                        context.theme.muted_style(),
+                    );
                 }
                 output.label("services: no data");
                 return output.finish();
@@ -802,7 +807,8 @@ mod tests {
         );
         let mut terminal =
             ratatui::Terminal::new(ratatui::backend::TestBackend::new(120, 7)).unwrap();
-        let mut model = test_fixtures::view_model(fox_services_top_core::commands::ViewKind::Overview, 1);
+        let mut model =
+            test_fixtures::view_model(fox_services_top_core::commands::ViewKind::Overview, 1);
         model.modules.processes = Some(std::sync::Arc::new(view));
         terminal
             .draw(|frame| {
@@ -828,7 +834,8 @@ mod tests {
         let view = test_fixtures::processes_view(2, 0, 2);
         let mut terminal =
             ratatui::Terminal::new(ratatui::backend::TestBackend::new(120, 7)).unwrap();
-        let mut model = test_fixtures::view_model(fox_services_top_core::commands::ViewKind::Overview, 1);
+        let mut model =
+            test_fixtures::view_model(fox_services_top_core::commands::ViewKind::Overview, 1);
         model.modules.processes = Some(std::sync::Arc::new(view));
         terminal
             .draw(|frame| {
@@ -892,7 +899,8 @@ mod tests {
         let context = test_fixtures::display_context();
         let draw = |count: usize, height: u16| -> Vec<String> {
             let view = test_fixtures::processes_view(count, 0, u32::try_from(count).unwrap());
-            let mut model = test_fixtures::view_model(fox_services_top_core::commands::ViewKind::Overview, 1);
+            let mut model =
+                test_fixtures::view_model(fox_services_top_core::commands::ViewKind::Overview, 1);
             model.modules.processes = Some(std::sync::Arc::new(view));
             let mut terminal =
                 ratatui::Terminal::new(ratatui::backend::TestBackend::new(120, height)).unwrap();
@@ -923,12 +931,7 @@ mod tests {
         assert_eq!(rows_of(&few), vec![4, 5, 6], "{}", few.join("\n"));
         // Six processes in the same body of four rows: one row each.
         let packed = draw(6, 10);
-        assert_eq!(
-            rows_of(&packed),
-            vec![4, 5, 6, 7],
-            "{}",
-            packed.join("\n")
-        );
+        assert_eq!(rows_of(&packed), vec![4, 5, 6, 7], "{}", packed.join("\n"));
     }
 
     #[test]

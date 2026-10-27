@@ -9,7 +9,9 @@ use fox_services_top_core::clock::TimeProvider;
 use fox_services_top_core::identity::{EntityId, Scope};
 use fox_services_top_core::metric::{ids, native};
 use fox_services_top_core::naming::{attributes, entity, groups};
-use fox_services_top_core::observation::{Attribute, EntityKind, EntityRecord, Observation, ReadPlan};
+use fox_services_top_core::observation::{
+    Attribute, EntityKind, EntityRecord, Observation, ReadPlan,
+};
 use fox_services_top_core::quality::{Quality, RawKind, ReadStatus};
 
 use crate::common::{SystemFiles, parse_u64};

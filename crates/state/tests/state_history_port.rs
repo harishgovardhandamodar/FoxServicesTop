@@ -301,8 +301,8 @@ fn maintenance_sampling_and_clock_are_forwarded() {
         .observe_wall_clock(30 * SECOND, UTC_ON_A_WHOLE_MINUTE_NS);
     let calls = rig.history.calls();
     assert_eq!(calls[0], Call::Maintain(10 * SECOND));
-    let grace =
-        fox_services_top_core::sampling::SamplingTiming::from_sampling(&config.sampling).finalize_grace_ns;
+    let grace = fox_services_top_core::sampling::SamplingTiming::from_sampling(&config.sampling)
+        .finalize_grace_ns;
     assert!(calls.contains(&Call::FinalizeGrace(grace)));
     assert_eq!(
         calls.last(),

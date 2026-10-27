@@ -45,7 +45,8 @@ fn a_committed_table_goes_to_the_process_actor_once() {
     assert_eq!(tables[0].table().rows.len(), 1);
     assert!(tables[0].process_period_ms > 0);
     // Handed over as committed, with the catalog of the moment (D-99).
-    let committed = fox_services_top_core::ports::SnapshotReader::latest(harness.ports.snapshots.as_ref());
+    let committed =
+        fox_services_top_core::ports::SnapshotReader::latest(harness.ports.snapshots.as_ref());
     assert!(Arc::ptr_eq(
         &tables[0].snapshot.process_table,
         &committed.process_table

@@ -8,7 +8,9 @@ use std::sync::Arc;
 use fox_services_top_core::clock::TimeProvider;
 use fox_services_top_core::identity::{AdapterId, HostId};
 use fox_services_top_core::naming::{self, adapters};
-use fox_services_top_core::observation::{AdapterManifest, AdapterOperation, Isolation, MAX_CATALOG_PAGE};
+use fox_services_top_core::observation::{
+    AdapterManifest, AdapterOperation, Isolation, MAX_CATALOG_PAGE,
+};
 use fox_services_top_core::ports::TelemetryPort;
 use fox_services_top_core::quality::Namespace;
 use thiserror::Error;

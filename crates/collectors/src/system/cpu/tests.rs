@@ -286,7 +286,8 @@ fn millidegrees(key: &MetricKey, adapter: &str, source: &str, value: f64, at: u6
 
 fn with_origin(mut observation: Observation, origin: &str) -> Observation {
     observation.provenance.origin_id = Some(OriginId::new(origin).unwrap());
-    observation.provenance.origin_relation = fox_services_top_core::identity::OriginRelation::Confirmed;
+    observation.provenance.origin_relation =
+        fox_services_top_core::identity::OriginRelation::Confirmed;
     observation
 }
 
@@ -557,7 +558,10 @@ fn retained_reading_expires_once_as_stale() {
     );
     let value = value_of(&expired, &package_temperature()).unwrap();
     assert_eq!(value.value, None);
-    assert_eq!(value.freshness, fox_services_top_core::quality::Freshness::Stale);
+    assert_eq!(
+        value.freshness,
+        fox_services_top_core::quality::Freshness::Stale
+    );
     assert!(expired.next_state.candidates.is_empty());
     assert!(
         expired
@@ -818,7 +822,8 @@ fn replayed_inputs_never_publish_into_the_live_namespace() {
         let mut records = stat_line(None, ticks, at);
         for record in &mut records {
             record.sample_kind = SampleKind::Replay;
-            record.provenance.adapter_id = fox_services_top_core::identity::AdapterId::new("replay").unwrap();
+            record.provenance.adapter_id =
+                fox_services_top_core::identity::AdapterId::new("replay").unwrap();
         }
         records
     };
@@ -1002,7 +1007,9 @@ fn committed_power(
     let value = fox_services_top_core::canonical::CanonicalValue {
         key: metric_key(entity, metric, scope),
         cycle_id: 1,
-        source_id: Some(fox_services_top_core::testing::source_id(&format!("{entity}:power"))),
+        source_id: Some(fox_services_top_core::testing::source_id(&format!(
+            "{entity}:power"
+        ))),
         source_generation: Some(1),
         unit: CanonicalUnit::Watts,
         value: watts.map(|watts| fox_services_top_core::metric::Scalar::from_f64(watts).unwrap()),
@@ -1234,7 +1241,8 @@ fn a_package_the_job_did_not_read_counts_as_committed() {
 fn a_replayed_total_never_enters_the_history() {
     let replayed = |mut record: Observation| {
         record.sample_kind = SampleKind::Replay;
-        record.provenance.adapter_id = fox_services_top_core::identity::AdapterId::new("replay").unwrap();
+        record.provenance.adapter_id =
+            fox_services_top_core::identity::AdapterId::new("replay").unwrap();
         record
     };
     let mut gpu = (*gpu_power(GPU_A, Some(60.0), 3 * SECOND)).clone();

@@ -327,7 +327,10 @@ mod tests {
     }
 
     fn rendered(size: (u16, u16)) -> String {
-        let model = crate::test_fixtures::view_model(fox_services_top_core::commands::ViewKind::Settings, 1);
+        let model = crate::test_fixtures::view_model(
+            fox_services_top_core::commands::ViewKind::Settings,
+            1,
+        );
         crate::test_fixtures::render_text(&SettingsModule::new().unwrap(), &model, size)
     }
 
@@ -382,8 +385,10 @@ mod tests {
 
     #[test]
     fn data_sources_say_when_no_host_reported() {
-        let mut model =
-            crate::test_fixtures::view_model(fox_services_top_core::commands::ViewKind::Settings, 1);
+        let mut model = crate::test_fixtures::view_model(
+            fox_services_top_core::commands::ViewKind::Settings,
+            1,
+        );
         let mut settings = crate::test_fixtures::settings_view();
         settings.hosts.clear();
         model.modules.settings = Some(std::sync::Arc::new(settings));

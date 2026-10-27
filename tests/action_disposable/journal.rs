@@ -6,7 +6,9 @@ use std::os::fd::RawFd;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 
-use fox_services_top_core::action::{ActionState, PersistenceState, RecoveredIntent, SignalOutcome};
+use fox_services_top_core::action::{
+    ActionState, PersistenceState, RecoveredIntent, SignalOutcome,
+};
 use fox_services_top_core::errors::ErrorCode;
 use uuid::Uuid;
 

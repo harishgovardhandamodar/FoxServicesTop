@@ -2,11 +2,15 @@
 
 use std::collections::BTreeMap;
 
-use fox_services_top_core::canonical::{CandidateDisposition, PolicySnapshot, RejectReason, SelectionMemo};
+use fox_services_top_core::canonical::{
+    CandidateDisposition, PolicySnapshot, RejectReason, SelectionMemo,
+};
 use fox_services_top_core::identity::MetricKey;
 use fox_services_top_core::metric::{descriptor, ids, native};
 use fox_services_top_core::observation::Observation;
-use fox_services_top_core::quality::{Freshness, Quality, RawKind, ReadStatus, SampleKind, SelectionState};
+use fox_services_top_core::quality::{
+    Freshness, Quality, RawKind, ReadStatus, SampleKind, SelectionState,
+};
 use fox_services_top_core::testing::{ObservationBuilder, metric_key, source_id};
 use proptest::prelude::*;
 

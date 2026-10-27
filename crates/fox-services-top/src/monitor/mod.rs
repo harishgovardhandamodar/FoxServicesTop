@@ -237,7 +237,8 @@ struct Application {
     frontend_finished: Arc<AtomicBool>,
     fail_stop: FailStop,
     /// `None` result: the control thread panicked (fail-stop).
-    manager_thread: Option<std::thread::JoinHandle<Option<fox_services_top_manager::ShutdownSummary>>>,
+    manager_thread:
+        Option<std::thread::JoinHandle<Option<fox_services_top_manager::ShutdownSummary>>>,
     supervisor: SupervisorHandle,
     workers: Workers,
     logger: Arc<FileLogger>,
@@ -264,7 +265,8 @@ impl Application {
         let (loaded, config_repository) =
             startup::load_configuration(cli, &paths, Arc::clone(&filesystem))
                 .map_err(|error| StartError::invalid(error.to_string()))?;
-        let clock: Arc<dyn fox_services_top_core::clock::TimeProvider> = Arc::new(BootClock::new()?);
+        let clock: Arc<dyn fox_services_top_core::clock::TimeProvider> =
+            Arc::new(BootClock::new()?);
         let logger = Arc::new(FileLogger::start(
             &paths.log_file,
             usize::try_from(loaded.effective.queues.log_bytes).unwrap_or(1 << 20),
@@ -429,7 +431,10 @@ fn replay_state_root() -> Result<PathBuf, StartError> {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|elapsed| elapsed.as_nanos())
         .unwrap_or_default();
-    let root = std::env::temp_dir().join(format!("fox-services-top-replay-{}-{unique}", std::process::id()));
+    let root = std::env::temp_dir().join(format!(
+        "fox-services-top-replay-{}-{unique}",
+        std::process::id()
+    ));
     std::fs::create_dir(&root)
         .map_err(|error| StartError::failure(format!("replay state directory: {error}")))?;
     use std::os::unix::fs::PermissionsExt;

@@ -18,7 +18,10 @@ use support::*;
 
 const ADAPTER: &str = "thermal";
 
-fn adapter(sysfs: &FakeSysfs, clock: &Arc<fox_services_top_core::testing::FakeClock>) -> ThermalAdapter {
+fn adapter(
+    sysfs: &FakeSysfs,
+    clock: &Arc<fox_services_top_core::testing::FakeClock>,
+) -> ThermalAdapter {
     ThermalAdapter::new(
         time(clock),
         host(),

@@ -67,7 +67,12 @@ impl DisplayModule for ClusterModule {
         let mut output = Output::default();
         let Some(cluster) = model.modules.cluster.as_deref() else {
             let inner = panel_with_keys(frame, area, "Nodes", NODES_KEYS, context);
-            message(frame, inner, &no_data("cluster"), context.theme.muted_style());
+            message(
+                frame,
+                inner,
+                &no_data("cluster"),
+                context.theme.muted_style(),
+            );
             output.label("nodes: no data");
             return output.finish();
         };
@@ -120,11 +125,14 @@ fn render_node_table(
     context: &DisplayContext,
     output: &mut Output,
 ) {
-    let Some(table) = rows.take(saturate_u16(nodes.len().max(1) + 1).min(rows.remaining().max(3))) else {
+    let Some(table) = rows.take(saturate_u16(nodes.len().max(1) + 1).min(rows.remaining().max(3)))
+    else {
         return;
     };
     let mut cursor = RowCursor::new(table);
-    let Some(header) = cursor.next_row() else { return };
+    let Some(header) = cursor.next_row() else {
+        return;
+    };
     let columns = fit_columns(&NODE_COLUMNS, header.width);
     draw_table_header(
         frame.buffer_mut(),
@@ -158,7 +166,8 @@ fn node_cells(node: &ClusterNodeView, style: Style) -> Vec<TableCell> {
         TableCell::new(gpu_text(node), style),
         TableCell::new(net_text(node), style),
         TableCell::new(
-            node.tokens_per_sec.map_or_else(|| "–".to_owned(), |rate| format!("{rate:.1}")),
+            node.tokens_per_sec
+                .map_or_else(|| "–".to_owned(), |rate| format!("{rate:.1}")),
             style,
         ),
         TableCell::new(containers_text(node), style),
@@ -206,7 +215,9 @@ fn render_offline(
     output: &mut Output,
 ) {
     for node in nodes.iter().filter(|node| !node.online) {
-        let Some(error) = node.error.as_deref() else { continue };
+        let Some(error) = node.error.as_deref() else {
+            continue;
+        };
         let Some(row) = rows.next_row() else { break };
         draw_line(
             frame.buffer_mut(),

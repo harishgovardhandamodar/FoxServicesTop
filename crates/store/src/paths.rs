@@ -376,7 +376,10 @@ mod tests {
             paths.config_file,
             PathBuf::from("/xdg/config/fox-services-top/v2/config.json")
         );
-        assert_eq!(paths.state_dir, PathBuf::from("/xdg/state/fox-services-top/v2"));
+        assert_eq!(
+            paths.state_dir,
+            PathBuf::from("/xdg/state/fox-services-top/v2")
+        );
         assert_eq!(
             paths.audit_database,
             PathBuf::from("/xdg/state/fox-services-top/v2/audit.sqlite3")

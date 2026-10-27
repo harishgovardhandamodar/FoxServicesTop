@@ -3,7 +3,9 @@
 //! timing, candidate lists and history eligibility.
 
 use fox_services_top_core::canonical::{CanonicalSample, CanonicalValue, MAX_CANDIDATE_IDS};
-use fox_services_top_core::identity::{EntityId, IdentityError, MetricId, MetricKey, Scope, SourceId};
+use fox_services_top_core::identity::{
+    EntityId, IdentityError, MetricId, MetricKey, Scope, SourceId,
+};
 use fox_services_top_core::metric::{MetricDescriptor, Scalar, ScalarView, descriptor};
 use fox_services_top_core::observation::Observation;
 use fox_services_top_core::quality::{Freshness, Namespace, Quality, SampleKind, SelectionState};

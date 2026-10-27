@@ -11,7 +11,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-use fox_services_top_adapters::replay::{RefProfile, ReplayError, ReplayFixture, generate_ref_fixture};
+use fox_services_top_adapters::replay::{
+    RefProfile, ReplayError, ReplayFixture, generate_ref_fixture,
+};
 use fox_services_top_core::quality::{Quality, RawKind, ReadStatus};
 use serde::Serialize;
 use thiserror::Error;
@@ -324,7 +326,10 @@ mod tests {
         let profile = small_profile(2);
         let written = write_fixture(&directory, 11, &profile).unwrap();
         let on_disk = std::fs::read(&written.path).unwrap();
-        assert_eq!(fox_services_top_core::digest::sha256_hex(&on_disk), written.sha256);
+        assert_eq!(
+            fox_services_top_core::digest::sha256_hex(&on_disk),
+            written.sha256
+        );
         assert_eq!(on_disk, fixture_bytes(11, &profile).unwrap());
         assert!(written.path.starts_with(&directory));
         std::fs::remove_dir_all(&directory).unwrap();

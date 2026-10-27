@@ -9,7 +9,9 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use fox_services_top_core::identity::ProcessKey;
-use fox_services_top_core::process_history::{KeepLatest, ProcessHistoryJournal, RunBucketRow, RunInfo};
+use fox_services_top_core::process_history::{
+    KeepLatest, ProcessHistoryJournal, RunBucketRow, RunInfo,
+};
 use fox_services_top_core::tiers::Tier;
 
 /// Bytes the refused buckets may hold.

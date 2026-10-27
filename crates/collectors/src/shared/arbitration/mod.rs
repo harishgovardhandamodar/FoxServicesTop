@@ -304,7 +304,9 @@ fn decide(input: &DecisionInput<'_, '_, '_>) -> Decision {
         current_healthy,
         now_boot_ns: input.now_boot_ns,
         required_streak: input.policy.switch_successes.max(1),
-        min_hold_ns: fox_services_top_core::clock::ms_to_ns(u64::from(input.policy.switch_min_hold_ms)),
+        min_hold_ns: fox_services_top_core::clock::ms_to_ns(u64::from(
+            input.policy.switch_min_hold_ms,
+        )),
     });
     let index = index_of(input.assessed, &verdict.selected).unwrap_or(best);
     let held_challenger = verdict

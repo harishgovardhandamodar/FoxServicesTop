@@ -103,8 +103,10 @@ impl Pipeline {
                     catalog_revision: self.catalog.revision.max(1),
                     config_revision: 1,
                     cycle_id: self.cycle,
-                    read_group: fox_services_top_core::identity::ReadGroup::new(paged_group(&group, page))
-                        .unwrap(),
+                    read_group: fox_services_top_core::identity::ReadGroup::new(paged_group(
+                        &group, page,
+                    ))
+                    .unwrap(),
                     source_slots: Vec::new(),
                     deadline_boot_ns: self.clock.now_boot_ns() + 1_000_000_000,
                     epoch: 1,

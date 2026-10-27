@@ -97,7 +97,12 @@ impl DisplayModule for DockerModule {
         let mut output = Output::default();
         let Some(services) = model.modules.docker.as_deref() else {
             let inner = panel_with_keys(frame, area, "Fox-Services", SERVICES_KEYS, context);
-            message(frame, inner, &no_data("services"), context.theme.muted_style());
+            message(
+                frame,
+                inner,
+                &no_data("services"),
+                context.theme.muted_style(),
+            );
             output.label("services: no data");
             return output.finish();
         };
@@ -186,9 +191,7 @@ pub(crate) fn render_services_content(
         return;
     }
     render_services(frame, rows, &matching, context, output);
-    if legend
-        && let Some(row) = rows.next_row()
-    {
+    if legend && let Some(row) = rows.next_row() {
         draw_line(
             frame.buffer_mut(),
             row,
@@ -219,13 +222,14 @@ fn render_services(
     output: &mut Output,
 ) {
     // One header plus one row per service.
-    let Some(table) = rows.take(
-        saturate_u16(services.len() + 1).min(rows.remaining().max(3)),
-    ) else {
+    let Some(table) = rows.take(saturate_u16(services.len() + 1).min(rows.remaining().max(3)))
+    else {
         return;
     };
     let mut cursor = RowCursor::new(table);
-    let Some(header) = cursor.next_row() else { return };
+    let Some(header) = cursor.next_row() else {
+        return;
+    };
     let columns = fit_columns(&SERVICE_COLUMNS, header.width);
     draw_table_header(
         frame.buffer_mut(),
@@ -266,7 +270,10 @@ fn service_cells(service: &ServiceRowView, context: &DisplayContext) -> Vec<Tabl
         .join(", ");
     vec![
         TableCell::new(clean(&service.service), context.theme.text_style()),
-        TableCell::new(clean(&service.status), status_style(&service.status, context)),
+        TableCell::new(
+            clean(&service.status),
+            status_style(&service.status, context),
+        ),
         TableCell::new(models, context.theme.text_style()),
         TableCell::new(service.requests.to_string(), context.theme.text_style()),
         TableCell::new(
@@ -305,7 +312,9 @@ fn render_recent(
     if rows.remaining() < 3 {
         return;
     }
-    let Some(caption) = rows.next_row() else { return };
+    let Some(caption) = rows.next_row() else {
+        return;
+    };
     draw_line(
         frame.buffer_mut(),
         caption,
@@ -315,13 +324,13 @@ fn render_recent(
         )),
     );
     // One header plus one row per request; `j`/`k` scroll this table.
-    let Some(table) = rows.take(
-        saturate_u16(recent.len() + 1).min(rows.remaining().max(2)),
-    ) else {
+    let Some(table) = rows.take(saturate_u16(recent.len() + 1).min(rows.remaining().max(2))) else {
         return;
     };
     let mut cursor = RowCursor::new(table);
-    let Some(header) = cursor.next_row() else { return };
+    let Some(header) = cursor.next_row() else {
+        return;
+    };
     let columns = fit_columns(&RECENT_COLUMNS, header.width);
     draw_table_header(
         frame.buffer_mut(),
@@ -371,10 +380,7 @@ fn recent_cells(request: &RecentRequestView, context: &DisplayContext) -> Vec<Ta
         (query, requestor) => format!("{} · {}", clean(query), clean(requestor)),
     };
     vec![
-        TableCell::new(
-            format_short_age(request.ago_s),
-            context.theme.muted_style(),
-        ),
+        TableCell::new(format_short_age(request.ago_s), context.theme.muted_style()),
         TableCell::new(clean(&request.service), context.theme.text_style()),
         TableCell::new(model, context.theme.text_style()),
         TableCell::new(

@@ -18,7 +18,9 @@ use fox_services_top_core::view::{SettingsView, ViewModel};
 use fox_services_top_manager::{ManagerChannels, ManagerPorts};
 use fox_services_top_runtime::clock::BootClock;
 use fox_services_top_store::config::FileConfigRepository;
-use fox_services_top_store::fs::{Failpoint, FailpointFileSystem, FileSystemOps, RealFileSystem, Trigger};
+use fox_services_top_store::fs::{
+    Failpoint, FailpointFileSystem, FileSystemOps, RealFileSystem, Trigger,
+};
 
 use crate::support::filesystem::FaultyFileSystem;
 use crate::support::manager_rig::{

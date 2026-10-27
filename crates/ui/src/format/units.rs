@@ -141,7 +141,8 @@ pub fn format_tps(value: f64) -> String {
 }
 
 /// Fixed decimals without a `-0` artifact for values that round to zero.
-pub fn fixed(value: f64, decimals: usize) -> String {    let text = format!("{value:.decimals$}");
+pub fn fixed(value: f64, decimals: usize) -> String {
+    let text = format!("{value:.decimals$}");
     match text.strip_prefix('-') {
         Some(unsigned) if unsigned.chars().all(|c| c == '0' || c == '.') => unsigned.to_owned(),
         _ => text,

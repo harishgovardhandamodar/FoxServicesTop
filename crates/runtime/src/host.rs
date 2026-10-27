@@ -476,7 +476,9 @@ impl<'a> DiagnosticLines<'a> {
         }
         self.written += 1;
         let mut line = sanitize_message(&format!("{code}: {detail}"));
-        line.truncate(fox_services_top_core::text::truncate_utf8(&line, MAX_DIAGNOSTIC_LINE_BYTES).len());
+        line.truncate(
+            fox_services_top_core::text::truncate_utf8(&line, MAX_DIAGNOSTIC_LINE_BYTES).len(),
+        );
         line.push('\n');
         // Diagnostics are best effort: a closed stderr must not stop the host.
         let _ = self.sink.write_all(line.as_bytes());

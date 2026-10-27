@@ -12,18 +12,24 @@ use std::time::Duration;
 
 use crossbeam_channel::{Sender, TrySendError};
 use fox_services_top::live_store::LiveStore;
-use fox_services_top_core::budget::{ByteLedger, BytePermit, MIB, Partition, QueueGate, QueueTicket};
+use fox_services_top_core::budget::{
+    ByteLedger, BytePermit, MIB, Partition, QueueGate, QueueTicket,
+};
 use fox_services_top_core::clock::TimeProvider;
 use fox_services_top_core::commands::CommandBody;
 use fox_services_top_core::config::Config;
 use fox_services_top_core::errors::{ErrorCode, ErrorDetail};
 use fox_services_top_core::identity::SessionId;
-use fox_services_top_core::ports::{ConfigRepository, ControlCompletion, IngestionCompletion, Logger};
+use fox_services_top_core::ports::{
+    ConfigRepository, ControlCompletion, IngestionCompletion, Logger,
+};
 use fox_services_top_core::quality::Namespace;
 use fox_services_top_core::testing::FakeClock;
 use fox_services_top_core::testing::MemoryLogger;
 use fox_services_top_core::view::{HostState, HostStatus, OverloadState, ViewModel};
-use fox_services_top_manager::{INGESTION_INBOX_CAPACITY, ManagerChannels, ManagerInboxes, ManagerPorts};
+use fox_services_top_manager::{
+    INGESTION_INBOX_CAPACITY, ManagerChannels, ManagerInboxes, ManagerPorts,
+};
 use fox_services_top_store::config::FileConfigRepository;
 use fox_services_top_store::fs::RealFileSystem;
 use uuid::Uuid;
@@ -116,7 +122,8 @@ impl OverloadRig {
         // A real live manifest gives the scheduler its fast read groups (the
         // header projects their effective period); behind the inert adapter
         // port the host never becomes dispatchable, so nothing is read.
-        let procfs = fox_services_top_adapters::registry::live_manifest("procfs").expect("procfs manifest");
+        let procfs =
+            fox_services_top_adapters::registry::live_manifest("procfs").expect("procfs manifest");
         let setup = manager_setup(&config, &identity, vec![procfs], Namespace::Live);
         let manager = RunningManager::start(setup, ports, channels);
         Self {

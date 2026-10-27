@@ -8,7 +8,9 @@
 //! per-core bars.
 
 use fox_services_top_core::metric::CanonicalUnit;
-use fox_services_top_core::view::{CoreView, CpuView, FrequencyGroup, LabeledCell, MetricCell, ViewModel};
+use fox_services_top_core::view::{
+    CoreView, CpuView, FrequencyGroup, LabeledCell, MetricCell, ViewModel,
+};
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
@@ -672,7 +674,8 @@ mod tests {
     #[test]
     fn the_collapsed_chart_fills_a_taller_panel() {
         let context = test_fixtures::display_context();
-        let model = test_fixtures::view_model(fox_services_top_core::commands::ViewKind::Overview, 1);
+        let model =
+            test_fixtures::view_model(fox_services_top_core::commands::ViewKind::Overview, 1);
         let module = CpuModule::new().unwrap();
         let own = module.preferred_rows(&model, 80, Slot::Overview).unwrap();
         for height in [own, own + 4] {

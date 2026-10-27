@@ -289,9 +289,9 @@ mod tests {
 
     #[test]
     fn failed_reservation_leaves_log_unchanged() {
-        let ledger = ByteLedger::new(fox_services_top_core::budget::PartitionLimits::for_memory_limit_mib(
-            0,
-        ));
+        let ledger = ByteLedger::new(
+            fox_services_top_core::budget::PartitionLimits::for_memory_limit_mib(0),
+        );
         let mut log = ChunkLog::<GaugeSample>::new(&ledger, Partition::RawHistory);
         assert!(log.try_push(sample(1)).is_err());
         assert!(log.is_empty());

@@ -643,7 +643,8 @@ mod tests {
 
     #[test]
     fn rooted_files_read_fake_tree() {
-        let directory = std::env::temp_dir().join(format!("fox-services-top-common-{}", std::process::id()));
+        let directory =
+            std::env::temp_dir().join(format!("fox-services-top-common-{}", std::process::id()));
         std::fs::create_dir_all(directory.join("proc")).unwrap();
         std::fs::write(directory.join("proc/loadavg"), "0.5 0.6 0.7 2/300 42\n").unwrap();
         let files = CountingFiles::new(RootedFiles::new(&directory));

@@ -9,7 +9,9 @@ use fox_services_top_core::config::{BUILTIN_MODULES, Config, ValueOrigin};
 use fox_services_top_core::identity::ModuleId;
 use fox_services_top_core::naming::groups;
 use fox_services_top_core::observation::split_page;
-use fox_services_top_core::view::{HostStatus, IntervalView, OverloadState, SettingField, SettingsView};
+use fox_services_top_core::view::{
+    HostStatus, IntervalView, OverloadState, SettingField, SettingsView,
+};
 use serde_json::Value;
 
 use super::SettingsInputs;

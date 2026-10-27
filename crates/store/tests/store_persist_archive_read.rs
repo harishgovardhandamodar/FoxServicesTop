@@ -180,7 +180,10 @@ fn temperature_in(boot: &str) -> MetricKey {
     key
 }
 
-fn minutes_of(key: &MetricKey, before: u64) -> fox_services_top_core::overview_history::ArchivedMinutesRead {
+fn minutes_of(
+    key: &MetricKey,
+    before: u64,
+) -> fox_services_top_core::overview_history::ArchivedMinutesRead {
     fox_services_top_core::overview_history::ArchivedMinutesRead {
         series: SeriesInEveryBoot::from(key),
         from_utc_ns: 0,
@@ -255,7 +258,10 @@ fn an_archive_of_another_format_is_not_read() {
             .archived_minutes(&minutes_of(&key, now))
             .unwrap_err();
         assert!(
-            matches!(error, fox_services_top_core::errors::InfraError::Unavailable(_)),
+            matches!(
+                error,
+                fox_services_top_core::errors::InfraError::Unavailable(_)
+            ),
             "{label}: {error:?}"
         );
         assert!(
@@ -377,11 +383,13 @@ fn the_backfill_reads_minutes_oldest_first_a_page_at_a_time() {
         start_boot: MINUTE,
     };
     fixture.write(&second, &[Some(60.0), Some(70.0)]);
-    let read = |from: u64, max_minutes: u32| fox_services_top_core::overview_history::ArchivedMinutesRead {
-        series: SeriesInEveryBoot::from(&boot_a),
-        from_utc_ns: utc_i64(from),
-        segments_before_utc_ns: utc_i64(now),
-        max_minutes,
+    let read = |from: u64, max_minutes: u32| {
+        fox_services_top_core::overview_history::ArchivedMinutesRead {
+            series: SeriesInEveryBoot::from(&boot_a),
+            from_utc_ns: utc_i64(from),
+            segments_before_utc_ns: utc_i64(now),
+            max_minutes,
+        }
     };
     let mut reader = fixture.reader();
     let all = reader.archived_minutes(&read(0, 100)).unwrap();

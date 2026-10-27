@@ -241,7 +241,9 @@ impl EndCause {
     /// Short text for the list and the detail page.
     pub fn text(self) -> String {
         match self {
-            Self::SignaledByFoxServicesTop(signal) => format!("{} by fox-services-top", signal.name()),
+            Self::SignaledByFoxServicesTop(signal) => {
+                format!("{} by fox-services-top", signal.name())
+            }
             Self::Signal(signal) => match signal_name(signal) {
                 Some(name) => format!("killed by {name}"),
                 None => format!("killed by signal {signal}"),

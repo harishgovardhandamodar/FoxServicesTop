@@ -6,7 +6,9 @@ use fox_services_top_core::errors::InfraError;
 use fox_services_top_core::identity::EntityId;
 use fox_services_top_core::naming::{attributes, entity};
 use fox_services_top_core::observation::EntityKind;
-use fox_services_top_core::ports::{ProcessHistoryCompletion, ProcessHistoryReader, ProcessMemoryReader};
+use fox_services_top_core::ports::{
+    ProcessHistoryCompletion, ProcessHistoryReader, ProcessMemoryReader,
+};
 use fox_services_top_core::process_history::{
     EndCause, ProcessHistoryLoad, RunDetails, RunEnd, RunInfo, RunMetric, StoreUsage,
 };

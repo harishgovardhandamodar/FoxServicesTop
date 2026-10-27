@@ -442,7 +442,8 @@ fn validation_rejects_oversize_inputs() {
         code_of(&ReplayFixture::from_json_slice(&bytes).unwrap_err()),
         Some("FILE_TOO_LARGE")
     );
-    let missing = ReplayFixture::load(Path::new("/nonexistent/fox-services-top/fixture.json")).unwrap_err();
+    let missing =
+        ReplayFixture::load(Path::new("/nonexistent/fox-services-top/fixture.json")).unwrap_err();
     assert!(
         matches!(missing, ReplayError::Io { .. }),
         "I/O is an infrastructure error"

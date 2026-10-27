@@ -8,7 +8,9 @@
 //! loaded and resident in memory/VRAM. Read-only: nothing here starts,
 //! unloads or switches a model.
 
-use fox_services_top_core::view::{TokenAppView, TokenEngineView, TokenModelView, TokensView, ViewModel};
+use fox_services_top_core::view::{
+    TokenAppView, TokenEngineView, TokenModelView, TokensView, ViewModel,
+};
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::Style;
@@ -105,7 +107,12 @@ impl DisplayModule for TokensModule {
         let mut output = Output::default();
         let Some(tokens) = model.modules.tokens.as_deref() else {
             let inner = panel_with_keys(frame, area, "Tokens", TOKENS_KEYS, context);
-            message(frame, inner, &no_data("tokens"), context.theme.muted_style());
+            message(
+                frame,
+                inner,
+                &no_data("tokens"),
+                context.theme.muted_style(),
+            );
             output.label("tokens: no data");
             return output.finish();
         };
@@ -238,7 +245,12 @@ fn tps_style(value: f64, trend: Style, theme: &ThemePalette) -> Style {
 
 /// The tokens-per-second chart over the window, with its caption: both
 /// directions stacked per bucket, newest bucket at the right edge.
-fn render_chart(frame: &mut Frame<'_>, rows: &mut RowCursor, flow: &Flow, context: &DisplayContext) {
+fn render_chart(
+    frame: &mut Frame<'_>,
+    rows: &mut RowCursor,
+    flow: &Flow,
+    context: &DisplayContext,
+) {
     if rows.remaining() == 0 {
         return;
     }
@@ -262,7 +274,11 @@ fn render_chart(frame: &mut Frame<'_>, rows: &mut RowCursor, flow: &Flow, contex
                 Span::styled(" / out ", context.theme.muted_style()),
                 Span::styled(
                     format_tps(flow.peak_egress),
-                    tps_style(flow.peak_egress, egress_style(&context.theme), &context.theme),
+                    tps_style(
+                        flow.peak_egress,
+                        egress_style(&context.theme),
+                        &context.theme,
+                    ),
                 ),
             ]),
             Some("egress at the foot, ingress above"),
@@ -275,7 +291,10 @@ fn render_chart(frame: &mut Frame<'_>, rows: &mut RowCursor, flow: &Flow, contex
         area,
         &flow.totals,
         (
-            vec![(flow.egress.as_slice(), Style::new().fg(context.theme.accent))],
+            vec![(
+                flow.egress.as_slice(),
+                Style::new().fg(context.theme.accent),
+            )],
             Some(context.theme.sparkline),
         ),
         None,
@@ -304,7 +323,10 @@ fn render_summary(
             area,
             &flow.totals,
             (
-                vec![(flow.egress.as_slice(), Style::new().fg(context.theme.accent))],
+                vec![(
+                    flow.egress.as_slice(),
+                    Style::new().fg(context.theme.accent),
+                )],
                 Some(context.theme.sparkline),
             ),
             None,
@@ -336,10 +358,7 @@ fn render_summary(
 
 /// Every model of every app, busiest first.
 fn busiest_models<'a>(apps: &[&'a TokenAppView]) -> Vec<&'a TokenModelView> {
-    let mut models: Vec<&TokenModelView> = apps
-        .iter()
-        .flat_map(|app| app.models.iter())
-        .collect();
+    let mut models: Vec<&TokenModelView> = apps.iter().flat_map(|app| app.models.iter()).collect();
     models.sort_by(|a, b| {
         total_of(b)
             .partial_cmp(&total_of(a))
@@ -388,22 +407,32 @@ fn render_apps(
     output: &mut Output,
 ) {
     // One header plus one row per app and per model.
-    let wanted = apps.len() + 1 + apps.iter().map(|app| app.models.len().min(4)).sum::<usize>();
-    let Some(table) = rows.take(
-        crate::num::saturate_u16(wanted).min(rows.remaining().max(4)),
-    ) else {
+    let wanted = apps.len()
+        + 1
+        + apps
+            .iter()
+            .map(|app| app.models.len().min(4))
+            .sum::<usize>();
+    let Some(table) = rows.take(crate::num::saturate_u16(wanted).min(rows.remaining().max(4)))
+    else {
         return;
     };
     let mut cursor = RowCursor::new(table);
-    let Some(header) = cursor.next_row() else { return };
+    let Some(header) = cursor.next_row() else {
+        return;
+    };
     let columns = fit_columns(&APP_COLUMNS, header.width);
-    draw_colored_header(frame.buffer_mut(), header, &APP_COLUMNS, &columns, |spec| {
-        match spec {
+    draw_colored_header(
+        frame.buffer_mut(),
+        header,
+        &APP_COLUMNS,
+        &columns,
+        |spec| match spec {
             4 => ingress_style(&context.theme),
             5 => egress_style(&context.theme),
             _ => context.theme.title_style(),
-        }
-    });
+        },
+    );
     for app in apps {
         if cursor.remaining() == 0 {
             break;
@@ -421,7 +450,8 @@ fn render_apps(
         for model in app.models.iter().take(4) {
             let Some(row) = cursor.next_row() else { break };
             let mut line = model_line(model, context.theme.muted_style(), &context.theme);
-            line.spans.insert(0, Span::styled("  ", context.theme.muted_style()));
+            line.spans
+                .insert(0, Span::styled("  ", context.theme.muted_style()));
             draw_line(frame.buffer_mut(), row, &line);
         }
     }
@@ -497,9 +527,9 @@ fn render_engines(
                 ("", quant) => format!(" · {quant}"),
                 (size, quant) => format!(" · {size} {quant}"),
             };
-            let vram = model
-                .size_vram_bytes
-                .map_or_else(String::new, |bytes| format!(" · {} VRAM", format_bytes(bytes)));
+            let vram = model.size_vram_bytes.map_or_else(String::new, |bytes| {
+                format!(" · {} VRAM", format_bytes(bytes))
+            });
             draw_line(
                 frame.buffer_mut(),
                 row,

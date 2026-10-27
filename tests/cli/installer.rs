@@ -65,8 +65,10 @@ impl Sandbox {
     }
 
     fn archive_path(&self, tag: &str) -> PathBuf {
-        self.release_dir()
-            .join(format!("fox-services-top-{tag}-{}.tar.gz", release_target()))
+        self.release_dir().join(format!(
+            "fox-services-top-{tag}-{}.tar.gz",
+            release_target()
+        ))
     }
 
     /// Publishes `binary` (plus `extra` entries) as the archive of `tag`,
@@ -222,7 +224,9 @@ fn stderr_of(output: &Output) -> String {
 fn installs_a_verified_release_keeps_the_previous_binary_and_rolls_back() {
     let sandbox = Sandbox::new("roundtrip");
     let config = sandbox.root.join(".config/fox-services-top/v2/config.json");
-    let audit = sandbox.root.join(".local/state/fox-services-top/v2/audit.sqlite3");
+    let audit = sandbox
+        .root
+        .join(".local/state/fox-services-top/v2/audit.sqlite3");
     for file in [&config, &audit] {
         std::fs::create_dir_all(file.parent().unwrap()).unwrap();
         std::fs::write(file, b"user data").unwrap();
@@ -236,7 +240,10 @@ fn installs_a_verified_release_keeps_the_previous_binary_and_rolls_back() {
         reported_version(&sandbox.installed()),
         format!("fox-services-top {}", env!("CARGO_PKG_VERSION"))
     );
-    assert_eq!(reported_version(&sandbox.previous()), "fox-services-top 0.1.0");
+    assert_eq!(
+        reported_version(&sandbox.previous()),
+        "fox-services-top 0.1.0"
+    );
     assert_eq!(
         sandbox.install_dir_entries(),
         ["fox-services-top", "fox-services-top.previous"],
@@ -245,7 +252,10 @@ fn installs_a_verified_release_keeps_the_previous_binary_and_rolls_back() {
 
     let rolled_back = sandbox.rollback();
     assert!(rolled_back.status.success(), "{}", stderr_of(&rolled_back));
-    assert_eq!(reported_version(&sandbox.installed()), "fox-services-top 0.1.0");
+    assert_eq!(
+        reported_version(&sandbox.installed()),
+        "fox-services-top 0.1.0"
+    );
     assert_eq!(
         reported_version(&sandbox.previous()),
         format!("fox-services-top {}", env!("CARGO_PKG_VERSION"))
@@ -276,7 +286,10 @@ fn a_checksum_mismatch_is_refused_and_the_installed_binary_is_kept() {
         "{}",
         stderr_of(&refused)
     );
-    assert_eq!(reported_version(&sandbox.installed()), "fox-services-top 0.1.0");
+    assert_eq!(
+        reported_version(&sandbox.installed()),
+        "fox-services-top 0.1.0"
+    );
     assert_eq!(sandbox.install_dir_entries(), ["fox-services-top"]);
 }
 
@@ -343,7 +356,10 @@ fn an_archive_without_a_checksum_entry_is_refused() {
         "{}",
         stderr_of(&refused)
     );
-    assert_eq!(reported_version(&sandbox.installed()), "fox-services-top 0.1.0");
+    assert_eq!(
+        reported_version(&sandbox.installed()),
+        "fox-services-top 0.1.0"
+    );
     assert_eq!(sandbox.install_dir_entries(), ["fox-services-top"]);
 }
 
@@ -456,7 +472,10 @@ fn releases_before_v2_are_refused_before_downloading() {
         let refused = sandbox.install(old);
         assert!(!refused.status.success(), "{old} was accepted");
         let stderr = stderr_of(&refused);
-        assert!(stderr.contains("earlier fox-services-top"), "{old}: {stderr}");
+        assert!(
+            stderr.contains("earlier fox-services-top"),
+            "{old}: {stderr}"
+        );
         assert!(!stderr.contains("could not download"), "{old}: {stderr}");
         assert!(sandbox.install_dir_entries().is_empty());
     }
@@ -505,6 +524,9 @@ fn a_build_for_a_newer_glibc_is_reported_as_such() {
         "{}",
         stderr_of(&refused)
     );
-    assert_eq!(reported_version(&sandbox.installed()), "fox-services-top 0.1.0");
+    assert_eq!(
+        reported_version(&sandbox.installed()),
+        "fox-services-top 0.1.0"
+    );
     assert_eq!(sandbox.install_dir_entries(), ["fox-services-top"]);
 }

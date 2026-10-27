@@ -9,7 +9,9 @@ use fox_services_top_core::canonical::GapRecord;
 use fox_services_top_core::history::SeriesInEveryBoot;
 use fox_services_top_core::identity::MetricKey;
 use fox_services_top_core::metric::CanonicalUnit;
-pub(crate) use fox_services_top_core::ports::{CutAppend, GaugeAppend, HistoryAppends, IntervalAppend};
+pub(crate) use fox_services_top_core::ports::{
+    CutAppend, GaugeAppend, HistoryAppends, IntervalAppend,
+};
 
 use super::gaps::{GapEntry, GapInsert, GapList, ReasonInterner};
 use super::grid::MinuteGrid;

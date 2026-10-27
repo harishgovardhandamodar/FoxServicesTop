@@ -45,8 +45,12 @@ mod tests {
     use fox_services_top_core::config::Config;
     use fox_services_top_core::identity::CollectorId;
     use fox_services_top_core::metric::{CanonicalUnit, Scalar, ids};
-    use fox_services_top_core::ports::{ArchiveJournal, HistoryAppends, HistoryIngest, HistoryOutcome};
-    use fox_services_top_core::quality::{Freshness, Namespace, Quality, SampleKind, SelectionState};
+    use fox_services_top_core::ports::{
+        ArchiveJournal, HistoryAppends, HistoryIngest, HistoryOutcome,
+    };
+    use fox_services_top_core::quality::{
+        Freshness, Namespace, Quality, SampleKind, SelectionState,
+    };
     use fox_services_top_core::sampling::SamplingTiming;
     use fox_services_top_core::testing::{FakeClock, metric_key, source_id};
     use fox_services_top_state::LiveState;

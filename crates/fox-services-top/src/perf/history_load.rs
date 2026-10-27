@@ -25,7 +25,9 @@ use fox_services_top_core::config::SamplingConfig;
 use fox_services_top_core::identity::{
     BootId, CollectorId, EntityId, HostId, IdentityError, MetricId, MetricKey, Scope, SourceId,
 };
-use fox_services_top_core::metric::{CanonicalUnit, METRIC_CATALOG, MetricRole, Scalar, descriptor};
+use fox_services_top_core::metric::{
+    CanonicalUnit, METRIC_CATALOG, MetricRole, Scalar, descriptor,
+};
 use fox_services_top_core::ports::StoreWriter;
 use fox_services_top_core::quality::{Freshness, Quality, SampleKind, SelectionState};
 use fox_services_top_state::StateWriter;

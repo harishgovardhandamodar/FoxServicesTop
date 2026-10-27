@@ -156,7 +156,10 @@ pub struct Config {
     /// Fox-services nodes polled for the Nodes and Docker tabs. Documents
     /// written before it default to polling the example nodes, so old
     /// files keep loading; the section is only written back once set.
-    #[serde(default = "RemoteConfig::default", skip_serializing_if = "RemoteConfig::is_default")]
+    #[serde(
+        default = "RemoteConfig::default",
+        skip_serializing_if = "RemoteConfig::is_default"
+    )]
     pub remote: RemoteConfig,
 }
 
@@ -468,7 +471,12 @@ impl Config {
         config.actions.allow_force = true;
         // The Nodes and Docker tabs are built-in: on unless turned off.
         for module in ["cluster", "docker", "tokens", "power"] {
-            if !config.viewer.enabled_modules.iter().any(|entry| entry == module) {
+            if !config
+                .viewer
+                .enabled_modules
+                .iter()
+                .any(|entry| entry == module)
+            {
                 config.viewer.enabled_modules.push(module.to_owned());
             }
         }

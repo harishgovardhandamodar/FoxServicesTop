@@ -65,7 +65,6 @@ impl FoxServicesClient {
         get_json(&self.node.base_url, path, self.timeout)
     }
 
-
     /// Polls everything one node offers for the three tabs. Every endpoint
     /// answers from memory or the database; the per-container shell-outs
     /// (`/api/docker/stats`, log tails) are deliberately not polled, so one
@@ -106,9 +105,7 @@ impl FoxServicesClient {
         if let Ok(projects) = self.get("/api/docker/projects") {
             apply_project_counts(&mut poll.node, &projects);
         }
-        if discover_mesh
-            && let Ok(peers) = self.get("/api/mesh/peers")
-        {
+        if discover_mesh && let Ok(peers) = self.get("/api/mesh/peers") {
             apply_peers(&mut poll, &peers);
         }
         poll
@@ -138,8 +135,12 @@ fn apply_hardware(node: &mut ClusterNodeView, hardware: &Value) {
                 if let Some(percent) = f64_at(card, "util_pct") {
                     util = Some(util.map_or(percent, |best: f64| best.max(percent)));
                 }
-                used += f64_at(card, "mem_used_bytes").map(|bytes| bytes.max(0.0) as u64).unwrap_or(0);
-                total += f64_at(card, "mem_total_bytes").map(|bytes| bytes.max(0.0) as u64).unwrap_or(0);
+                used += f64_at(card, "mem_used_bytes")
+                    .map(|bytes| bytes.max(0.0) as u64)
+                    .unwrap_or(0);
+                total += f64_at(card, "mem_total_bytes")
+                    .map(|bytes| bytes.max(0.0) as u64)
+                    .unwrap_or(0);
             }
         }
         node.gpu_util_pct = util;
@@ -162,7 +163,9 @@ fn apply_hardware(node: &mut ClusterNodeView, hardware: &Value) {
 /// Container counts for the Nodes tab. The project list itself is not
 /// shown anywhere, so only the totals are kept.
 fn apply_project_counts(node: &mut ClusterNodeView, projects: &Value) {
-    let Some(entries) = projects.get("projects").and_then(Value::as_array) else { return };
+    let Some(entries) = projects.get("projects").and_then(Value::as_array) else {
+        return;
+    };
     let mut projects_running = 0u32;
     let mut containers_running = 0u32;
     let mut containers_total = 0u32;
@@ -172,7 +175,10 @@ fn apply_project_counts(node: &mut ClusterNodeView, projects: &Value) {
         if let Some(containers) = project.get("containers").and_then(Value::as_array) {
             for container in containers.iter().take(MAX_CONTAINERS_PER_PROJECT) {
                 total += 1;
-                let status = container.get("Status").and_then(Value::as_str).unwrap_or("");
+                let status = container
+                    .get("Status")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
                 running += u32::from(status.contains("Up"));
             }
         }
@@ -187,21 +193,31 @@ fn apply_project_counts(node: &mut ClusterNodeView, projects: &Value) {
 }
 
 fn apply_peers(poll: &mut NodePoll, peers: &Value) {
-    let Some(entries) = peers.get("peers").and_then(Value::as_array) else { return };
+    let Some(entries) = peers.get("peers").and_then(Value::as_array) else {
+        return;
+    };
     for entry in entries.iter().take(MAX_PEERS_PER_NODE) {
-        let Some(node_id) = str_at(entry, "node_id") else { continue };
+        let Some(node_id) = str_at(entry, "node_id") else {
+            continue;
+        };
         poll.peers.push(MeshPeerView {
             node_id: truncate(node_id, 128),
             name: str_at(entry, "name").map(|name| truncate(name, 128)),
             machine: str_at(entry, "machine").map(|machine| truncate(machine, 128)),
-            online: entry.get("online").and_then(Value::as_bool).unwrap_or(false),
+            online: entry
+                .get("online")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
             via: poll.node.name.clone(),
         });
     }
 }
 
 fn f64_at(value: &Value, key: &str) -> Option<f64> {
-    value.get(key).and_then(Value::as_f64).filter(|number| number.is_finite())
+    value
+        .get(key)
+        .and_then(Value::as_f64)
+        .filter(|number| number.is_finite())
 }
 
 fn str_at(value: &Value, key: &str) -> Option<String> {

@@ -24,7 +24,9 @@ use fox_services_top_core::action::{PersistenceState, PersistenceStatus};
 use fox_services_top_core::canonical::CatalogSnapshot;
 use fox_services_top_core::clock::NANOS_PER_SECOND;
 use fox_services_top_core::commands::CommandResult;
-use fox_services_top_core::config::{BUILTIN_MODULES, Config, ValidationIssue, ValueOrigin, is_known_module};
+use fox_services_top_core::config::{
+    BUILTIN_MODULES, Config, ValidationIssue, ValueOrigin, is_known_module,
+};
 use fox_services_top_core::errors::{ErrorCode, ErrorDetail};
 use fox_services_top_core::identity::ModuleId;
 use fox_services_top_core::ports::{ConfigJob, Dispatch, DispatchError, PersistError};

@@ -12,7 +12,9 @@ use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use fox_services_top::live_store::LiveStore;
-use fox_services_top::perf::history_load::{HistoryFeeder, PreloadReport, PreloadShape, history_series};
+use fox_services_top::perf::history_load::{
+    HistoryFeeder, PreloadReport, PreloadShape, history_series,
+};
 use fox_services_top::perf::threads::HarnessCpu;
 use fox_services_top_core::budget::{ByteLedger, Partition};
 use fox_services_top_core::canonical::ImmutableSnapshot;

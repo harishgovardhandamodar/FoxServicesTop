@@ -13,7 +13,8 @@
 use std::collections::BTreeMap;
 
 use fox_services_top_core::view::{
-    TokenAppView, TokenBucketView, TokenEngineModelView, TokenEngineView, TokenModelView, TokensView,
+    TokenAppView, TokenBucketView, TokenEngineModelView, TokenEngineView, TokenModelView,
+    TokensView,
 };
 use serde_json::Value;
 
@@ -54,12 +55,15 @@ impl TokenPoll {
             .map(|since| since.as_secs_f64());
         let cutoff = window_cutoff(self.window_hours);
         let mut apps: BTreeMap<String, AppAccumulator> = BTreeMap::new();
-        let mut buckets: Vec<BucketAccumulator> =
-            (0..TIMELINE_POINTS).map(|_| BucketAccumulator::default()).collect();
+        let mut buckets: Vec<BucketAccumulator> = (0..TIMELINE_POINTS)
+            .map(|_| BucketAccumulator::default())
+            .collect();
         let bucket_seconds = self.bucket_seconds();
         if let Some(rows) = usage.get("usage").and_then(Value::as_array) {
             for row in rows.iter().take(MAX_ROWS) {
-                let Some(ts) = f64_at(row, "ts") else { continue };
+                let Some(ts) = f64_at(row, "ts") else {
+                    continue;
+                };
                 if cutoff.is_some_and(|cutoff| ts < cutoff) {
                     continue;
                 }
@@ -84,7 +88,9 @@ impl TokenPoll {
             window_label: format!("{}h", self.window_hours),
             apps: finish_apps(apps),
             timeline: finish_buckets(buckets, now, bucket_seconds),
-            engines: stats.map(|stats| vec![ollama_engine(stats)]).unwrap_or_default(),
+            engines: stats
+                .map(|stats| vec![ollama_engine(stats)])
+                .unwrap_or_default(),
         }
     }
 
@@ -154,23 +160,36 @@ pub fn merge(into: &mut TokensView, node: &str, tokens: NodeTokens) {
         seen.push(app.app.clone());
         into.apps.push(app);
     }
-    into.apps
-        .sort_by(|a, b| b.ingress_tokens.cmp(&a.ingress_tokens).then(b.egress_tokens.cmp(&a.egress_tokens)));
+    into.apps.sort_by(|a, b| {
+        b.ingress_tokens
+            .cmp(&a.ingress_tokens)
+            .then(b.egress_tokens.cmp(&a.egress_tokens))
+    });
     into.apps.truncate(MAX_APPS);
     for engine in tokens.engines {
-        match into.engines.iter_mut().find(|held| held.engine == engine.engine) {
+        match into
+            .engines
+            .iter_mut()
+            .find(|held| held.engine == engine.engine)
+        {
             Some(held) => {
                 held.available = held.available || engine.available;
                 held.loaded_count += engine.loaded_count;
                 held.model_count += engine.model_count;
-                held.vram_total_bytes = held.vram_total_bytes.saturating_add(engine.vram_total_bytes);
+                held.vram_total_bytes = held
+                    .vram_total_bytes
+                    .saturating_add(engine.vram_total_bytes);
                 held.models.extend(engine.models);
             }
             None => into.engines.push(engine),
         }
     }
     for engine in &mut into.engines {
-        engine.models.sort_by(|a, b| b.running.cmp(&a.running).then(b.size_vram_bytes.cmp(&a.size_vram_bytes)));
+        engine.models.sort_by(|a, b| {
+            b.running
+                .cmp(&a.running)
+                .then(b.size_vram_bytes.cmp(&a.size_vram_bytes))
+        });
         engine.models.truncate(MAX_ENGINE_MODELS);
     }
     into.idle = into.total_requests == 0;
@@ -238,7 +257,14 @@ struct BucketAccumulator {
 }
 
 impl AppAccumulator {
-    fn push(&mut self, model: String, ingress: u64, egress: u64, ts: f64, duration_ms: Option<f64>) {
+    fn push(
+        &mut self,
+        model: String,
+        ingress: u64,
+        egress: u64,
+        ts: f64,
+        duration_ms: Option<f64>,
+    ) {
         self.requests = self.requests.saturating_add(1);
         self.ingress = self.ingress.saturating_add(ingress);
         self.egress = self.egress.saturating_add(egress);
@@ -286,7 +312,8 @@ fn finish_apps(apps: BTreeMap<String, AppAccumulator>) -> Vec<TokenAppView> {
                 egress_tokens: acc.egress,
                 ingress_tps: rate(acc.ingress, acc.durations),
                 egress_tps: rate(acc.egress, acc.durations),
-                avg_duration_ms: (acc.durations_seen > 0).then(|| acc.durations / f64::from(acc.durations_seen)),
+                avg_duration_ms: (acc.durations_seen > 0)
+                    .then(|| acc.durations / f64::from(acc.durations_seen)),
                 last_seen_s: (acc.last_seen > 0.0).then_some(acc.last_seen as u64),
                 models,
             }
@@ -336,11 +363,18 @@ fn ollama_engine(stats: &Value) -> TokenEngineView {
                 model: text(model, "name")
                     .or_else(|| text(model, "model"))
                     .unwrap_or_else(|| "?".to_owned()),
-                running: model.get("running").and_then(Value::as_bool).unwrap_or(false),
+                running: model
+                    .get("running")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false),
                 size_bytes: f64_at(model, "size").unwrap_or(0.0).max(0.0) as u64,
                 size_vram_bytes: f64_at(model, "size_vram").map(|bytes| bytes.max(0.0) as u64),
-                parameter_size: details.and_then(|d| text(d, "parameter_size")).unwrap_or_default(),
-                quantization: details.and_then(|d| text(d, "quantization_level")).unwrap_or_default(),
+                parameter_size: details
+                    .and_then(|d| text(d, "parameter_size"))
+                    .unwrap_or_default(),
+                quantization: details
+                    .and_then(|d| text(d, "quantization_level"))
+                    .unwrap_or_default(),
                 expires_in_s: None,
             }
         })
@@ -409,7 +443,11 @@ mod tests {
         ];
         let tokens = TokenPoll::new(24, 500).apply(&usage(&rows), None);
         assert_eq!(tokens.apps.len(), 2);
-        let radar = tokens.apps.iter().find(|app| app.app == "quai-radar").unwrap();
+        let radar = tokens
+            .apps
+            .iter()
+            .find(|app| app.app == "quai-radar")
+            .unwrap();
         assert_eq!(radar.requests, 3);
         assert_eq!(radar.ingress_tokens, 180);
         assert_eq!(radar.egress_tokens, 1300);

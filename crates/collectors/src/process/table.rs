@@ -23,7 +23,9 @@ use fox_services_top_core::canonical::{
     ProcessDescendants, ProcessGpuLink, ProcessRow, ProcessTable, RejectReason,
 };
 use fox_services_top_core::clock::NANOS_PER_SECOND;
-use fox_services_top_core::identity::{AdapterId, CollectorId, EntityId, IdentityError, ProcessKey};
+use fox_services_top_core::identity::{
+    AdapterId, CollectorId, EntityId, IdentityError, ProcessKey,
+};
 use fox_services_top_core::metric::{self, Domain, MetricDescriptor, Scalar, ids, native};
 use fox_services_top_core::naming::{self, adapters, groups};
 use fox_services_top_core::observation::BatchStatus;

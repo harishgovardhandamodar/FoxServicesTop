@@ -366,9 +366,11 @@ mod tests {
 
     #[test]
     fn an_uncertain_commit_is_never_reported_as_unchanged() {
-        let detail =
-            fox_services_top_core::errors::ErrorDetail::new(ErrorCode::PersistFailed, "dir fsync failed")
-                .uncertain();
+        let detail = fox_services_top_core::errors::ErrorDetail::new(
+            ErrorCode::PersistFailed,
+            "dir fsync failed",
+        )
+        .uncertain();
         let mut adopted = CommandResult::from_error(TEST_REQUEST_ID.try_into().unwrap(), &detail);
         adopted.config_revision = Some(2);
         let (level, text) =

@@ -87,7 +87,8 @@ fn collect(cli: &Cli) -> Result<DiagnosticsReport, String> {
     let (effective, config_error) = match &loaded {
         Ok((loaded, _)) => (loaded.effective.clone(), None),
         Err(error) => (
-            fox_services_top_core::config::Config::defaults().map_err(|defaults| defaults.to_string())?,
+            fox_services_top_core::config::Config::defaults()
+                .map_err(|defaults| defaults.to_string())?,
             Some(error.to_string()),
         ),
     };

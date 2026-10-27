@@ -125,7 +125,8 @@ pub(crate) fn validate(setup: &ManagerSetup, ports: &ManagerPorts) -> Result<(),
                 )
         })
         .collect();
-    if !restart_only.is_empty() {        return Err(invalid(format!(
+    if !restart_only.is_empty() {
+        return Err(invalid(format!(
             "effective configuration differs from the saved one in restart-only fields: {}",
             restart_only.join(", ")
         )));
@@ -208,7 +209,11 @@ mod tests {
             &origins(&[("remote.nodes", ValueOrigin::CliOverride)]),
         ));
         // Same node list from a file edit (no CLI origin) still needs one.
-        assert!(!Config::remote_diff_is_cli_only(&saved, &flagged, &origins(&[])));
+        assert!(!Config::remote_diff_is_cli_only(
+            &saved,
+            &flagged,
+            &origins(&[])
+        ));
         // A file edit to another leaf is not covered by the nodes flag.
         let mut timed = flagged.clone();
         timed.remote.poll_interval_ms = 10_000;

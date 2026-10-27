@@ -19,7 +19,9 @@ use fox_services_top_core::canonical::{
 };
 use fox_services_top_core::clock::{NANOS_PER_MILLI, TimeProvider};
 use fox_services_top_core::config::Config;
-use fox_services_top_core::identity::{AdapterId, BootId, CollectorId, HostId, IdentityError, ReadGroup};
+use fox_services_top_core::identity::{
+    AdapterId, BootId, CollectorId, HostId, IdentityError, ReadGroup,
+};
 use fox_services_top_core::observation::{DiscoverRequest, ReadPlan, paged_group, split_page};
 use fox_services_top_core::ports::{Collector, IngressBatch, TelemetryPort};
 use fox_services_top_core::quality::Namespace;

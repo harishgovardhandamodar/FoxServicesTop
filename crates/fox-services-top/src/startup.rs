@@ -5,7 +5,9 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use fox_services_top_core::config::{Config, ValueOrigin, retired_by};
-use fox_services_top_core::ports::{ConfigLoadError, ConfigRepository, LoadOrigin, LogLevel, Logger};
+use fox_services_top_core::ports::{
+    ConfigLoadError, ConfigRepository, LoadOrigin, LogLevel, Logger,
+};
 use fox_services_top_core::quality::Namespace;
 use fox_services_top_store::config::FileConfigRepository;
 use fox_services_top_store::fs::{FileSystemOps, RealFileSystem};

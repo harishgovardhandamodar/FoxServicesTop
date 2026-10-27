@@ -736,9 +736,9 @@ mod tests {
 
     #[test]
     fn full_queue_drops_oldest_and_reports_overflow() {
-        let ledger = ByteLedger::new(fox_services_top_core::budget::PartitionLimits::for_memory_limit_mib(
-            1,
-        ));
+        let ledger = ByteLedger::new(
+            fox_services_top_core::budget::PartitionLimits::for_memory_limit_mib(1),
+        );
         let mut queue = ArchiveQueue::new(&ledger);
         let segment = segment();
         let rows: Vec<ArchiveRow> = (0..10_000)

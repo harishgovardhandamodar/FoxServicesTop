@@ -12,7 +12,9 @@ use std::path::PathBuf;
 
 use fox_services_top_core::action::{ActionState, ConfirmationToken, Signal};
 use fox_services_top_core::canonical::{CanonicalSample, CanonicalValue};
-use fox_services_top_core::commands::{CommandBody, CommandEnvelope, CommandResult, SortKey, ViewKind};
+use fox_services_top_core::commands::{
+    CommandBody, CommandEnvelope, CommandResult, SortKey, ViewKind,
+};
 use fox_services_top_core::config::Config;
 use fox_services_top_core::errors::ErrorCode;
 use fox_services_top_core::identity::{

@@ -543,7 +543,10 @@ mod tests {
     #[test]
     fn a_gray_line_sets_two_gpus_apart() {
         let context = display_context();
-        let model = crate::test_fixtures::view_model(fox_services_top_core::commands::ViewKind::Overview, 1);
+        let model = crate::test_fixtures::view_model(
+            fox_services_top_core::commands::ViewKind::Overview,
+            1,
+        );
         let module = GpuModule::new().unwrap();
         let rows = module.preferred_rows(&model, 120, Slot::Overview).unwrap();
         let draw = |height: u16| -> Vec<String> {

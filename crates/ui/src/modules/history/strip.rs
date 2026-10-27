@@ -12,7 +12,9 @@
 //!   (and for power the energy), as many as the strip has rows.
 
 use fox_services_top_core::metric::CanonicalUnit;
-use fox_services_top_core::view::{HISTORY_GUTTER_COLUMNS, HISTORY_LEGEND_COLUMNS, HistoryPointView};
+use fox_services_top_core::view::{
+    HISTORY_GUTTER_COLUMNS, HISTORY_LEGEND_COLUMNS, HistoryPointView,
+};
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::Style;

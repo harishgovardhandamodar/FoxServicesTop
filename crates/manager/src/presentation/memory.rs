@@ -6,7 +6,9 @@ use fox_services_top_core::metric::{Scalar, ids};
 use fox_services_top_core::naming::entity;
 use fox_services_top_core::process_model::TrackedProcess;
 use fox_services_top_core::quality::SampleKind;
-use fox_services_top_core::view::{CellState, MemoryView, MetricCell, ProcessShare, ProcessTrend, Trend};
+use fox_services_top_core::view::{
+    CellState, MemoryView, MetricCell, ProcessShare, ProcessTrend, Trend,
+};
 
 use super::gpu_directory::GpuDirectory;
 use super::process_shares::process_shares;

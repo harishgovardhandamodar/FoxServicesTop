@@ -127,10 +127,7 @@ fn spawn(
 fn poll_once(config: &RemoteConfig, state: &Mutex<Arc<ClusterSnapshot>>, timeout: Duration) {
     // A poll whose endpoints time out keeps the last answered rows rather
     // than blanking the tabs (D-118).
-    let previous = state
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .clone();
+    let previous = state.lock().unwrap_or_else(PoisonError::into_inner).clone();
     let mut cluster = ClusterView {
         enabled: true,
         nodes: Vec::new(),
@@ -175,7 +172,9 @@ fn poll_once(config: &RemoteConfig, state: &Mutex<Arc<ClusterSnapshot>>, timeout
     if !services_answered && previous.docker.enabled && !previous.docker.idle {
         services.services = previous.docker.services.clone();
         services.recent = previous.docker.recent.clone();
-        services.window_label.clone_from(&previous.docker.window_label);
+        services
+            .window_label
+            .clone_from(&previous.docker.window_label);
         services.stale = true;
     }
     if !tokens_answered && tokens.enabled && previous.tokens.enabled && !previous.tokens.idle {
@@ -184,7 +183,9 @@ fn poll_once(config: &RemoteConfig, state: &Mutex<Arc<ClusterSnapshot>>, timeout
         tokens.total_requests = previous.tokens.total_requests;
         tokens.total_ingress = previous.tokens.total_ingress;
         tokens.total_egress = previous.tokens.total_egress;
-        tokens.window_label.clone_from(&previous.tokens.window_label);
+        tokens
+            .window_label
+            .clone_from(&previous.tokens.window_label);
         tokens.timeline = previous.tokens.timeline.clone();
         tokens.stale = true;
     }
@@ -278,10 +279,7 @@ mod tests {
                     } else {
                         b"{}".to_vec()
                     };
-                    let head = format!(
-                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n",
-                        body.len()
-                    );
+                    let head = format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n", body.len());
                     let _ = socket.write_all(head.as_bytes());
                     let _ = socket.write_all(&body);
                 });
@@ -381,7 +379,10 @@ mod tests {
         assert!(snapshot.tokens.stale, "tokens marked as the last read");
         assert_eq!(snapshot.tokens.total_ingress, 581_671);
         assert_eq!(snapshot.tokens.total_egress, 683_004);
-        assert!(snapshot.cluster.nodes[0].error.is_some(), "still reports offline");
+        assert!(
+            snapshot.cluster.nodes[0].error.is_some(),
+            "still reports offline"
+        );
     }
 
     #[test]

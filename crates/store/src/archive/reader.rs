@@ -14,7 +14,9 @@ use std::time::Duration;
 
 use fox_services_top_core::errors::InfraError;
 use fox_services_top_core::history::SeriesInEveryBoot;
-use fox_services_top_core::overview_history::{ArchivedMinutes, ArchivedMinutesRead, ArchivedSeriesList};
+use fox_services_top_core::overview_history::{
+    ArchivedMinutes, ArchivedMinutesRead, ArchivedSeriesList,
+};
 use fox_services_top_core::ports::ArchiveReader;
 use rusqlite::config::DbConfig;
 use rusqlite::{Connection, OpenFlags};

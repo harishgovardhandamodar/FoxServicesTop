@@ -265,7 +265,8 @@ pub fn probe(
         build: BuildProvenance::from_build(build),
         cpu_frequency_governor: first_line("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"),
         load_average_at_start: load,
-        clock_ticks_per_second: fox_services_top_adapters::procfs::HostConstants::from_sysconf().clk_tck,
+        clock_ticks_per_second: fox_services_top_adapters::procfs::HostConstants::from_sysconf()
+            .clk_tck,
         available_parallelism: parallelism,
     };
     Ok((environment, details))

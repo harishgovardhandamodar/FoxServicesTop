@@ -37,7 +37,9 @@ use fox_services_top_core::clock::{NANOS_PER_SECOND, TimeProvider, ms_to_ns};
 use fox_services_top_core::config::Config;
 use fox_services_top_core::history::{SeriesInEveryBoot, coverage_ratio};
 use fox_services_top_core::identity::{BootId, HostId};
-use fox_services_top_core::overview_history::{OverviewAnswer, OverviewRequest, is_overview_series};
+use fox_services_top_core::overview_history::{
+    OverviewAnswer, OverviewRequest, is_overview_series,
+};
 use fox_services_top_core::ports::{CancelFlag, OverviewReader, StoreWriter};
 use fox_services_top_core::quality::Namespace;
 use fox_services_top_core::tiers::{BarSize, Tier};

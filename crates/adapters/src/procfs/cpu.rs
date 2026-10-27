@@ -13,7 +13,9 @@ use fox_services_top_core::clock::TimeProvider;
 use fox_services_top_core::identity::{EntityId, Scope};
 use fox_services_top_core::metric::{Scalar, ids, native};
 use fox_services_top_core::naming::{entity, groups};
-use fox_services_top_core::observation::{Capability, EntityKind, Observation, ReadPlan, SourceDescriptor};
+use fox_services_top_core::observation::{
+    Capability, EntityKind, Observation, ReadPlan, SourceDescriptor,
+};
 use fox_services_top_core::quality::{Quality, RawKind, ReadStatus, Support};
 
 use super::catalog::{

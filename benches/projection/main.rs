@@ -39,7 +39,9 @@ use fox_services_top_core::action::{PersistenceKind, PersistenceStatus};
 use fox_services_top_core::budget::ByteLedger;
 use fox_services_top_core::canonical::{CommitGuard, ImmutableSnapshot};
 use fox_services_top_core::clock::TimeProvider;
-use fox_services_top_core::commands::{CommandEnvelope, CommandRejection, CommandResult, SortKey, ViewKind};
+use fox_services_top_core::commands::{
+    CommandEnvelope, CommandRejection, CommandResult, SortKey, ViewKind,
+};
 use fox_services_top_core::config::{Config, ValueOrigin};
 use fox_services_top_core::errors::ErrorCode;
 use fox_services_top_core::identity::{EntityId, MetricKey, SessionId};
@@ -361,8 +363,10 @@ impl StaticInputs {
             .collect::<std::collections::BTreeSet<_>>()
             .into_iter()
             .map(|(adapter_id, read_group)| {
-                let period =
-                    fox_services_top::perf::coverage::replay_group_period_ms(&read_group, &config.sampling);
+                let period = fox_services_top::perf::coverage::replay_group_period_ms(
+                    &read_group,
+                    &config.sampling,
+                );
                 IntervalView {
                     adapter_id,
                     read_group,
@@ -391,7 +395,9 @@ impl StaticInputs {
                 host_name: world.pipeline.host_id().to_string(),
                 kernel: Some("synthetic".to_owned()),
                 cpu_model: Some("synthetic REF host".to_owned()),
-                version: fox_services_top::version::BuildInfo::current().version.to_owned(),
+                version: fox_services_top::version::BuildInfo::current()
+                    .version
+                    .to_owned(),
                 namespace_label: Some("replay (simulated data)".to_owned()),
                 utc_offset_s: 0,
             },

@@ -27,7 +27,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use fox_services_top_core::clock::TimeProvider;
-use fox_services_top_core::identity::{AdapterId, EntityId, HostId, MetricKey, ReadGroup, SourceId};
+use fox_services_top_core::identity::{
+    AdapterId, EntityId, HostId, MetricKey, ReadGroup, SourceId,
+};
 use fox_services_top_core::metric::Scalar;
 use fox_services_top_core::naming;
 use fox_services_top_core::observation::{
@@ -35,7 +37,9 @@ use fox_services_top_core::observation::{
     MAX_RECORDS_PER_BATCH, Observation, ObservationBatch, ReadPlan, SourceDescriptor, split_page,
 };
 use fox_services_top_core::ports::TelemetryPort;
-use fox_services_top_core::quality::{Availability, Quality, RawKind, ReadStatus, SampleKind, Support};
+use fox_services_top_core::quality::{
+    Availability, Quality, RawKind, ReadStatus, SampleKind, Support,
+};
 use fox_services_top_core::shared_text::SharedText;
 
 use super::fixture::{

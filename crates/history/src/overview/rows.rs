@@ -138,7 +138,9 @@ mod tests {
     use fox_services_top_core::history::HistoryMethod;
     use fox_services_top_core::metric::{CanonicalUnit, ids};
     use fox_services_top_core::quality::SampleKind;
-    use fox_services_top_core::testing::{UTC_ON_A_WHOLE_MINUTE_NS as UTC_AT_BOOT, metric_key, source_id};
+    use fox_services_top_core::testing::{
+        UTC_ON_A_WHOLE_MINUTE_NS as UTC_AT_BOOT, metric_key, source_id,
+    };
     use uuid::Uuid;
 
     use super::*;

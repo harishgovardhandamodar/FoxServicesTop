@@ -39,7 +39,9 @@ use fox_services_top_core::ports::{
     IngressBatch, TelemetryPort,
 };
 use fox_services_top_core::quality::Namespace;
-use fox_services_top_core::testing::{MemoryLogger, ObservationBuilder, adapter_id, metric_key, read_group};
+use fox_services_top_core::testing::{
+    MemoryLogger, ObservationBuilder, adapter_id, metric_key, read_group,
+};
 use fox_services_top_core::view::{HostState, HostStatus};
 use fox_services_top_runtime::clock::BootClock;
 use fox_services_top_runtime::host::{HOST_GENERATION_ARG, host_nonce_from_env};
@@ -868,7 +870,9 @@ impl ChildControl for NeverReaped {
         self.inner.kill()
     }
 
-    fn try_reap(&mut self) -> Result<Option<fox_services_top_runtime::supervisor::ExitSummary>, InfraError> {
+    fn try_reap(
+        &mut self,
+    ) -> Result<Option<fox_services_top_runtime::supervisor::ExitSummary>, InfraError> {
         Ok(None)
     }
 }

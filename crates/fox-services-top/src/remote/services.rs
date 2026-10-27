@@ -180,7 +180,11 @@ pub fn merge(into: &mut ServicesView, node: &str, services: NodeServices) {
         into.window_label = services.window_label.clone();
     }
     // A name already listed belongs to another node: prefix it.
-    let mut seen: Vec<String> = into.services.iter().map(|row| row.service.clone()).collect();
+    let mut seen: Vec<String> = into
+        .services
+        .iter()
+        .map(|row| row.service.clone())
+        .collect();
     for mut row in services.services {
         if seen.contains(&row.service) {
             let original = row.service.clone();
@@ -193,11 +197,7 @@ pub fn merge(into: &mut ServicesView, node: &str, services: NodeServices) {
     into.services.truncate(MAX_SERVICES);
     // Only names listed by another node collide: rows of this batch share
     // their node's plain names.
-    let prior: Vec<String> = into
-        .recent
-        .iter()
-        .map(|row| row.service.clone())
-        .collect();
+    let prior: Vec<String> = into.recent.iter().map(|row| row.service.clone()).collect();
     for mut row in services.recent {
         row.node = node.to_owned();
         if prior.contains(&row.service) {
@@ -295,7 +295,10 @@ mod tests {
         assert_eq!(row.service, "mapper");
         assert_eq!(row.model, "qwen3.8:27b");
         assert_eq!(row.status, "complete");
-        assert_eq!((row.prompt_tokens, row.completion_tokens, row.total_tokens), (97, 400, 497));
+        assert_eq!(
+            (row.prompt_tokens, row.completion_tokens, row.total_tokens),
+            (97, 400, 497)
+        );
         assert_eq!(row.query_type, "research");
         assert_eq!(row.client_ip, "172.26.0.1");
         assert_eq!(row.prompt, "Brief: flagged brief");
@@ -309,8 +312,16 @@ mod tests {
         // One node keeps plain names, even across many rows of one service.
         let recent: Vec<&str> = into.recent.iter().map(|row| row.service.as_str()).collect();
         assert!(recent.iter().all(|name| *name == "mapper"), "{recent:?}");
-        merge(&mut into, "axiom-dgx", ServicePoll::new(24).apply(&live_map()));
-        let names: Vec<&str> = into.services.iter().map(|row| row.service.as_str()).collect();
+        merge(
+            &mut into,
+            "axiom-dgx",
+            ServicePoll::new(24).apply(&live_map()),
+        );
+        let names: Vec<&str> = into
+            .services
+            .iter()
+            .map(|row| row.service.as_str())
+            .collect();
         assert!(names.contains(&"mapper"), "{names:?}");
         assert!(names.contains(&"axiom-dgx/mapper"), "{names:?}");
         assert!(!into.idle);

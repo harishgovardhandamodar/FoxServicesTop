@@ -124,7 +124,10 @@ mod tests {
     use super::*;
 
     fn scratch(name: &str) -> PathBuf {
-        std::env::temp_dir().join(format!("fox-services-top-evidence-{name}-{}", std::process::id()))
+        std::env::temp_dir().join(format!(
+            "fox-services-top-evidence-{name}-{}",
+            std::process::id()
+        ))
     }
 
     #[test]
@@ -142,7 +145,10 @@ mod tests {
             .iter()
             .find(|file| file.path == "run1/raw.txt")
             .unwrap();
-        assert_eq!(raw.sha256, fox_services_top_core::digest::sha256_hex(b"abcd"));
+        assert_eq!(
+            raw.sha256,
+            fox_services_top_core::digest::sha256_hex(b"abcd")
+        );
         assert_eq!(std::fs::read(root.join("run1/raw.txt")).unwrap(), b"abcd");
         for bad in ["../escape", "/abs", "", "a/../b"] {
             assert!(writer.write_bytes(bad, b"x").is_err(), "{bad}");
