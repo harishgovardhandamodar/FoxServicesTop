@@ -559,6 +559,62 @@ fn w_steps_the_window_or_an_opened_runs_bar_size() {
     );
 }
 
+/// `c`/`C` cycle the Power tab's country tariff and `t`/`T` its priced
+/// database window; both are presentation only and submit no command.
+#[test]
+fn power_cost_keys_cycle_country_and_range_without_a_command() {
+    use crate::controller::keymap::{KeyAction, ModeKind, resolve};
+    use crossterm::event::{KeyEvent, KeyEventKind};
+
+    let press = |character: char| {
+        let mut event = KeyEvent::new(KeyCode::Char(character), KeyModifiers::NONE);
+        event.kind = KeyEventKind::Press;
+        event
+    };
+    assert_eq!(
+        resolve(&press('c'), ModeKind::Normal, ViewKind::Power),
+        Some(KeyAction::NextPowerTariff)
+    );
+    assert_eq!(
+        resolve(&press('C'), ModeKind::Normal, ViewKind::Power),
+        Some(KeyAction::PreviousPowerTariff)
+    );
+    assert_eq!(
+        resolve(&press('t'), ModeKind::Normal, ViewKind::Power),
+        Some(KeyAction::NextPowerCostWindow)
+    );
+    assert_eq!(
+        resolve(&press('T'), ModeKind::Normal, ViewKind::Power),
+        Some(KeyAction::PreviousPowerCostWindow)
+    );
+    assert_eq!(
+        resolve(&press('c'), ModeKind::Normal, ViewKind::Overview),
+        Some(KeyAction::ToggleCpuDetail),
+        "`c` stays the CPU detail toggle on the Overview"
+    );
+    assert_eq!(
+        resolve(&press('t'), ModeKind::Normal, ViewKind::Overview),
+        None,
+        "`t` prices nothing outside the Power tab"
+    );
+
+    let mut harness = Harness::new(ViewKind::Power);
+    let state = |harness: &Harness| {
+        let ui = harness.controller.ui_state(harness.now);
+        (ui.power_tariff, ui.power_cost_window)
+    };
+    assert_eq!(state(&harness), (0, 0));
+    harness.keys(&[key('c'), key('c'), key('t')]);
+    assert_eq!(state(&harness), (2, 1));
+    harness.keys(&[key('C'), key('T')]);
+    assert_eq!(state(&harness), (1, 0));
+    assert!(
+        harness.submitted().is_empty(),
+        "cost selection is presentation only: {:?}",
+        harness.submitted()
+    );
+}
+
 /// In an opened run `e` shows the whole command line and `y` queues it for
 /// the clipboard once; on the list neither does anything (D-76).
 #[test]

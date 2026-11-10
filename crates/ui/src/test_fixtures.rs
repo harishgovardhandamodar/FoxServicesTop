@@ -140,6 +140,8 @@ pub(crate) fn display_context() -> crate::registry::DisplayContext {
         expanded: false,
         scroll: 0,
         tab: 0,
+        power_tariff: 0,
+        power_cost_window: 0,
     }
 }
 

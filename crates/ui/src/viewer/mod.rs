@@ -247,6 +247,8 @@ impl Viewer {
                 .get(&module.manifest().module_id)
                 .copied()
                 .unwrap_or(0),
+            power_tariff: input.ui.power_tariff,
+            power_cost_window: input.ui.power_cost_window,
         };
         let outcome =
             isolation::render_isolated(|| module.render(&context, model, placement.area, frame));

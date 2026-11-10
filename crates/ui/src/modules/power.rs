@@ -1,10 +1,13 @@
-//! Power module: energy / power consumption timeline and per-query kWh.
+//! Power module: energy / power consumption timeline and per-query kWh,
+//! plus a priced total for a selectable country and database window.
 //!
 //! The watts timeline draws the host total over the history's window (the
 //! session's Overview History bar size, `w`/`W` to change); the series table
 //! lists total, CPU packages and GPUs with now/mean/peak watts and kWh over
 //! the window; the windows table lists kWh per series over 1 h, 6 h, 12 h
-//! and 24 h. Read-only: nothing here changes a power limit or cap.
+//! and 24 h; the cost row prices the total of one window (`t`/`T` to pick
+//! the window, `c`/`C` to pick the country tariff) from the energy the
+//! local database holds. Read-only: nothing here changes a power limit or cap.
 
 use fox_services_top_core::metric::CanonicalUnit;
 use fox_services_top_core::view::{PowerView, PowerWindowView, ViewModel};
@@ -19,7 +22,9 @@ use super::common::{
     draw_table_header, draw_table_row, fit_columns, message, no_data, panel_with_keys,
     render_chart,
 };
-use crate::format::{clean, format_energy, format_span_ns, format_value};
+use crate::format::{
+    COST_WINDOWS, clean, format_cost_usd, format_energy, format_span_ns, format_value, tariff,
+};
 use crate::registry::{DisplayContext, DisplayModule, DisplayModuleManifest, RenderOutput, Slot};
 
 use super::history::{
@@ -28,7 +33,10 @@ use super::history::{
 };
 
 /// The keys acting on the view, at the right of its title.
-const POWER_KEYS: &str = "w/W timescale · / filter";
+const POWER_KEYS: &str = "w/W timescale · c/C country · t/T cost range · / filter";
+
+/// Rows the cost estimate takes: its caption plus the priced total.
+const COST_ROWS: u16 = 2;
 
 /// Rows the watts chart takes: its caption plus the plot.
 const CHART_ROWS: u16 = 4;
@@ -92,7 +100,8 @@ impl DisplayModule for PowerModule {
         Some(
             CHART_ROWS
                 + crate::num::saturate_u16(power.rows.len() + 1)
-                + crate::num::saturate_u16(window_groups(&power.windows).len() + 1),
+                + crate::num::saturate_u16(window_groups(&power.windows).len() + 1)
+                + COST_ROWS,
         )
     }
 
@@ -147,6 +156,7 @@ impl DisplayModule for PowerModule {
         render_chart_block(frame, &mut rows, power, context);
         render_series(frame, &mut rows, power, &filter, context, &mut output);
         render_windows(frame, &mut rows, power, &filter, context, &mut output);
+        render_cost(frame, &mut rows, power, context, &mut output);
         output.finish()
     }
 }
@@ -406,6 +416,105 @@ fn window_cells(group: &[&PowerWindowView], context: &DisplayContext) -> Vec<Tab
     cells
 }
 
+struct CostSelection {
+    label: String,
+    energy_joules: Option<f64>,
+    covered_ns: Option<u64>,
+    span_ns: Option<u64>,
+}
+
+/// Total consumption for the selected cost range: the current timeline
+/// window (`total_joules`) or the database's 1 h/6 h/12 h/24 h total-power
+/// window, so the priced energy is what the local database holds.
+fn cost_of(power: &PowerView, cost_window: u8) -> CostSelection {
+    let label = COST_WINDOWS[usize::from(cost_window) % COST_WINDOWS.len()].to_owned();
+    if label == "window" {
+        let covered = power
+            .rows
+            .iter()
+            .find(|row| row.subject == "total")
+            .and_then(|row| row.covered_ns);
+        return CostSelection {
+            label,
+            energy_joules: power.total_joules,
+            covered_ns: covered,
+            span_ns: Some(power.requested_span_ns),
+        };
+    }
+    let entry = power.windows.iter().find(|window| {
+        window.window_label == label
+            && window.kind == fox_services_top_core::view::HistoryChartKind::TotalPower
+            && window.subject == "total"
+    });
+    CostSelection {
+        label,
+        energy_joules: entry.and_then(|window| window.energy_joules),
+        covered_ns: entry.and_then(|window| window.covered_ns),
+        span_ns: entry.map(|window| window.span_ns),
+    }
+}
+
+/// Priced total for the selected country and database window
+/// (`c`/`C` country, `t`/`T` range), with the kWh beside its cost.
+fn render_cost(
+    frame: &mut Frame<'_>,
+    rows: &mut RowCursor,
+    power: &PowerView,
+    context: &DisplayContext,
+    output: &mut Output,
+) {
+    if rows.remaining() < COST_ROWS {
+        return;
+    }
+    let selection = cost_of(power, context.power_cost_window);
+    let current = tariff(context.power_tariff);
+    let caption = rows.next_row();
+    let Some(area) = rows.next_row() else {
+        return;
+    };
+    if let Some(row) = caption {
+        let coverage = match (selection.covered_ns, selection.span_ns) {
+            (Some(covered), Some(span)) if span > 0 && covered < span => {
+                format!(
+                    " · recorded {} of {}",
+                    super::history::history_recorded_text(covered / 1_000_000_000),
+                    format_span_ns(span)
+                )
+            }
+            _ => String::new(),
+        };
+        draw_caption(
+            frame.buffer_mut(),
+            row,
+            &Line::from(vec![
+                Span::styled("cost", context.theme.title_style()),
+                Span::styled(
+                    format!(
+                        " · {} {} ${:.2}/kWh · {}",
+                        current.code, current.country, current.price_usd_per_kwh,
+                        selection.label
+                    ),
+                    context.theme.muted_style(),
+                ),
+            ]),
+            Some(format!("c/C country · t/T range{coverage}").as_str()),
+            context,
+        );
+    }
+    let energy = selection
+        .energy_joules
+        .filter(|joules| joules.is_finite())
+        .map_or_else(|| "n/a".to_owned(), format_energy);
+    let cost = format_cost_usd(selection.energy_joules, current.price_usd_per_kwh);
+    let text = format!("total {energy} ≈ {cost}");
+    crate::modules::common::message(frame, area, &text, context.theme.text_style());
+    output.label(format!(
+        "power cost {} {} {energy} {cost}",
+        current.code,
+        selection.label
+    ));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -418,7 +527,7 @@ mod tests {
     fn the_power_tab_charts_watts_and_lists_kwh() {
         let mut model = test_fixtures::view_model(ViewKind::Power, 1);
         model.modules.power = Some(std::sync::Arc::new(test_fixtures::power_view()));
-        let text = test_fixtures::render_text(&PowerModule::new().unwrap(), &model, (120, 20));
+        let text = test_fixtures::render_text(&PowerModule::new().unwrap(), &model, (120, 24));
         for needle in [
             "Power · 1h",
             "watts",
@@ -432,6 +541,9 @@ mod tests {
             "GPU 0",
             "1H",
             "24H",
+            "cost",
+            "US",
+            "$0.18/kWh",
         ] {
             assert!(text.contains(needle), "missing {needle:?}\n{text}");
         }
@@ -469,8 +581,47 @@ mod tests {
 
         let mut model = test_fixtures::view_model(ViewKind::Power, 1);
         model.modules.power = Some(std::sync::Arc::new(full));
-        let text = test_fixtures::render_text(&PowerModule::new().unwrap(), &model, (160, 24));
+        let text = test_fixtures::render_text(&PowerModule::new().unwrap(), &model, (160, 28));
         assert!(text.contains("recorded 30m of 1h"), "{text}");
         assert!(text.contains("disk history unavailable"), "{text}");
+    }
+
+    /// The cost estimate prices the current window by default and the
+    /// database's 24 h total on request.
+    #[test]
+    fn the_cost_estimate_prices_the_selected_database_window() {
+        let power = test_fixtures::power_view();
+        let window = cost_of(&power, 0);
+        assert_eq!(window.label, "window");
+        assert_eq!(window.energy_joules, power.total_joules);
+        let day = cost_of(&power, 4);
+        assert_eq!(day.label, "24h");
+        // The fixture's 24 h total holds 200 W over 24 h: 4.8 kWh.
+        assert_eq!(day.energy_joules, Some(200.0 * 24.0 * 3_600.0));
+        assert_eq!(
+            crate::format::format_cost_usd(day.energy_joules, 0.18),
+            "$0.86",
+            "4.8 kWh at $0.18/kWh"
+        );
+    }
+
+    /// Selecting another country reprices the same logged consumption.
+    #[test]
+    fn the_cost_estimate_follows_the_selected_country() {
+        let power = test_fixtures::power_view();
+        let window = cost_of(&power, 0);
+        let us = crate::format::tariff(0);
+        let de = crate::format::TARIFFS
+            .iter()
+            .find(|tariff| tariff.code == "DE")
+            .copied()
+            .expect("DE tariff");
+        assert_eq!(us.code, "US");
+        assert!(de.price_usd_per_kwh > us.price_usd_per_kwh);
+        let us_cost = crate::format::cost_usd(window.energy_joules, us.price_usd_per_kwh).unwrap();
+        let de_cost = crate::format::cost_usd(window.energy_joules, de.price_usd_per_kwh).unwrap();
+        assert!(de_cost > us_cost);
+        // The fixture's window total holds 300 W over 1 h: 0.3 kWh.
+        assert!((us_cost - 0.3 * 0.18).abs() < 1e-9, "{us_cost}");
     }
 }

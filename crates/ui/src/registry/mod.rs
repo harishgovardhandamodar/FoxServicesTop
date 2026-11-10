@@ -48,6 +48,11 @@ pub struct DisplayContext {
     pub scroll: u16,
     /// The module's inner tab (D-72): 0 its first page.
     pub tab: u8,
+    /// Power tab cost estimate: index into [`crate::format::TARIFFS`].
+    pub power_tariff: usize,
+    /// Power tab cost estimate: index into [`crate::format::COST_WINDOWS`].
+    /// 0 prices the current timeline window, the rest the database windows.
+    pub power_cost_window: u8,
 }
 
 /// Clickable region produced by a module, resolved by the Controller through
