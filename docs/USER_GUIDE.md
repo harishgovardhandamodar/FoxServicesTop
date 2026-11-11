@@ -313,6 +313,12 @@ fox-services-top --remote-node axiom=http://192.168.1.63:8210 --remote-node lab=
 fox-services-top --no-remote    # local monitor only
 ```
 
+Each answered token poll is also appended to the token usage timeseries in
+the state dir (`token_usage.sqlite3`, one row per poll per node/app/model,
+`remote.token_retention_days` kept, 30 by default). Hardware power and
+utilization already live in the history databases; the token log is what the
+fox-services "Top Usage" tab reads for live consumption charts.
+
 Mesh peers a node reports appear under the node table automatically when
 `discover_mesh` is on; pairing between the fox-services nodes themselves is
 managed in fox-services, not here.
