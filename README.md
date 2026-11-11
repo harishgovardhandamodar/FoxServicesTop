@@ -193,7 +193,8 @@ of the whole machine.
 - **Power.** Its own tab (key `7`) with the watts timeline, per-series kWh and
   priced consumption: GPU, CPU and total kWh with cost over a selectable range
   (`t`/`T`: `window`, `1h` … `30d`, `all`), priced by a scrollable country
-  tariff list (`j`/`k`, euros/kWh, Netherlands by default). On a host without
+  tariff list (`j`/`k`, each country's native currency per kWh, Netherlands
+  in euros by default). On a host without
   GPUs the total is the CPU sum; with GPUs a missing total stays `n/a` rather
   than a partial sum.
 

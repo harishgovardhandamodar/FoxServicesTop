@@ -7,9 +7,9 @@
 //! the window; the windows table lists kWh per series over 1 h, 6 h, 12 h
 //! and 24 h; the cost row prices the total of one window (`t`/`T` to pick
 //! the window) and the tariff list below prices it per country (`j`/`k`
-//! move the selected row, live on the cost above). The priced energy is what
-//! the local database holds. Read-only: nothing here changes a power limit
-//! or cap.
+//! move the selected row, live on the cost above) in that country's own
+//! currency. The priced energy is what the local database holds. Read-only:
+//! nothing here changes a power limit or cap.
 
 use fox_services_top_core::metric::CanonicalUnit;
 use fox_services_top_core::view::{PowerView, PowerWindowView, ViewModel};
@@ -25,8 +25,7 @@ use super::common::{
     render_chart,
 };
 use crate::format::{
-    COST_WINDOWS, TARIFFS, clean, format_cost_eur, format_energy, format_span_ns, format_value,
-    tariff,
+    COST_WINDOWS, TARIFFS, Tariff, clean, format_energy, format_span_ns, format_value, tariff,
 };
 use crate::registry::{DisplayContext, DisplayModule, DisplayModuleManifest, RenderOutput, Slot};
 
@@ -300,7 +299,7 @@ fn render_series(
             frame.buffer_mut(),
             area,
             &columns,
-            &series_cells(row, selected_tariff(context).1.price_eur_per_kwh, context),
+            &series_cells(row, selected_tariff(context).1, context),
             None,
         );
         output.label(format!("power {}", clean(&row.subject)));
@@ -309,7 +308,7 @@ fn render_series(
 
 fn series_cells(
     row: &fox_services_top_core::view::PowerRowView,
-    price_eur_per_kwh: f64,
+    tariff: Tariff,
     context: &DisplayContext,
 ) -> Vec<TableCell> {
     let style = context.theme.text_style();
@@ -340,7 +339,7 @@ fn series_cells(
             .filter(|joules| joules.is_finite())
             .map_or_else(
                 || TableCell::new("n/a", context.theme.muted_style()),
-                |joules| TableCell::new(format_cost_eur(Some(joules), price_eur_per_kwh), style),
+                |joules| TableCell::new(tariff.format_cost(Some(joules)), style),
             ),
         covered_cell(row.covered_ns, context),
     ]
@@ -603,8 +602,11 @@ fn render_cost(
             Span::styled("cost", context.theme.title_style()),
             Span::styled(
                 format!(
-                    " · {} {} €{:.2}/kWh · {}",
-                    current.code, current.country, current.price_eur_per_kwh, selection.label
+                    " · {} {} {} · {}",
+                    current.code,
+                    current.country,
+                    current.format_price(),
+                    selection.label
                 ),
                 context.theme.muted_style(),
             ),
@@ -625,7 +627,7 @@ fn render_cost(
             .energy_joules
             .filter(|joules| joules.is_finite())
             .map_or_else(|| "n/a".to_owned(), format_energy);
-        let cost = format_cost_eur(group.energy_joules, current.price_eur_per_kwh);
+        let cost = current.format_cost(group.energy_joules);
         // A missing total with GPU series present means a part is
         // unreadable: say so instead of leaving a bare `n/a`.
         let note = if group.label == "total" && groups_missing_total {
@@ -643,7 +645,8 @@ fn render_cost(
 }
 
 /// Country tariff list (Detail slot only): one row per country with its
-/// €/kWh price, `j`/`k` moving the selected row that prices the cost above.
+/// native-currency kWh price, `j`/`k` moving the selected row that prices
+/// the cost above.
 fn render_tariffs(
     frame: &mut Frame<'_>,
     rows: &mut RowCursor,
@@ -662,7 +665,10 @@ fn render_tariffs(
         caption,
         &Line::from(vec![
             Span::styled("tariffs", context.theme.title_style()),
-            Span::styled(" · €/kWh · j/k select", context.theme.muted_style()),
+            Span::styled(
+                " · native currency · j/k select",
+                context.theme.muted_style(),
+            ),
         ]),
         None,
         context,
@@ -680,8 +686,10 @@ fn render_tariffs(
             ),
             Span::styled(
                 format!(
-                    "{} {} €{:.2}/kWh",
-                    current.code, current.country, current.price_eur_per_kwh
+                    "{} {} {}",
+                    current.code,
+                    current.country,
+                    current.format_price()
                 ),
                 if index == selected {
                     context.theme.selected_row_style()
@@ -805,7 +813,7 @@ mod tests {
             "GPUs, CPUs, total"
         );
         assert_eq!(
-            crate::format::format_cost_eur(day.total_joules(), 0.30),
+            crate::format::tariff(crate::format::DEFAULT_TARIFF).format_cost(day.total_joules()),
             "€1.44",
             "4.8 kWh at €0.30/kWh"
         );
@@ -843,10 +851,10 @@ mod tests {
         };
         let nl = by_code("NL");
         let de = by_code("DE");
-        assert!(de.price_eur_per_kwh > nl.price_eur_per_kwh);
+        assert!(de.price_per_kwh > nl.price_per_kwh);
         let total = window.total_joules();
-        let nl_cost = crate::format::cost_eur(total, nl.price_eur_per_kwh).unwrap();
-        let de_cost = crate::format::cost_eur(total, de.price_eur_per_kwh).unwrap();
+        let nl_cost = nl.cost(total).unwrap();
+        let de_cost = de.cost(total).unwrap();
         assert!(de_cost > nl_cost);
         // The fixture's window total holds 300 W over 1 h: 0.3 kWh.
         assert!((nl_cost - 0.3 * 0.30).abs() < 1e-9, "{nl_cost}");

@@ -252,8 +252,9 @@ prices (`window`, `1h`, `6h`, `12h`, `24h`, `7d`, `30d`, `all` — everything
 the database holds, i.e. the 30-day window, with its recorded coverage
 shown beside it). The cost block lists three lines: all GPUs together, all
 CPUs together, and the total, each as kWh beside its cost. `j`/`k` move
-through the country tariff list (€/kWh, Netherlands by default), which
-prices the cost lines live; every series row also carries its own COST.
+through the country tariff list (each country's native currency per kWh,
+Netherlands in euros by default), which prices the cost lines live; every
+series row also carries its own COST.
 
 On a host without GPUs there is no `host.power.total` series (it would only
 repeat the CPU), so the tab totals the CPU packages instead. On a host with
