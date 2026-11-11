@@ -229,8 +229,14 @@ const SCROLL_VIEWS: &[ViewKind] = &[
     ViewKind::Power,
     ViewKind::Zombies,
 ];
-/// Views with the Power tab's cost estimate (`c`/`C` country, `t`/`T` range).
-const POWER_VIEWS: &[ViewKind] = &[ViewKind::Power];
+/// Views with the Power tab's cost estimate (`c`/`C` country, `t`/`T` range):
+/// the whole Fox-Services dashboard, whose power widget prices the total.
+const POWER_VIEWS: &[ViewKind] = &[
+    ViewKind::Nodes,
+    ViewKind::Docker,
+    ViewKind::Tokens,
+    ViewKind::Power,
+];
 /// Views whose charts follow the history bar sizes (`w`/`W`).
 const BAR_VIEWS: &[ViewKind] = &[
     ViewKind::History,

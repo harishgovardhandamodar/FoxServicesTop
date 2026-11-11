@@ -587,6 +587,25 @@ fn power_cost_keys_cycle_country_and_range_without_a_command() {
         resolve(&press('T'), ModeKind::Normal, ViewKind::Power),
         Some(KeyAction::PreviousPowerCostWindow)
     );
+    // The legacy Power view shares the Fox-Services dashboard: the keys
+    // work on every dashboard view, reached with key 6 (Nodes).
+    for view in [
+        ViewKind::Nodes,
+        ViewKind::Docker,
+        ViewKind::Tokens,
+        ViewKind::Power,
+    ] {
+        assert_eq!(
+            resolve(&press('c'), ModeKind::Normal, view),
+            Some(KeyAction::NextPowerTariff),
+            "{view:?}"
+        );
+        assert_eq!(
+            resolve(&press('t'), ModeKind::Normal, view),
+            Some(KeyAction::NextPowerCostWindow),
+            "{view:?}"
+        );
+    }
     assert_eq!(
         resolve(&press('c'), ModeKind::Normal, ViewKind::Overview),
         Some(KeyAction::ToggleCpuDetail),
@@ -598,7 +617,7 @@ fn power_cost_keys_cycle_country_and_range_without_a_command() {
         "`t` prices nothing outside the Power tab"
     );
 
-    let mut harness = Harness::new(ViewKind::Power);
+    let mut harness = Harness::new(ViewKind::Nodes);
     let state = |harness: &Harness| {
         let ui = harness.controller.ui_state(harness.now);
         (ui.power_tariff, ui.power_cost_window)
