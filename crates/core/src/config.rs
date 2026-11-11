@@ -196,6 +196,10 @@ pub struct RemoteConfig {
     pub service_window_hours: u32,
     /// Requests read from a node for that window (1–1000).
     pub token_history_limit: u32,
+    /// Days of polled token usage the background monitor keeps in its
+    /// timeseries log; unset keeps 30 days (1–365).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token_retention_days: Option<u32>,
     /// Statically configured nodes, polled in order.
     pub nodes: Vec<RemoteNodeConfig>,
 }
@@ -212,6 +216,7 @@ impl Default for RemoteConfig {
             token_window_hours: 24,
             service_window_hours: 24,
             token_history_limit: 500,
+            token_retention_days: None,
             nodes: vec![
                 RemoteNodeConfig {
                     name: "axiom".to_owned(),
@@ -230,7 +235,17 @@ impl RemoteConfig {
     fn is_default(&self) -> bool {
         self == &Self::default()
     }
+
+    /// Days of polled token usage the background monitor keeps in its
+    /// timeseries log: as set, else [`DEFAULT_TOKEN_RETENTION_DAYS`].
+    pub fn token_retention_days(&self) -> u32 {
+        self.token_retention_days
+            .unwrap_or(DEFAULT_TOKEN_RETENTION_DAYS)
+    }
 }
+
+/// Days of token usage kept when `remote.token_retention_days` is unset.
+pub const DEFAULT_TOKEN_RETENTION_DAYS: u32 = 30;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -795,6 +810,13 @@ impl Config {
             "remote.service_window_hours",
             "must be 1..=168",
         );
+        if let Some(days) = remote.token_retention_days {
+            check(
+                range(days, 1, 365),
+                "remote.token_retention_days",
+                "must be 1..=365",
+            );
+        }
         check(
             remote.nodes.len() <= 16,
             "remote.nodes",
@@ -1602,6 +1624,25 @@ mod tests {
         assert!(issues.iter().any(|issue| {
             issue.path == "remote.nodes[0].base_url"
                 && issue.message == "must be an http:// URL of at most 256 bytes"
+        }));
+    }
+
+    #[test]
+    fn token_retention_days_defaults_and_validates() {
+        let config = defaults();
+        assert_eq!(config.remote.token_retention_days, None);
+        assert_eq!(config.remote.token_retention_days(), 30);
+
+        let mut limited = defaults();
+        limited.remote.token_retention_days = Some(7);
+        limited.validate().unwrap();
+        assert_eq!(limited.remote.token_retention_days(), 7);
+
+        let mut bad = defaults();
+        bad.remote.token_retention_days = Some(0);
+        let issues = bad.validate().unwrap_err();
+        assert!(issues.iter().any(|issue| {
+            issue.path == "remote.token_retention_days" && issue.message == "must be 1..=365"
         }));
     }
 

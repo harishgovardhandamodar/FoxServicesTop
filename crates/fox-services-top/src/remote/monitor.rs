@@ -16,10 +16,19 @@ use std::time::Duration;
 use fox_services_top_core::config::RemoteConfig;
 use fox_services_top_core::ports::ClusterSource;
 use fox_services_top_core::view::{ClusterSnapshot, ClusterView, ServicesView, TokensView};
+use fox_services_top_store::token_usage::{TokenSample, TokenUsageLog};
 
 use super::client::{FoxServicesClient, NodePoll};
 use super::services::merge as merge_services;
-use super::tokens::merge as merge_tokens;
+use super::tokens::{NodeTokens, merge as merge_tokens};
+
+/// Models logged per app per poll; apps report most tokens first, so the
+/// cap keeps the heaviest models.
+const MAX_LOGGED_MODELS_PER_APP: usize = 8;
+/// Nanoseconds between log appends: the windowed totals move slowly, so
+/// one batch a minute is plenty for a timeseries.
+const LOG_EVERY: Duration = Duration::from_secs(60);
+const DAY_NS: i64 = 24 * 3_600 * 1_000_000_000;
 
 /// Polls the cluster on its own thread and serves the latest snapshot.
 pub struct ClusterMonitor {
@@ -29,11 +38,12 @@ pub struct ClusterMonitor {
 }
 
 impl ClusterMonitor {
-    /// Starts polling `config`'s nodes. Disabled configs (or an empty node
-    /// list) publish a disabled snapshot and spawn no thread.
+    /// Starts polling `config`'s nodes, appending each answered token poll
+    /// to `token_log` (at most once a minute). Disabled configs (or an
+    /// empty node list) publish a disabled snapshot and spawn no thread.
     ///
     /// Returns the operating-system error if the polling thread cannot start.
-    pub fn start(config: &RemoteConfig) -> std::io::Result<Self> {
+    pub fn start(config: &RemoteConfig, token_log: Option<TokenUsageLog>) -> std::io::Result<Self> {
         let state = Arc::new(Mutex::new(Arc::new(ClusterSnapshot {
             cluster: Arc::new(ClusterView {
                 enabled: config.enabled,
@@ -55,6 +65,7 @@ impl ClusterMonitor {
                 config.clone(),
                 Arc::clone(&state),
                 Arc::clone(&shutdown),
+                token_log,
             )?)
         } else {
             None
@@ -112,20 +123,36 @@ fn spawn(
     config: RemoteConfig,
     state: Arc<Mutex<Arc<ClusterSnapshot>>>,
     shutdown: Arc<AtomicBool>,
+    mut token_log: Option<TokenUsageLog>,
 ) -> std::io::Result<JoinHandle<()>> {
     thread::Builder::new()
         .name("fox-services-top-cluster".to_owned())
         .spawn(move || {
             let timeout = Duration::from_millis(u64::from(config.timeout_ms.max(1)));
             let interval = Duration::from_millis(u64::from(config.poll_interval_ms.max(1)));
+            let mut last_logged: Option<std::time::Instant> = None;
             while !shutdown.load(Ordering::Acquire) {
-                poll_once(&config, &state, timeout);
+                let log_due = last_logged.is_none_or(|at| at.elapsed() >= LOG_EVERY);
+                let logged = poll_once(
+                    &config,
+                    &state,
+                    timeout,
+                    token_log.as_mut().filter(|_| log_due),
+                );
+                if logged {
+                    last_logged = Some(std::time::Instant::now());
+                }
                 sleep_slice(interval, &shutdown);
             }
         })
 }
 
-fn poll_once(config: &RemoteConfig, state: &Mutex<Arc<ClusterSnapshot>>, timeout: Duration) {
+fn poll_once(
+    config: &RemoteConfig,
+    state: &Mutex<Arc<ClusterSnapshot>>,
+    timeout: Duration,
+    token_log: Option<&mut TokenUsageLog>,
+) -> bool {
     // A poll whose endpoints time out keeps the last answered rows rather
     // than blanking the tabs (D-118).
     let previous = state.lock().unwrap_or_else(PoisonError::into_inner).clone();
@@ -144,6 +171,11 @@ fn poll_once(config: &RemoteConfig, state: &Mutex<Arc<ClusterSnapshot>>, timeout
     };
     let mut services_answered = false;
     let mut tokens_answered = false;
+    let mut logged_samples: Vec<TokenSample> = Vec::new();
+    let now_utc_ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|since| i64::try_from(since.as_nanos()).unwrap_or(i64::MAX))
+        .unwrap_or(0);
     for node in config.nodes.iter().take(16) {
         let client = FoxServicesClient::new(node.clone(), timeout)
             .with_services(config.service_window_hours);
@@ -167,6 +199,7 @@ fn poll_once(config: &RemoteConfig, state: &Mutex<Arc<ClusterSnapshot>>, timeout
         }
         if let Some(node_tokens) = node_tokens {
             tokens_answered = true;
+            logged_samples.extend(token_samples(now_utc_ns, &node_name, &node_tokens));
             merge_tokens(&mut tokens, &node_name, node_tokens);
         }
     }
@@ -197,6 +230,35 @@ fn poll_once(config: &RemoteConfig, state: &Mutex<Arc<ClusterSnapshot>>, timeout
         tokens: Arc::new(tokens),
     });
     *state.lock().unwrap_or_else(PoisonError::into_inner) = snapshot;
+    // Best effort: polling goes on in memory while the log is broken.
+    if !tokens_answered {
+        return false;
+    }
+    let Some(log) = token_log else {
+        return false;
+    };
+    let retain_utc_ns =
+        now_utc_ns.saturating_sub(i64::from(config.token_retention_days()) * DAY_NS);
+    log.append(&logged_samples, retain_utc_ns).is_ok()
+}
+
+/// Timeseries rows for one node's answered poll, most tokens first.
+fn token_samples(utc_ns: i64, node: &str, tokens: &NodeTokens) -> Vec<TokenSample> {
+    let mut samples = Vec::new();
+    for app in &tokens.apps {
+        for model in app.models.iter().take(MAX_LOGGED_MODELS_PER_APP) {
+            samples.push(TokenSample {
+                utc_ns,
+                node: node.to_owned(),
+                app: app.app.clone(),
+                model: model.model.clone(),
+                requests: u64::from(model.requests),
+                ingress_tokens: model.ingress_tokens,
+                egress_tokens: model.egress_tokens,
+            });
+        }
+    }
+    samples
 }
 
 /// Sleeps `total` in small slices so shutdown stays prompt.
@@ -217,17 +279,21 @@ mod tests {
     use fox_services_top_core::view::{ServiceRowView, TokenAppView};
 
     fn test_monitor(nodes: Vec<RemoteNodeConfig>, enabled: bool) -> ClusterMonitor {
-        ClusterMonitor::start(&RemoteConfig {
-            enabled,
-            poll_interval_ms: 1000,
-            timeout_ms: 200,
-            discover_mesh: false,
-            collect_tokens: false,
-            token_window_hours: 24,
-            token_history_limit: 500,
-            service_window_hours: 24,
-            nodes,
-        })
+        ClusterMonitor::start(
+            &RemoteConfig {
+                enabled,
+                poll_interval_ms: 1000,
+                timeout_ms: 200,
+                discover_mesh: false,
+                collect_tokens: false,
+                token_window_hours: 24,
+                token_history_limit: 500,
+                service_window_hours: 24,
+                token_retention_days: None,
+                nodes,
+            },
+            None,
+        )
         .unwrap()
     }
 
@@ -300,6 +366,7 @@ mod tests {
             token_window_hours: 24,
             token_history_limit: 500,
             service_window_hours: 24,
+            token_retention_days: None,
             nodes: vec![RemoteNodeConfig {
                 name: "axiom".into(),
                 base_url: base,
@@ -318,7 +385,7 @@ mod tests {
     fn one_poll_reads_services_and_tokens() {
         let config = live_config(fake_node(live_now()));
         let state = Mutex::new(Arc::new(ClusterSnapshot::default()));
-        poll_once(&config, &state, Duration::from_millis(2000));
+        poll_once(&config, &state, Duration::from_millis(2000), None);
         let snapshot = state.lock().unwrap_or_else(PoisonError::into_inner).clone();
         assert!(snapshot.cluster.nodes[0].online);
         assert_eq!(snapshot.docker.services.len(), 1);
@@ -369,12 +436,13 @@ mod tests {
             token_window_hours: 24,
             token_history_limit: 500,
             service_window_hours: 24,
+            token_retention_days: None,
             nodes: vec![RemoteNodeConfig {
                 name: "gone".into(),
                 base_url: "http://127.0.0.1:1".into(),
             }],
         };
-        poll_once(&config, &state, Duration::from_millis(200));
+        poll_once(&config, &state, Duration::from_millis(200), None);
         let snapshot = state.lock().unwrap_or_else(PoisonError::into_inner).clone();
         assert!(snapshot.docker.stale, "services marked as the last read");
         assert_eq!(snapshot.docker.services.len(), 1);
@@ -410,5 +478,57 @@ mod tests {
         assert_eq!(snapshot.cluster.nodes.len(), 1);
         assert!(!snapshot.cluster.nodes[0].online);
         assert!(snapshot.cluster.nodes[0].error.is_some());
+    }
+
+    /// An answered poll appends one row per (node, app, model) to the
+    /// token usage log.
+    #[test]
+    fn one_poll_logs_token_timeseries() {
+        use fox_services_top_store::token_usage::TokenUsageLog;
+
+        let dir = std::env::temp_dir().join(format!(
+            "fox-services-top-token-log-{}-{}",
+            std::process::id(),
+            uuid::Uuid::new_v4().simple()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut log = TokenUsageLog::open(&dir.join("token_usage.sqlite3"));
+        let config = live_config(fake_node(live_now()));
+        let state = Mutex::new(Arc::new(ClusterSnapshot::default()));
+        let logged = poll_once(&config, &state, Duration::from_millis(2000), Some(&mut log));
+        assert!(logged, "the answered poll is logged");
+        let held = log.usage().unwrap();
+        assert_eq!(held.rows, 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Only the heaviest models of an app are logged.
+    #[test]
+    fn token_samples_keep_the_heaviest_models() {
+        use fox_services_top_core::view::TokenModelView;
+
+        let app = TokenAppView {
+            app: "quai-radar".to_owned(),
+            models: (0..12)
+                .map(|index| TokenModelView {
+                    model: format!("model-{index}"),
+                    requests: 1,
+                    ingress_tokens: 10,
+                    egress_tokens: 5,
+                    ..TokenModelView::default()
+                })
+                .collect(),
+            ..TokenAppView::default()
+        };
+        let tokens = NodeTokens {
+            window_label: "24h".to_owned(),
+            apps: vec![app],
+            timeline: Vec::new(),
+            engines: Vec::new(),
+        };
+        let samples = token_samples(1_000, "axiom", &tokens);
+        assert_eq!(samples.len(), MAX_LOGGED_MODELS_PER_APP);
+        assert_eq!(samples[0].model, "model-0");
+        assert!(samples.iter().all(|sample| sample.node == "axiom"));
     }
 }

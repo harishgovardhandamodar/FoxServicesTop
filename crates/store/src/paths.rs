@@ -28,6 +28,8 @@ pub const HISTORY_DATABASE_NAME: &str = "history.sqlite3";
 pub const PROCESS_HISTORY_DATABASE_NAME: &str = "process_history.sqlite3";
 /// The Overview History's buckets of every bar size (D-82).
 pub const HISTORY_TIERS_DATABASE_NAME: &str = "history_tiers.sqlite3";
+/// The token usage log of the background remote monitor.
+pub const TOKEN_USAGE_DATABASE_NAME: &str = "token_usage.sqlite3";
 /// The process history's short-term file (D-76).
 pub const PROCESS_RECENT_FILE_NAME: &str = "process_recent.json";
 pub const LOG_FILE_NAME: &str = "fox-services-top.log";
@@ -135,6 +137,8 @@ pub struct StatePaths {
     pub history_database: PathBuf,
     /// The Overview History's buckets of every bar size (D-82).
     pub history_tiers_database: PathBuf,
+    /// The polled token usage timeseries of the remote monitor.
+    pub token_usage_database: PathBuf,
     /// The process history's runs and buckets (D-76).
     pub process_history_database: PathBuf,
     /// The live runs' recent buckets, replaced every 30 s (D-76).
@@ -183,6 +187,7 @@ impl StatePaths {
             audit_database: state_dir.join(AUDIT_DATABASE_NAME),
             history_database: state_dir.join(HISTORY_DATABASE_NAME),
             history_tiers_database: state_dir.join(HISTORY_TIERS_DATABASE_NAME),
+            token_usage_database: state_dir.join(TOKEN_USAGE_DATABASE_NAME),
             process_history_database: state_dir.join(PROCESS_HISTORY_DATABASE_NAME),
             process_recent_file: state_dir.join(PROCESS_RECENT_FILE_NAME),
             log_file: state_dir.join(LOG_FILE_NAME),
@@ -391,6 +396,10 @@ mod tests {
         assert_eq!(
             paths.history_tiers_database,
             PathBuf::from("/xdg/state/fox-services-top/v2/history_tiers.sqlite3")
+        );
+        assert_eq!(
+            paths.token_usage_database,
+            PathBuf::from("/xdg/state/fox-services-top/v2/token_usage.sqlite3")
         );
         assert_eq!(
             paths.log_file,

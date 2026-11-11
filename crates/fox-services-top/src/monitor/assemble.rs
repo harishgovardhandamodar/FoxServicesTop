@@ -25,6 +25,7 @@ use fox_services_top_runtime::timezone::local_utc_offset_s;
 use fox_services_top_store::config::FileConfigRepository;
 use fox_services_top_store::lock::InstanceLock;
 use fox_services_top_store::paths::StatePaths;
+use fox_services_top_store::token_usage::TokenUsageLog;
 
 use super::hosts::host_specs;
 use super::signals::SignalWatch;
@@ -187,7 +188,12 @@ impl Wiring {
         let (specs, manifests) = host_specs(cli, effective, self.namespace, &self.clock, &host_id)?;
         // The Overview and Fox-Services dashboard read this monitor's latest
         // snapshot; polling lives on its own thread, never on the control thread.
-        let cluster = ClusterMonitor::start(&effective.remote)?;
+        // Answered token polls are appended to the token usage timeseries.
+        let token_log = (effective.remote.enabled
+            && effective.remote.collect_tokens
+            && !effective.remote.nodes.is_empty())
+        .then(|| TokenUsageLog::open(&paths.token_usage_database));
+        let cluster = ClusterMonitor::start(&effective.remote, token_log)?;
         let supervisor = Supervisor::start(
             SupervisorConfig::from_config(effective),
             specs,

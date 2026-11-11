@@ -626,6 +626,11 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 168
+        },
+        "token_retention_days": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 365
         }
       },
       "required": [

@@ -149,7 +149,8 @@ fn the_store_keeps_only_sqlite_and_file_modules() {
             "lock",
             "paths",
             "process_history",
-            "sqlite"
+            "sqlite",
+            "token_usage"
         ]
     );
     assert!(

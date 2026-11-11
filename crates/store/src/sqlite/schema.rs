@@ -24,6 +24,10 @@ const PROCESS_HISTORY_USER_VERSION: i64 = 3;
 const HISTORY_TIERS_DDL: &str = include_str!("../history_tiers/schema.sql");
 /// `PRAGMA user_version` of the tiers' DDL.
 const HISTORY_TIERS_USER_VERSION: i64 = 1;
+/// The token usage log's DDL, fox-services-top's own.
+const TOKEN_USAGE_DDL: &str = include_str!("../token_usage/schema.sql");
+/// `PRAGMA user_version` of the token usage log's DDL.
+const TOKEN_USAGE_USER_VERSION: i64 = 1;
 
 /// The high half of `PRAGMA application_id` in every database fox-services-top
 /// writes ("DG"); the low half is the partition's format version (D-85).
@@ -51,6 +55,7 @@ pub enum SchemaKind {
     History,
     ProcessHistory,
     HistoryTiers,
+    TokenUsage,
 }
 
 impl SchemaKind {
@@ -60,6 +65,7 @@ impl SchemaKind {
             Self::History => HISTORY_DDL,
             Self::ProcessHistory => PROCESS_HISTORY_DDL,
             Self::HistoryTiers => HISTORY_TIERS_DDL,
+            Self::TokenUsage => TOKEN_USAGE_DDL,
         }
     }
 
@@ -69,6 +75,7 @@ impl SchemaKind {
             Self::Audit | Self::History => SCHEMA_USER_VERSION,
             Self::ProcessHistory => PROCESS_HISTORY_USER_VERSION,
             Self::HistoryTiers => HISTORY_TIERS_USER_VERSION,
+            Self::TokenUsage => TOKEN_USAGE_USER_VERSION,
         }
     }
 
@@ -82,6 +89,7 @@ impl SchemaKind {
             Self::Audit | Self::History | Self::ProcessHistory => 1,
             // 2: `tier_series.last_utc_ns` and its index dropped (D-95).
             Self::HistoryTiers => 2,
+            Self::TokenUsage => 1,
         }
     }
 
@@ -96,6 +104,7 @@ impl SchemaKind {
             Self::History => "history",
             Self::ProcessHistory => "process history",
             Self::HistoryTiers => "history tiers",
+            Self::TokenUsage => "token usage",
         }
     }
 
@@ -126,6 +135,7 @@ impl SchemaKind {
                 "idx_process_buckets_time",
             ],
             Self::HistoryTiers => &["tier_series", "tier_buckets"],
+            Self::TokenUsage => &["token_samples", "token_samples_time"],
         }
     }
 }
@@ -284,11 +294,12 @@ mod tests {
         }
     }
 
-    const KINDS: [SchemaKind; 4] = [
+    const KINDS: [SchemaKind; 5] = [
         SchemaKind::Audit,
         SchemaKind::History,
         SchemaKind::ProcessHistory,
         SchemaKind::HistoryTiers,
+        SchemaKind::TokenUsage,
     ];
 
     #[test]
@@ -299,6 +310,8 @@ mod tests {
         assert!(HISTORY_DDL.contains("BEGIN IMMEDIATE;"));
         assert!(PROCESS_HISTORY_DDL.contains("PRAGMA user_version = 3;"));
         assert!(HISTORY_TIERS_DDL.contains("PRAGMA user_version = 1;"));
+        assert!(TOKEN_USAGE_DDL.contains("CREATE TABLE IF NOT EXISTS token_samples"));
+        assert!(TOKEN_USAGE_DDL.contains("PRAGMA user_version = 1;"));
     }
 
     /// The stamp keeps fox-services-top's magic apart from the format version, and

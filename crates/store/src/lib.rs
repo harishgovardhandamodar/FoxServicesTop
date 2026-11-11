@@ -20,3 +20,4 @@ pub mod lock;
 pub mod paths;
 pub mod process_history;
 pub mod sqlite;
+pub mod token_usage;
