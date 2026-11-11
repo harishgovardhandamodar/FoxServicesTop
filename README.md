@@ -101,6 +101,12 @@ grant read access once (the monitor itself never runs as root):
 ./install-from-source.sh --cpu-power
 ```
 
+or straight from the one-liner (flags go after `bash -s --`):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/harishgovardhandamodar/FoxServicesTop/master/install-from-source.sh | bash -s -- --cpu-power
+```
+
 or run the whole monitor as root (`sudo -H fox-services-top`; process actions
 are then disabled). No restart is needed: a running collector picks the counters
 up by itself. Details and how to undo it are in the
