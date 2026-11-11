@@ -163,10 +163,14 @@ of the whole machine.
   source's state. Every setting shows its saved and effective value, where it came from, and
   whether it applies now or after a restart.
 - **Fox-Services dashboard.** One multi-widget tab (key `6`) combines LAN machine health,
-  live services and recent LLM requests, token-flow charts, and a watts timeline. Its
+  live services and recent LLM requests, and token-flow charts. Its
   responsive, color-coded panels arrange as a graphical dashboard and stack on narrow terminals.
   A node that does not answer stays visible with its error; service and process monitoring are
   read-only.
+- **Power.** Its own tab (key `7`) with the watts timeline, per-series kWh and the priced
+  total: `c`/`C` picks the country tariff (euros/kWh, Netherlands by default) and `t`/`T`
+  picks which database window the cost prices. On a host without GPUs the total is the
+  CPU sum; with GPUs a missing total stays `n/a` rather than a partial sum.
 
 ## Screens
 
@@ -372,11 +376,11 @@ Each panel names its own keys at the right of its title; the footer keeps the gl
 
 | Key | Action |
 |---|---|
-| `1`–`6`, `0`, `Tab`, `Shift-Tab` | Overview, GPU, Overview History, Process History, Settings, Fox-Services, Zombies |
+| `1`–`7`, `0`, `Tab`, `Shift-Tab` | Overview, GPU, Overview History, Process History, Settings, Fox-Services, Power, Zombies |
 | `q`, `Ctrl-C` | Quit (`q` is text while typing a filter; `Ctrl-C` always quits) |
 | `?`, `F1` | Help |
 | `+` / `-` | Faster / slower sampling |
-| `j`/`k`, arrows, `PgUp`/`PgDn`, `Home`/`End` | Move the selection (scroll on Fox-Services and Zombies) |
+| `j`/`k`, arrows, `PgUp`/`PgDn`, `Home`/`End` | Move the selection (scroll on Fox-Services, Power and Zombies) |
 | `c` | Show or hide the CPU sensors and per-core bars (or click the CPU panel) |
 | `[` / `]` | Scroll the GPU processes of the memory panel |
 | `s` / `r` | Next sort column / reverse order |

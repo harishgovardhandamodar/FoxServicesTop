@@ -20,26 +20,106 @@ pub struct Tariff {
 
 /// Selectable countries and their display-only tariffs, in a stable order.
 pub const TARIFFS: &[Tariff] = &[
-    Tariff { code: "US", country: "United States", price_eur_per_kwh: 0.17 },
-    Tariff { code: "CA", country: "Canada", price_eur_per_kwh: 0.13 },
-    Tariff { code: "GB", country: "United Kingdom", price_eur_per_kwh: 0.32 },
-    Tariff { code: "DE", country: "Germany", price_eur_per_kwh: 0.38 },
-    Tariff { code: "FR", country: "France", price_eur_per_kwh: 0.27 },
-    Tariff { code: "IT", country: "Italy", price_eur_per_kwh: 0.31 },
-    Tariff { code: "ES", country: "Spain", price_eur_per_kwh: 0.28 },
-    Tariff { code: "NL", country: "Netherlands", price_eur_per_kwh: 0.30 },
-    Tariff { code: "SE", country: "Sweden", price_eur_per_kwh: 0.21 },
-    Tariff { code: "NO", country: "Norway", price_eur_per_kwh: 0.15 },
-    Tariff { code: "PL", country: "Poland", price_eur_per_kwh: 0.23 },
-    Tariff { code: "CH", country: "Switzerland", price_eur_per_kwh: 0.29 },
-    Tariff { code: "AU", country: "Australia", price_eur_per_kwh: 0.24 },
-    Tariff { code: "JP", country: "Japan", price_eur_per_kwh: 0.23 },
-    Tariff { code: "KR", country: "South Korea", price_eur_per_kwh: 0.13 },
-    Tariff { code: "IN", country: "India", price_eur_per_kwh: 0.07 },
-    Tariff { code: "BR", country: "Brazil", price_eur_per_kwh: 0.19 },
-    Tariff { code: "ZA", country: "South Africa", price_eur_per_kwh: 0.13 },
-    Tariff { code: "SG", country: "Singapore", price_eur_per_kwh: 0.26 },
-    Tariff { code: "AE", country: "UAE", price_eur_per_kwh: 0.08 },
+    Tariff {
+        code: "US",
+        country: "United States",
+        price_eur_per_kwh: 0.17,
+    },
+    Tariff {
+        code: "CA",
+        country: "Canada",
+        price_eur_per_kwh: 0.13,
+    },
+    Tariff {
+        code: "GB",
+        country: "United Kingdom",
+        price_eur_per_kwh: 0.32,
+    },
+    Tariff {
+        code: "DE",
+        country: "Germany",
+        price_eur_per_kwh: 0.38,
+    },
+    Tariff {
+        code: "FR",
+        country: "France",
+        price_eur_per_kwh: 0.27,
+    },
+    Tariff {
+        code: "IT",
+        country: "Italy",
+        price_eur_per_kwh: 0.31,
+    },
+    Tariff {
+        code: "ES",
+        country: "Spain",
+        price_eur_per_kwh: 0.28,
+    },
+    Tariff {
+        code: "NL",
+        country: "Netherlands",
+        price_eur_per_kwh: 0.30,
+    },
+    Tariff {
+        code: "SE",
+        country: "Sweden",
+        price_eur_per_kwh: 0.21,
+    },
+    Tariff {
+        code: "NO",
+        country: "Norway",
+        price_eur_per_kwh: 0.15,
+    },
+    Tariff {
+        code: "PL",
+        country: "Poland",
+        price_eur_per_kwh: 0.23,
+    },
+    Tariff {
+        code: "CH",
+        country: "Switzerland",
+        price_eur_per_kwh: 0.29,
+    },
+    Tariff {
+        code: "AU",
+        country: "Australia",
+        price_eur_per_kwh: 0.24,
+    },
+    Tariff {
+        code: "JP",
+        country: "Japan",
+        price_eur_per_kwh: 0.23,
+    },
+    Tariff {
+        code: "KR",
+        country: "South Korea",
+        price_eur_per_kwh: 0.13,
+    },
+    Tariff {
+        code: "IN",
+        country: "India",
+        price_eur_per_kwh: 0.07,
+    },
+    Tariff {
+        code: "BR",
+        country: "Brazil",
+        price_eur_per_kwh: 0.19,
+    },
+    Tariff {
+        code: "ZA",
+        country: "South Africa",
+        price_eur_per_kwh: 0.13,
+    },
+    Tariff {
+        code: "SG",
+        country: "Singapore",
+        price_eur_per_kwh: 0.26,
+    },
+    Tariff {
+        code: "AE",
+        country: "UAE",
+        price_eur_per_kwh: 0.08,
+    },
 ];
 
 /// Default tariff selector: the Netherlands, priced in euros.

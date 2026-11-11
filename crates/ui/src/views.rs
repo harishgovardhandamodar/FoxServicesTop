@@ -22,17 +22,19 @@ pub enum Tab {
     ProcessHistory,
     Settings,
     FoxServices,
+    Power,
     Zombies,
 }
 
-/// Offered tabs in order; digit keys 1–6 and 0 follow this order.
-pub const OFFERED_TABS: [Tab; 7] = [
+/// Offered tabs in order; digit keys 1–7 and 0 follow this order.
+pub const OFFERED_TABS: [Tab; 8] = [
     Tab::Overview,
     Tab::Gpu,
     Tab::OverviewHistory,
     Tab::ProcessHistory,
     Tab::Settings,
     Tab::FoxServices,
+    Tab::Power,
     Tab::Zombies,
 ];
 
@@ -47,6 +49,7 @@ impl Tab {
             Self::OverviewHistory | Self::ProcessHistory => ViewKind::History,
             Self::Settings => ViewKind::Settings,
             Self::FoxServices => ViewKind::Nodes,
+            Self::Power => ViewKind::Power,
             Self::Zombies => ViewKind::Zombies,
         }
     }
@@ -59,6 +62,7 @@ impl Tab {
             Self::ProcessHistory => "Process History",
             Self::Settings => "Settings",
             Self::FoxServices => "Fox-Services",
+            Self::Power => "Power",
             Self::Zombies => "Zombies",
         }
     }
@@ -72,6 +76,7 @@ impl Tab {
             Self::ProcessHistory => "tab.process_history",
             Self::Settings => "tab.settings",
             Self::FoxServices => "tab.fox_services",
+            Self::Power => "tab.power",
             Self::Zombies => "tab.zombies",
         }
     }
@@ -91,9 +96,8 @@ impl Tab {
             ViewKind::History if page == 0 => Some(Self::OverviewHistory),
             ViewKind::History => Some(Self::ProcessHistory),
             ViewKind::Settings => Some(Self::Settings),
-            ViewKind::Nodes | ViewKind::Docker | ViewKind::Tokens | ViewKind::Power => {
-                Some(Self::FoxServices)
-            }
+            ViewKind::Nodes | ViewKind::Docker | ViewKind::Tokens => Some(Self::FoxServices),
+            ViewKind::Power => Some(Self::Power),
             ViewKind::Zombies => Some(Self::Zombies),
             ViewKind::Processes | ViewKind::Sources | ViewKind::Actions => None,
         }
@@ -153,16 +157,21 @@ mod tests {
         assert_eq!(Tab::Overview.number(), 1);
         assert_eq!(Tab::Settings.number(), 5);
         assert_eq!(Tab::FoxServices.number(), 6);
-        assert_eq!(Tab::Zombies.number(), 7);
+        assert_eq!(Tab::Power.number(), 7);
+        assert_eq!(Tab::Power.shortcut(), "7");
+        assert_eq!(Tab::Zombies.number(), 8);
         assert_eq!(Tab::Zombies.shortcut(), "0");
-        assert_eq!(Tab::of(ViewKind::Power, 0), Some(Tab::FoxServices));
+        assert_eq!(Tab::of(ViewKind::Power, 0), Some(Tab::Power));
         assert_eq!(Tab::of(ViewKind::Zombies, 0), Some(Tab::Zombies));
         assert_eq!(Tab::of(ViewKind::Tokens, 0), Some(Tab::FoxServices));
         assert_eq!(Tab::of(ViewKind::Nodes, 0), Some(Tab::FoxServices));
         assert_eq!(Tab::of(ViewKind::Docker, 0), Some(Tab::FoxServices));
         assert_eq!(Tab::FoxServices.view(), ViewKind::Nodes);
-        assert_eq!(next_tab(Some(Tab::FoxServices)), Tab::Zombies);
+        assert_eq!(Tab::Power.view(), ViewKind::Power);
+        assert_eq!(next_tab(Some(Tab::FoxServices)), Tab::Power);
+        assert_eq!(next_tab(Some(Tab::Power)), Tab::Zombies);
         assert_eq!(next_tab(Some(Tab::Zombies)), Tab::Overview);
+        assert_eq!(previous_tab(Some(Tab::Power)), Tab::FoxServices);
         assert_eq!(previous_tab(Some(Tab::Overview)), Tab::Zombies);
     }
 

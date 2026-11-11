@@ -183,11 +183,11 @@ path. `install.sh` installs neither unit.
 
 | Key | Action |
 |---|---|
-| `1`–`6`, `0`, `Tab`, `Shift-Tab` | Overview, GPU, Overview History, Process History, Settings, Fox-Services, Zombies |
+| `1`–`7`, `0`, `Tab`, `Shift-Tab` | Overview, GPU, Overview History, Process History, Settings, Fox-Services, Power, Zombies |
 | `q`, `Ctrl-C` | Quit (`q` is text while typing a filter) |
 | `?`, `F1` | Help |
 | `+` / `-` | Faster / slower sampling |
-| `j`/`k`, arrows, `PgUp`/`PgDn`, `Home`/`End` | Move the selection (scroll on Fox-Services/Zombies) |
+| `j`/`k`, arrows, `PgUp`/`PgDn`, `Home`/`End` | Move the selection (scroll on Fox-Services/Power/Zombies) |
 | `/` | Filter (`Enter` applies, `Esc` clears; narrows dashboard node/service tables too) |
 | `c` | Per-core CPU bars and sensors |
 | `[` / `]` | Scroll the memory panel's GPU processes |
@@ -226,7 +226,7 @@ clickable with the mouse.
 
 ## The Fox-Services dashboard (6)
 
-The former Nodes, Fox-Services, Tokens and Power tabs are now one responsive
+The former Nodes, Fox-Services and Tokens tabs are now one responsive
 multi-widget dashboard. At wide sizes it arranges four color-coded panels in
 a two-by-two grid; on narrower terminals the panels stack to fit:
 
@@ -243,6 +243,19 @@ a two-by-two grid; on narrower terminals the panels stack to fit:
 `/` filters the node and service tables; `j`/`k` scroll their content. The
 dashboard never blocks local monitoring, and an unreachable node remains
 visible with its error.
+
+## The Power tab (7)
+
+The watts timeline over the history window, per-series kWh and a priced
+total for one selectable database window. `c`/`C` picks the country tariff
+(euros/kWh, Netherlands by default) and `t`/`T` picks which window the cost
+prices (`window`, `1h`, `6h`, `12h`, `24h`); the priced energy is what the
+local database holds, with its recorded coverage shown beside it.
+
+On a host without GPUs there is no `host.power.total` series (it would only
+repeat the CPU), so the tab totals the CPU packages instead. On a host with
+GPUs a missing total means a part is unreadable, and the tab keeps `n/a`
+rather than a partial sum.
 
 ## The Zombies tab (0)
 

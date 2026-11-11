@@ -9,6 +9,7 @@
 
 use fox_services_top_core::metric::ids;
 use fox_services_top_core::naming::entity;
+use fox_services_top_core::observation::EntityKind;
 use fox_services_top_core::view::{
     HistoryChartKind, HistoryView, PowerRowView, PowerView, PowerWindowView,
 };
@@ -52,7 +53,7 @@ pub(crate) fn build_power_view(
                 .value_f64()
         });
     let total_joules = total_chart.and_then(|chart| energy_of(chart.mean, chart.covered_ns));
-    let rows: Vec<PowerRowView> = power_charts
+    let mut rows: Vec<PowerRowView> = power_charts
         .iter()
         .map(|chart| {
             let current_w = reader
@@ -73,7 +74,7 @@ pub(crate) fn build_power_view(
             }
         })
         .collect();
-    let windows: Vec<PowerWindowView> = history
+    let mut windows: Vec<PowerWindowView> = history
         .summaries
         .iter()
         .filter(|summary| summary.kind.is_power())
@@ -88,6 +89,14 @@ pub(crate) fn build_power_view(
             energy_joules: summary.integral,
         })
         .collect();
+    let (total_w, total_joules) = cpu_only_total(
+        reader,
+        total_chart.is_some(),
+        total_w,
+        total_joules,
+        &mut rows,
+        &mut windows,
+    );
     if timeline.iter().all(|point| point.is_none()) && rows.is_empty() && windows.is_empty() {
         return None;
     }
@@ -110,6 +119,146 @@ fn energy_of(mean: Option<f64>, covered_ns: Option<u64>) -> Option<f64> {
         return None;
     }
     Some(mean * (covered as f64) / 1_000_000_000.0)
+}
+
+/// Whether the catalog lists a GPU that has not been removed: the
+/// collector only publishes `host.power.total` for such hosts, so without
+/// one a missing total means "no total series", not "a part unreadable".
+fn has_live_gpus(reader: &MetricReader<'_>) -> bool {
+    reader
+        .catalog()
+        .entities
+        .values()
+        .any(|record| record.kind == EntityKind::Gpu && record.removed_boot_ns.is_none())
+}
+
+/// Finite values only; `None` when any part is missing or unusable, so a
+/// synthesized total is never a partial sum.
+fn sum_all(values: &[Option<f64>]) -> Option<f64> {
+    let mut sum = 0.0;
+    for value in values {
+        match value {
+            Some(value) if value.is_finite() && *value >= 0.0 => sum += *value,
+            _ => return None,
+        }
+    }
+    Some(sum)
+}
+
+/// Total from the CPU packages when the host has no GPUs: the collector
+/// never publishes `host.power.total` there (it would only repeat the
+/// CPU), so the title, the `total` row and the per-window totals would
+/// otherwise read `n/a` next to live CPU watts. The CPU sum is the whole
+/// total here, exact rather than partial. With GPUs present a missing total
+/// means a part is unreadable, and the `n/a` stays.
+#[allow(clippy::too_many_arguments)]
+fn cpu_only_total(
+    reader: &MetricReader<'_>,
+    has_total_chart: bool,
+    total_w: Option<f64>,
+    total_joules: Option<f64>,
+    rows: &mut Vec<PowerRowView>,
+    windows: &mut Vec<PowerWindowView>,
+) -> (Option<f64>, Option<f64>) {
+    if has_total_chart || has_live_gpus(reader) {
+        return (total_w, total_joules);
+    }
+    let cpu: Vec<&PowerRowView> = rows
+        .iter()
+        .filter(|row| row.kind == HistoryChartKind::CpuPower)
+        .collect();
+    if cpu.is_empty() {
+        return (total_w, total_joules);
+    }
+    let current_w = sum_all(&cpu.iter().map(|row| row.current_w).collect::<Vec<_>>());
+    let energy_joules = sum_all(&cpu.iter().map(|row| row.energy_joules).collect::<Vec<_>>());
+    let covered_ns = cpu.iter().filter_map(|row| row.covered_ns).max();
+    let mean_w = match (energy_joules, covered_ns) {
+        (Some(joules), Some(covered)) if covered > 0 => {
+            Some(joules * 1_000_000_000.0 / (covered as f64))
+        }
+        _ => None,
+    };
+    if current_w.is_none() && energy_joules.is_none() {
+        return (total_w, total_joules);
+    }
+    let peak_w = cpu
+        .iter()
+        .filter_map(|row| row.peak_w.filter(|watts| watts.is_finite()))
+        .reduce(f64::max);
+    rows.insert(
+        0,
+        PowerRowView {
+            kind: HistoryChartKind::TotalPower,
+            subject: "total".to_owned(),
+            current_w,
+            mean_w,
+            peak_w,
+            covered_ns,
+            energy_joules,
+        },
+    );
+    synthesize_total_windows(windows);
+    (current_w, energy_joules)
+}
+
+/// Per-window `total` entries summed from the CPU packages' summaries, in
+/// first-seen window order, skipping windows that already carry a total.
+fn synthesize_total_windows(windows: &mut Vec<PowerWindowView>) {
+    let mut labels: Vec<String> = Vec::new();
+    for window in windows.iter() {
+        if !labels.contains(&window.window_label) {
+            labels.push(window.window_label.clone());
+        }
+    }
+    let mut synthesized = Vec::new();
+    for label in labels {
+        if windows.iter().any(|window| {
+            window.window_label == label
+                && window.kind == HistoryChartKind::TotalPower
+                && window.subject == "total"
+        }) {
+            continue;
+        }
+        let cpu: Vec<&PowerWindowView> = windows
+            .iter()
+            .filter(|window| {
+                window.window_label == label && window.kind == HistoryChartKind::CpuPower
+            })
+            .collect();
+        if cpu.is_empty() {
+            continue;
+        }
+        let energy_joules = sum_all(
+            &cpu.iter()
+                .map(|window| window.energy_joules)
+                .collect::<Vec<_>>(),
+        );
+        let Some(energy) = energy_joules else {
+            continue;
+        };
+        let covered_ns = cpu.iter().filter_map(|window| window.covered_ns).max();
+        let span_ns = cpu.iter().map(|window| window.span_ns).max().unwrap_or(0);
+        let mean_w = match covered_ns {
+            Some(covered) if covered > 0 => Some(energy * 1_000_000_000.0 / (covered as f64)),
+            _ => None,
+        };
+        let peak_w = cpu
+            .iter()
+            .filter_map(|window| window.peak_w.filter(|watts| watts.is_finite()))
+            .reduce(f64::max);
+        synthesized.push(PowerWindowView {
+            kind: HistoryChartKind::TotalPower,
+            subject: "total".to_owned(),
+            window_label: label,
+            span_ns,
+            mean_w,
+            peak_w,
+            covered_ns,
+            energy_joules: Some(energy),
+        });
+    }
+    windows.splice(..0, synthesized);
 }
 
 /// Display subject: the host total reads `total`, the rest as charted.
@@ -311,5 +460,84 @@ mod tests {
             error: None,
         };
         assert!(build_power_view(&reader, &history).is_none());
+    }
+
+    /// A CPU-only history on a host without GPUs: the collector never
+    /// publishes `host.power.total` there, so the view synthesizes the
+    /// exact total from the CPU packages instead of showing `n/a`.
+    fn cpu_only_history() -> (Fixture, HistoryView) {
+        let mut fixture = Fixture::new();
+        fixture.add(
+            "cpu",
+            sample(ids::CPU_POWER_PACKAGE, "cpu.package.0", "package:0").f64(50.0),
+        );
+        let history = HistoryView {
+            window_label: "1h".to_owned(),
+            requested_span_ns: 3_600_000_000_000,
+            start_utc_ns: 0,
+            end_utc_ns: 3_600_000_000_000,
+            utc_offset_s: 0,
+            charts: vec![chart(HistoryChartKind::CpuPower, "CPU 0", 50.0)],
+            summaries: vec![window_summary(
+                HistoryChartKind::CpuPower,
+                "CPU 0",
+                "1h",
+                50.0,
+                180_000.0,
+            )],
+            disk: fox_services_top_core::view::DiskHistory::Off,
+            error: None,
+        };
+        (fixture, history)
+    }
+
+    #[test]
+    fn a_host_without_gpus_totals_its_cpu_packages() {
+        let (fixture, history) = cpu_only_history();
+        assert!(
+            fixture.catalog.entities.values().all(|record| {
+                record.kind != fox_services_top_core::observation::EntityKind::Gpu
+            }),
+            "the fixture host has no GPUs"
+        );
+        let reader = MetricReader::new(&fixture.snapshot, &fixture.catalog, NOW);
+        let view = build_power_view(&reader, &history).expect("CPU watts fill the view");
+        assert_eq!(view.total_w, Some(50.0));
+        assert_eq!(view.total_joules, Some(180_000.0));
+        assert_eq!(view.rows.len(), 2);
+        assert_eq!(view.rows[0].subject, "total");
+        assert_eq!(view.rows[0].energy_joules, Some(180_000.0));
+        let total_window = view
+            .windows
+            .iter()
+            .find(|window| window.kind == HistoryChartKind::TotalPower && window.subject == "total")
+            .expect("a per-window total from the CPU summaries");
+        assert_eq!(total_window.window_label, "1h");
+        assert_eq!(total_window.energy_joules, Some(180_000.0));
+    }
+
+    #[test]
+    fn a_host_with_a_gpu_keeps_a_missing_total_as_na() {
+        let (mut fixture, history) = cpu_only_history();
+        fixture.add_entity(fox_services_top_core::testing::entity_record(
+            "gpu:GPU-0",
+            fox_services_top_core::observation::EntityKind::Gpu,
+            "GPU 0",
+            &[],
+        ));
+        let reader = MetricReader::new(&fixture.snapshot, &fixture.catalog, NOW);
+        let view = build_power_view(&reader, &history).expect("CPU watts fill the view");
+        assert_eq!(view.total_w, None, "a partial sum would lie");
+        assert_eq!(view.total_joules, None);
+        assert!(
+            view.rows.iter().all(|row| row.subject != "total"),
+            "no synthesized total row"
+        );
+        assert!(
+            view.windows
+                .iter()
+                .all(|window| window.kind != HistoryChartKind::TotalPower),
+            "no synthesized total windows"
+        );
     }
 }

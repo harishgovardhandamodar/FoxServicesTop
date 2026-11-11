@@ -491,8 +491,7 @@ fn render_cost(
                 Span::styled(
                     format!(
                         " · {} {} €{:.2}/kWh · {}",
-                        current.code, current.country, current.price_eur_per_kwh,
-                        selection.label
+                        current.code, current.country, current.price_eur_per_kwh, selection.label
                     ),
                     context.theme.muted_style(),
                 ),
@@ -510,8 +509,7 @@ fn render_cost(
     crate::modules::common::message(frame, area, &text, context.theme.text_style());
     output.label(format!(
         "power cost {} {} {energy} {cost}",
-        current.code,
-        selection.label
+        current.code, selection.label
     ));
 }
 

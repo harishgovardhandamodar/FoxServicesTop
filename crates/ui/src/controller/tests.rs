@@ -867,14 +867,17 @@ fn tab_clicks_and_keys_switch_views() {
     assert_eq!(harness.last_session().0, ViewKind::Zombies);
     harness.keys(&[key('6')]);
     assert_eq!(harness.last_session().0, ViewKind::Nodes);
+    // 7 selects the Power tab; 8 and 9 select nothing.
+    harness.keys(&[key('7')]);
+    assert_eq!(harness.last_session().0, ViewKind::Power);
     let sent = harness.submitted().len();
-    harness.keys(&[key('7'), key('8'), key('9')]);
+    harness.keys(&[key('8'), key('9')]);
     assert_eq!(
         harness.submitted().len(),
         sent,
-        "merged tabs have no old keys"
+        "unassigned digits select nothing"
     );
-    assert_eq!(harness.last_session().0, ViewKind::Nodes);
+    assert_eq!(harness.last_session().0, ViewKind::Power);
     harness.keys(&[key('0')]);
     assert_eq!(harness.last_session().0, ViewKind::Zombies);
     harness.keys(&[code(KeyCode::Tab)]);
