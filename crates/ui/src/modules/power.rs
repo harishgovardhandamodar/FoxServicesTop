@@ -23,7 +23,7 @@ use super::common::{
     render_chart,
 };
 use crate::format::{
-    COST_WINDOWS, clean, format_cost_usd, format_energy, format_span_ns, format_value, tariff,
+    COST_WINDOWS, clean, format_cost_eur, format_energy, format_span_ns, format_value, tariff,
 };
 use crate::registry::{DisplayContext, DisplayModule, DisplayModuleManifest, RenderOutput, Slot};
 
@@ -490,8 +490,8 @@ fn render_cost(
                 Span::styled("cost", context.theme.title_style()),
                 Span::styled(
                     format!(
-                        " · {} {} ${:.2}/kWh · {}",
-                        current.code, current.country, current.price_usd_per_kwh,
+                        " · {} {} €{:.2}/kWh · {}",
+                        current.code, current.country, current.price_eur_per_kwh,
                         selection.label
                     ),
                     context.theme.muted_style(),
@@ -505,7 +505,7 @@ fn render_cost(
         .energy_joules
         .filter(|joules| joules.is_finite())
         .map_or_else(|| "n/a".to_owned(), format_energy);
-    let cost = format_cost_usd(selection.energy_joules, current.price_usd_per_kwh);
+    let cost = format_cost_eur(selection.energy_joules, current.price_eur_per_kwh);
     let text = format!("total {energy} ≈ {cost}");
     crate::modules::common::message(frame, area, &text, context.theme.text_style());
     output.label(format!(
@@ -542,8 +542,8 @@ mod tests {
             "1H",
             "24H",
             "cost",
-            "US",
-            "$0.18/kWh",
+            "NL",
+            "€0.30/kWh",
         ] {
             assert!(text.contains(needle), "missing {needle:?}\n{text}");
         }
@@ -599,9 +599,9 @@ mod tests {
         // The fixture's 24 h total holds 200 W over 24 h: 4.8 kWh.
         assert_eq!(day.energy_joules, Some(200.0 * 24.0 * 3_600.0));
         assert_eq!(
-            crate::format::format_cost_usd(day.energy_joules, 0.18),
-            "$0.86",
-            "4.8 kWh at $0.18/kWh"
+            crate::format::format_cost_eur(day.energy_joules, 0.30),
+            "€1.44",
+            "4.8 kWh at €0.30/kWh"
         );
     }
 
@@ -617,11 +617,11 @@ mod tests {
             .copied()
             .expect("DE tariff");
         assert_eq!(us.code, "US");
-        assert!(de.price_usd_per_kwh > us.price_usd_per_kwh);
-        let us_cost = crate::format::cost_usd(window.energy_joules, us.price_usd_per_kwh).unwrap();
-        let de_cost = crate::format::cost_usd(window.energy_joules, de.price_usd_per_kwh).unwrap();
+        assert!(de.price_eur_per_kwh > us.price_eur_per_kwh);
+        let us_cost = crate::format::cost_eur(window.energy_joules, us.price_eur_per_kwh).unwrap();
+        let de_cost = crate::format::cost_eur(window.energy_joules, de.price_eur_per_kwh).unwrap();
         assert!(de_cost > us_cost);
         // The fixture's window total holds 300 W over 1 h: 0.3 kWh.
-        assert!((us_cost - 0.3 * 0.18).abs() < 1e-9, "{us_cost}");
+        assert!((us_cost - 0.3 * 0.17).abs() < 1e-9, "{us_cost}");
     }
 }

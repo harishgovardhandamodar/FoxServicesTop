@@ -183,7 +183,7 @@ impl Controller {
             scroll: BTreeMap::new(),
             clipboard: None,
             tabs: BTreeMap::new(),
-            power_tariff: 0,
+            power_tariff: crate::format::DEFAULT_TARIFF,
             power_cost_window: 0,
         }
     }

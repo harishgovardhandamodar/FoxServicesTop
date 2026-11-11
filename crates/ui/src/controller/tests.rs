@@ -622,11 +622,12 @@ fn power_cost_keys_cycle_country_and_range_without_a_command() {
         let ui = harness.controller.ui_state(harness.now);
         (ui.power_tariff, ui.power_cost_window)
     };
-    assert_eq!(state(&harness), (0, 0));
+    let default = crate::format::DEFAULT_TARIFF;
+    assert_eq!(state(&harness), (default, 0));
     harness.keys(&[key('c'), key('c'), key('t')]);
-    assert_eq!(state(&harness), (2, 1));
+    assert_eq!(state(&harness), (default + 2, 1));
     harness.keys(&[key('C'), key('T')]);
-    assert_eq!(state(&harness), (1, 0));
+    assert_eq!(state(&harness), (default + 1, 0));
     assert!(
         harness.submitted().is_empty(),
         "cost selection is presentation only: {:?}",

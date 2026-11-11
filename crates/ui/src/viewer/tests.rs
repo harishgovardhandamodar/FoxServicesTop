@@ -149,7 +149,7 @@ fn fox_services_tab_renders_nodes_services_tokens_and_power_together() {
         if size == (160, 50) {
             assert!(rendered.contains("KWH"), "power details not visible");
             assert!(rendered.text().contains('█'), "dashboard charts not drawn");
-            for needle in ["cost", "US United States", "$0.18/kWh", "≈ $0.05"] {
+            for needle in ["cost", "NL Netherlands", "€0.30/kWh", "≈ €0.09"] {
                 assert!(
                     rendered.contains(needle),
                     "power cost not visible at {size:?}: missing {needle:?}\n{}",
