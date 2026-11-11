@@ -88,8 +88,24 @@ cargo build --release --locked
 ./target/release/fox-services-top
 ```
 
-New here? Start with the [User Guide](docs/USER_GUIDE.md): running it, the seven
+New here? Start with the [User Guide](docs/USER_GUIDE.md): running it, the eight
 tabs, and pointing the Fox-Services dashboard at your own fox-services nodes.
+
+#### CPU power (RAPL) access on Linux
+
+The CPU ⚡ figures come from the powercap/RAPL counters, which the kernel keeps
+root-only — without access the Power tab shows no CPU watts and no total. Either
+grant read access once (the monitor itself never runs as root):
+
+```bash
+./install-from-source.sh --cpu-power
+```
+
+or run the whole monitor as root (`sudo -H fox-services-top`; process actions
+are then disabled). No restart is needed: a running collector picks the counters
+up by itself. Details and how to undo it are in the
+[User Guide](docs/USER_GUIDE.md#cpu-power-without-root). Hosts with no powercap
+zone (and no `spbm` hwmon power sensor) have no CPU power to read either way.
 
 ## Features
 
