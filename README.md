@@ -73,10 +73,11 @@ without root — both are reported as unsupported, never as zeros.
 
 `install-from-source.sh` also builds from a checkout in one command
 (`--service` installs the headless collector's systemd user unit,
-`--install-rust` adds rustup first):
+`--cpu-power` makes the CPU power counters readable, `--install-rust` adds
+rustup first; flags go after `bash -s --`):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/harishgovardhandamodar/FoxServicesTop/master/install-from-source.sh | bash
+curl -fsSL https://raw.githubusercontent.com/harishgovardhandamodar/FoxServicesTop/master/install-from-source.sh | bash -s -- --service --cpu-power
 ```
 
 Or by hand:
