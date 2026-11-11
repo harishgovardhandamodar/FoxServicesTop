@@ -89,7 +89,7 @@ pub(crate) fn build_power_view(
             energy_joules: summary.integral,
         })
         .collect();
-    let (total_w, total_joules) = cpu_only_total(
+    let (total_w, total_joules) = synthesize_total(
         reader,
         total_chart.is_some(),
         total_w,
@@ -145,14 +145,20 @@ fn sum_all(values: &[Option<f64>]) -> Option<f64> {
     Some(sum)
 }
 
-/// Total from the CPU packages when the host has no GPUs: the collector
-/// never publishes `host.power.total` there (it would only repeat the
-/// CPU), so the title, the `total` row and the per-window totals would
-/// otherwise read `n/a` next to live CPU watts. The CPU sum is the whole
-/// total here, exact rather than partial. With GPUs present a missing total
-/// means a part is unreadable, and the `n/a` stays.
+/// Total when the collector did not publish `host.power.total`, without
+/// ever falling back to a partial sum:
+///
+/// * No live GPUs in the catalog: the collector never publishes the total
+///   there (it would only repeat the CPU), so the title, the `total` row
+///   and the per-window totals are synthesized from the CPU packages. The
+///   CPU sum is the whole total here, exact rather than partial.
+/// * Otherwise the series exists (or nothing reports at all). When every
+///   reporting part currently reads, the live total is their sum — the same
+///   instant sum the collector publishes, only missed through cycle timing.
+///   When any part lacks a reading, the `n/a` stays: a silent partial sum
+///   would lie.
 #[allow(clippy::too_many_arguments)]
-fn cpu_only_total(
+fn synthesize_total(
     reader: &MetricReader<'_>,
     has_total_chart: bool,
     total_w: Option<f64>,
@@ -160,9 +166,41 @@ fn cpu_only_total(
     rows: &mut Vec<PowerRowView>,
     windows: &mut Vec<PowerWindowView>,
 ) -> (Option<f64>, Option<f64>) {
-    if has_total_chart || has_live_gpus(reader) {
+    if !has_total_chart && !has_live_gpus(reader) {
+        return cpu_only_total(total_w, total_joules, rows, windows);
+    }
+    if total_w.is_some() || !has_total_chart {
         return (total_w, total_joules);
     }
+    // The series exists but the live cell does not read: sum the live
+    // readings of the parts, and only those.
+    let parts: Vec<&PowerRowView> = rows
+        .iter()
+        .filter(|row| row.kind != HistoryChartKind::TotalPower)
+        .collect();
+    if parts.is_empty() {
+        return (total_w, total_joules);
+    }
+    let Some(current) = sum_all(&parts.iter().map(|row| row.current_w).collect::<Vec<_>>()) else {
+        return (total_w, total_joules);
+    };
+    if let Some(total) = rows
+        .iter_mut()
+        .find(|row| row.kind == HistoryChartKind::TotalPower)
+    {
+        total.current_w = Some(current);
+    }
+    (Some(current), total_joules)
+}
+
+/// Total from the CPU packages when the host has no GPUs (see
+/// [`synthesize_total`]).
+fn cpu_only_total(
+    total_w: Option<f64>,
+    total_joules: Option<f64>,
+    rows: &mut Vec<PowerRowView>,
+    windows: &mut Vec<PowerWindowView>,
+) -> (Option<f64>, Option<f64>) {
     let cpu: Vec<&PowerRowView> = rows
         .iter()
         .filter(|row| row.kind == HistoryChartKind::CpuPower)
@@ -539,5 +577,73 @@ mod tests {
                 .all(|window| window.kind != HistoryChartKind::TotalPower),
             "no synthesized total windows"
         );
+    }
+
+    #[test]
+    fn a_live_total_missed_through_timing_is_summed_from_its_parts() {
+        // Total series in history, a GPU in the catalog, but no live
+        // `host.power.total` cell: every reporting part reads, so the
+        // title total is their exact sum rather than `n/a`.
+        let mut fixture = Fixture::new();
+        fixture.add(
+            "cpu",
+            sample(ids::CPU_POWER_PACKAGE, "cpu.package.0", "package:0").f64(50.0),
+        );
+        fixture.add(
+            "gpu",
+            sample(ids::GPU_POWER_DRAW, "gpu:GPU-0", "gpu").f64(220.0),
+        );
+        fixture.add_entity(fox_services_top_core::testing::entity_record(
+            "gpu:GPU-0",
+            fox_services_top_core::observation::EntityKind::Gpu,
+            "GPU 0",
+            &[],
+        ));
+        let history = HistoryView {
+            window_label: "1h".to_owned(),
+            requested_span_ns: 3_600_000_000_000,
+            start_utc_ns: 0,
+            end_utc_ns: 3_600_000_000_000,
+            utc_offset_s: 0,
+            charts: vec![
+                chart(HistoryChartKind::TotalPower, "", 200.0),
+                chart(HistoryChartKind::CpuPower, "CPU 0", 50.0),
+                HistoryChartView {
+                    kind: HistoryChartKind::GpuPower,
+                    subject: "GPU 0".to_owned(),
+                    series: fox_services_top_core::testing::metric_key(
+                        "gpu:GPU-0",
+                        ids::GPU_POWER_DRAW,
+                        "gpu",
+                    ),
+                    unit: fox_services_top_core::metric::CanonicalUnit::Watts,
+                    scale_max: None,
+                    points: vec![point(220.0)],
+                    mean: Some(200.0),
+                    peak: Some(240.0),
+                    covered_ns: Some(3_600_000_000_000),
+                    display_downsampled: false,
+                    pending: false,
+                    error: None,
+                    parts: Vec::new(),
+                },
+            ],
+            summaries: vec![
+                window_summary(HistoryChartKind::TotalPower, "", "1h", 200.0, 720_000.0),
+                window_summary(HistoryChartKind::CpuPower, "CPU 0", "1h", 50.0, 180_000.0),
+            ],
+            disk: fox_services_top_core::view::DiskHistory::Off,
+            error: None,
+        };
+        let reader = MetricReader::new(&fixture.snapshot, &fixture.catalog, NOW);
+        let view = build_power_view(&reader, &history).expect("power charts fill the view");
+        assert_eq!(view.total_w, Some(270.0));
+        assert_eq!(view.total_joules, Some(720_000.0));
+        let total = view
+            .rows
+            .iter()
+            .find(|row| row.subject == "total")
+            .expect("total row");
+        assert_eq!(total.current_w, Some(270.0));
     }
 }

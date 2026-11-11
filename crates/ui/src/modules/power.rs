@@ -52,12 +52,13 @@ const CHART_ROWS: u16 = 4;
 /// Per-series windows of the kWh table, in order.
 const WINDOW_ORDER: [&str; 4] = ["1h", "6h", "12h", "24h"];
 
-const SERIES_COLUMNS: [ColumnSpec; 6] = [
+const SERIES_COLUMNS: [ColumnSpec; 7] = [
     ColumnSpec::left("SERIES", 12, 100).flexible().prefer(22),
     ColumnSpec::right("NOW", 9, 80),
     ColumnSpec::right("MEAN", 9, 75),
     ColumnSpec::right("PEAK", 9, 70),
     ColumnSpec::right("KWH", 10, 90),
+    ColumnSpec::right("COST", 9, 80),
     ColumnSpec::right("COVER", 7, 60),
 ];
 
@@ -256,7 +257,8 @@ fn peak_of(power: &PowerView) -> Option<f64> {
         .reduce(f64::max)
 }
 
-/// One row per power series with now/mean/peak watts and kWh.
+/// One row per power series with now/mean/peak watts, kWh and its cost at
+/// the selected tariff.
 fn render_series(
     frame: &mut Frame<'_>,
     rows: &mut RowCursor,
@@ -295,7 +297,7 @@ fn render_series(
             frame.buffer_mut(),
             area,
             &columns,
-            &series_cells(row, context),
+            &series_cells(row, selected_tariff(context).1.price_eur_per_kwh, context),
             None,
         );
         output.label(format!("power {}", clean(&row.subject)));
@@ -304,6 +306,7 @@ fn render_series(
 
 fn series_cells(
     row: &fox_services_top_core::view::PowerRowView,
+    price_eur_per_kwh: f64,
     context: &DisplayContext,
 ) -> Vec<TableCell> {
     let style = context.theme.text_style();
@@ -329,6 +332,12 @@ fn series_cells(
             .map_or_else(
                 || TableCell::new("n/a", context.theme.muted_style()),
                 |joules| TableCell::new(format_energy(joules), style),
+            ),
+        row.energy_joules
+            .filter(|joules| joules.is_finite())
+            .map_or_else(
+                || TableCell::new("n/a", context.theme.muted_style()),
+                |joules| TableCell::new(format_cost_eur(Some(joules), price_eur_per_kwh), style),
             ),
         covered_cell(row.covered_ns, context),
     ]
@@ -522,7 +531,18 @@ fn render_cost(
         .filter(|joules| joules.is_finite())
         .map_or_else(|| "n/a".to_owned(), format_energy);
     let cost = format_cost_eur(selection.energy_joules, current.price_eur_per_kwh);
-    let text = format!("total {energy} ≈ {cost}");
+    // A missing total with GPU series present means a part is unreadable:
+    // say so instead of leaving a bare `n/a`.
+    let text = if selection.energy_joules.is_none()
+        && power
+            .rows
+            .iter()
+            .any(|row| row.kind == fox_services_top_core::view::HistoryChartKind::GpuPower)
+    {
+        format!("total {energy} ≈ {cost} · needs every CPU and GPU reading")
+    } else {
+        format!("total {energy} ≈ {cost}")
+    };
     crate::modules::common::message(frame, area, &text, context.theme.text_style());
     output.label(format!(
         "power cost {} {} {energy} {cost}",
@@ -610,6 +630,8 @@ mod tests {
             "1H",
             "24H",
             "cost",
+            "COST",
+            "€0.06",
             "NL",
             "€0.30/kWh",
         ] {
