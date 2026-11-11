@@ -524,14 +524,11 @@ fn a_projection_inside_the_budget_is_accounted_at_its_bound() {
 #[test]
 fn legacy_fox_services_views_share_dashboard_projections() {
     let widgets = ["cluster", "docker", "tokens", "power"];
-    for view in [
-        ViewKind::Nodes,
-        ViewKind::Docker,
-        ViewKind::Tokens,
-        ViewKind::Power,
-    ] {
+    for view in [ViewKind::Nodes, ViewKind::Docker, ViewKind::Tokens] {
         assert_eq!(super::plan::visible_modules(view), widgets, "{view:?}");
     }
+    // Power is its own detail tab with only the power module.
+    assert_eq!(super::plan::visible_modules(ViewKind::Power), ["power"]);
 }
 
 /// The dashboard and Overview fill power while the history carries

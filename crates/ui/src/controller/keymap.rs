@@ -35,8 +35,6 @@ pub enum KeyAction {
     CloseHelp,
     NextHistoryBarSize,
     PreviousHistoryBarSize,
-    NextPowerTariff,
-    PreviousPowerTariff,
     NextPowerCostWindow,
     PreviousPowerCostWindow,
     ToggleModule,
@@ -229,8 +227,8 @@ const SCROLL_VIEWS: &[ViewKind] = &[
     ViewKind::Power,
     ViewKind::Zombies,
 ];
-/// Views with the Power tab's cost estimate (`c`/`C` country, `t`/`T` range):
-/// the whole Fox-Services dashboard, whose power widget prices the total.
+/// Views with the Power tab's cost estimate (`t`/`T` range). The country
+/// tariff is the power module's scroll cursor (`j`/`k`), so it needs no key.
 const POWER_VIEWS: &[ViewKind] = &[
     ViewKind::Nodes,
     ViewKind::Docker,
@@ -315,8 +313,6 @@ pub static KEYMAP: &[KeyBinding] = &[
     binding("y", "copy the opened run's command line (OSC 52)", None, Section::History, ModeSet::NORMAL, ViewScope::Only(&[ViewKind::History]), &[KeyPattern::char('y')], KeyAction::HistoryCopyCommand),
     binding("w/W/→/←", "next / previous bar size of the history charts (1m … 24h)", None, Section::History, ModeSet::NORMAL, ViewScope::Only(BAR_VIEWS), &[KeyPattern::char('w'), KeyPattern::key(KeyCode::Right)], KeyAction::NextHistoryBarSize),
     binding("W", "previous bar size of the history charts", None, Section::History, ModeSet::NORMAL, ViewScope::Only(BAR_VIEWS), &[KeyPattern::char('W'), KeyPattern::key(KeyCode::Left)], KeyAction::PreviousHistoryBarSize),
-    binding("c/C", "next / previous country tariff of the power cost estimate", None, Section::History, ModeSet::NORMAL, ViewScope::Only(POWER_VIEWS), &[KeyPattern::char('c')], KeyAction::NextPowerTariff),
-    binding("C", "previous country tariff of the power cost estimate", None, Section::History, ModeSet::NORMAL, ViewScope::Only(POWER_VIEWS), &[KeyPattern::char('C')], KeyAction::PreviousPowerTariff),
     binding("t/T", "next / previous range of the power cost estimate (window, 1h … 24h)", None, Section::History, ModeSet::NORMAL, ViewScope::Only(POWER_VIEWS), &[KeyPattern::char('t')], KeyAction::NextPowerCostWindow),
     binding("T", "previous range of the power cost estimate", None, Section::History, ModeSet::NORMAL, ViewScope::Only(POWER_VIEWS), &[KeyPattern::char('T')], KeyAction::PreviousPowerCostWindow),
     binding("Space", "enable / disable the selected module", None, Section::Settings, ModeSet::NORMAL, ViewScope::Only(&[ViewKind::Settings]), &[KeyPattern::char(' ')], KeyAction::ToggleModule),

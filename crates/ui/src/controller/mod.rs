@@ -129,9 +129,9 @@ pub struct Controller {
     scroll: BTreeMap<ModuleId, u16>,
     /// Each module's inner tab (D-72).
     tabs: BTreeMap<ModuleId, u8>,
-    /// Power tab cost estimate: selected country tariff and database window.
-    /// Presentation only; never sent to the Manager.
-    power_tariff: usize,
+    /// Power tab cost estimate: priced database window. Presentation only;
+    /// never sent to the Manager. The country tariff is the power module's
+    /// scroll cursor instead (it needs no extra state).
     power_cost_window: u8,
     /// A command line to copy with the next frame (D-76).
     clipboard: Option<String>,
@@ -183,7 +183,6 @@ impl Controller {
             scroll: BTreeMap::new(),
             clipboard: None,
             tabs: BTreeMap::new(),
-            power_tariff: crate::format::DEFAULT_TARIFF,
             power_cost_window: 0,
         }
     }
@@ -250,7 +249,6 @@ impl Controller {
             expanded: self.expanded.clone(),
             scroll: self.scroll.clone(),
             tabs: self.tabs.clone(),
-            power_tariff: self.power_tariff,
             power_cost_window: self.power_cost_window,
         }
     }
@@ -396,8 +394,6 @@ impl Controller {
             KeyAction::Cancel => self.cancel(context, sink),
             KeyAction::NextHistoryBarSize => self.cycle_history_bar_size(true, context),
             KeyAction::PreviousHistoryBarSize => self.cycle_history_bar_size(false, context),
-            KeyAction::NextPowerTariff => self.cycle_power_tariff(true),
-            KeyAction::PreviousPowerTariff => self.cycle_power_tariff(false),
             KeyAction::NextPowerCostWindow => self.cycle_power_cost_window(true),
             KeyAction::PreviousPowerCostWindow => self.cycle_power_cost_window(false),
             KeyAction::ToggleModule => self.toggle_module(context, sink),
@@ -648,21 +644,6 @@ impl Controller {
                 fields.overview_bar = fields.overview_bar.step_overview(forward);
             }
         });
-    }
-
-    /// `c`/`C` on the Power tab: the country tariff of the cost estimate.
-    /// Presentation only; the selection never leaves the Controller.
-    fn cycle_power_tariff(&mut self, forward: bool) {
-        let count = crate::format::TARIFFS.len();
-        if count == 0 {
-            return;
-        }
-        self.power_tariff = if forward {
-            (self.power_tariff + 1) % count
-        } else {
-            self.power_tariff.checked_sub(1).unwrap_or(count - 1)
-        };
-        self.bump();
     }
 
     /// `t`/`T` on the Power tab: which database window the cost estimate

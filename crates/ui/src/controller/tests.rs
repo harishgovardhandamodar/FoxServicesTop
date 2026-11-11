@@ -559,10 +559,10 @@ fn w_steps_the_window_or_an_opened_runs_bar_size() {
     );
 }
 
-/// `c`/`C` cycle the Power tab's country tariff and `t`/`T` its priced
-/// database window; both are presentation only and submit no command.
+/// `j`/`k` move the Power tab's country cursor and `t`/`T` its priced
+/// database window; all are presentation only and submit no command.
 #[test]
-fn power_cost_keys_cycle_country_and_range_without_a_command() {
+fn power_cost_keys_select_country_and_range_without_a_command() {
     use crate::controller::keymap::{KeyAction, ModeKind, resolve};
     use crossterm::event::{KeyEvent, KeyEventKind};
 
@@ -571,24 +571,6 @@ fn power_cost_keys_cycle_country_and_range_without_a_command() {
         event.kind = KeyEventKind::Press;
         event
     };
-    assert_eq!(
-        resolve(&press('c'), ModeKind::Normal, ViewKind::Power),
-        Some(KeyAction::NextPowerTariff)
-    );
-    assert_eq!(
-        resolve(&press('C'), ModeKind::Normal, ViewKind::Power),
-        Some(KeyAction::PreviousPowerTariff)
-    );
-    assert_eq!(
-        resolve(&press('t'), ModeKind::Normal, ViewKind::Power),
-        Some(KeyAction::NextPowerCostWindow)
-    );
-    assert_eq!(
-        resolve(&press('T'), ModeKind::Normal, ViewKind::Power),
-        Some(KeyAction::PreviousPowerCostWindow)
-    );
-    // The legacy Power view shares the Fox-Services dashboard: the keys
-    // work on every dashboard view, reached with key 6 (Nodes).
     for view in [
         ViewKind::Nodes,
         ViewKind::Docker,
@@ -596,38 +578,41 @@ fn power_cost_keys_cycle_country_and_range_without_a_command() {
         ViewKind::Power,
     ] {
         assert_eq!(
-            resolve(&press('c'), ModeKind::Normal, view),
-            Some(KeyAction::NextPowerTariff),
-            "{view:?}"
-        );
-        assert_eq!(
             resolve(&press('t'), ModeKind::Normal, view),
             Some(KeyAction::NextPowerCostWindow),
             "{view:?}"
         );
+        assert_eq!(
+            resolve(&press('T'), ModeKind::Normal, view),
+            Some(KeyAction::PreviousPowerCostWindow),
+            "{view:?}"
+        );
+        assert_eq!(
+            resolve(&press('j'), ModeKind::Normal, view),
+            Some(KeyAction::ScrollDetailDown),
+            "{view:?} scrolls the country list"
+        );
     }
-    assert_eq!(
-        resolve(&press('c'), ModeKind::Normal, ViewKind::Overview),
-        Some(KeyAction::ToggleCpuDetail),
-        "`c` stays the CPU detail toggle on the Overview"
-    );
     assert_eq!(
         resolve(&press('t'), ModeKind::Normal, ViewKind::Overview),
         None,
-        "`t` prices nothing outside the Power tab"
+        "`t` prices nothing outside the power views"
     );
 
-    let mut harness = Harness::new(ViewKind::Nodes);
+    let mut harness = Harness::new(ViewKind::Power);
+    let power = ModuleId::new("power").unwrap();
     let state = |harness: &Harness| {
         let ui = harness.controller.ui_state(harness.now);
-        (ui.power_tariff, ui.power_cost_window)
+        (
+            ui.scroll.get(&power).copied().unwrap_or(0),
+            ui.power_cost_window,
+        )
     };
-    let default = crate::format::DEFAULT_TARIFF;
-    assert_eq!(state(&harness), (default, 0));
-    harness.keys(&[key('c'), key('c'), key('t')]);
-    assert_eq!(state(&harness), (default + 2, 1));
-    harness.keys(&[key('C'), key('T')]);
-    assert_eq!(state(&harness), (default + 1, 0));
+    assert_eq!(state(&harness), (0, 0));
+    harness.keys(&[key('j'), key('j'), key('t')]);
+    assert_eq!(state(&harness), (2, 1));
+    harness.keys(&[key('k'), key('T')]);
+    assert_eq!(state(&harness), (1, 0));
     assert!(
         harness.submitted().is_empty(),
         "cost selection is presentation only: {:?}",

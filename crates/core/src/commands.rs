@@ -57,11 +57,9 @@ impl ViewKind {
     ];
 
     /// Whether this view value selects the unified Fox-Services dashboard.
+    /// Power is its own detail tab, not part of the dashboard grid.
     pub const fn is_fox_services_dashboard(self) -> bool {
-        matches!(
-            self,
-            Self::Nodes | Self::Docker | Self::Tokens | Self::Power
-        )
+        matches!(self, Self::Nodes | Self::Docker | Self::Tokens)
     }
 
     pub const fn title(self) -> &'static str {
@@ -73,7 +71,8 @@ impl ViewKind {
             Self::Sources => "Sources",
             Self::Settings => "Settings",
             Self::Actions => "Actions",
-            Self::Nodes | Self::Docker | Self::Tokens | Self::Power => "Fox-Services",
+            Self::Nodes | Self::Docker | Self::Tokens => "Fox-Services",
+            Self::Power => "Power",
             Self::Zombies => "Zombies",
         }
     }

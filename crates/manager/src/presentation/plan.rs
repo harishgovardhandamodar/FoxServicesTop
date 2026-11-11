@@ -29,9 +29,10 @@ const GPU_OVERVIEW_POINT_BUDGET: usize = 2048;
 /// Module ids (from `config::BUILTIN_MODULES`) shown by each view.
 pub fn visible_modules(view: ViewKind) -> &'static [&'static str] {
     match view {
-        ViewKind::Nodes | ViewKind::Docker | ViewKind::Tokens | ViewKind::Power => {
-            &[CLUSTER, DOCKER, TOKENS, POWER]
-        }
+        ViewKind::Nodes | ViewKind::Docker | ViewKind::Tokens => &[CLUSTER, DOCKER, TOKENS, POWER],
+        // The dedicated Power tab shows only the power module: the full
+        // timeline, kWh tables, priced total and tariff list.
+        ViewKind::Power => &[POWER],
         // DOCKER rides the Overview: the process panel's Fox services
         // sub-tab shows its tables in place. POWER rides it too: the process
         // panel's Power sub-tab summarizes it in place. CLUSTER has its own

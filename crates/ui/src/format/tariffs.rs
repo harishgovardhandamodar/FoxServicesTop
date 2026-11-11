@@ -19,7 +19,13 @@ pub struct Tariff {
 }
 
 /// Selectable countries and their display-only tariffs, in a stable order.
+/// The first entry is the default (`NL`).
 pub const TARIFFS: &[Tariff] = &[
+    Tariff {
+        code: "NL",
+        country: "Netherlands",
+        price_eur_per_kwh: 0.30,
+    },
     Tariff {
         code: "US",
         country: "United States",
@@ -54,11 +60,6 @@ pub const TARIFFS: &[Tariff] = &[
         code: "ES",
         country: "Spain",
         price_eur_per_kwh: 0.28,
-    },
-    Tariff {
-        code: "NL",
-        country: "Netherlands",
-        price_eur_per_kwh: 0.30,
     },
     Tariff {
         code: "SE",
@@ -122,8 +123,8 @@ pub const TARIFFS: &[Tariff] = &[
     },
 ];
 
-/// Default tariff selector: the Netherlands, priced in euros.
-pub const DEFAULT_TARIFF: usize = 7;
+/// Default tariff selector: the first entry (Netherlands, priced in euros).
+pub const DEFAULT_TARIFF: usize = 0;
 
 /// Tariff at `index`, wrapping around the table.
 pub fn tariff(index: usize) -> Tariff {
@@ -176,7 +177,7 @@ mod tests {
         for tariff in TARIFFS {
             assert!(tariff.price_eur_per_kwh > 0.0, "{}", tariff.code);
         }
-        assert_eq!(tariff(TARIFFS.len()).code, "US", "index wraps");
+        assert_eq!(tariff(TARIFFS.len()).code, "NL", "index wraps");
     }
 
     #[test]

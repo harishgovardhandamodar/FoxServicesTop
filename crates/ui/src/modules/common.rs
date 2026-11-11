@@ -569,7 +569,6 @@ pub(crate) fn measuring_context(model: &ViewModel, slot: Slot) -> DisplayContext
         expanded: false,
         scroll: 0,
         tab: 0,
-        power_tariff: crate::format::DEFAULT_TARIFF,
         power_cost_window: 0,
     }
 }

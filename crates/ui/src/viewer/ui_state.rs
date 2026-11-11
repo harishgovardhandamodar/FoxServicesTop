@@ -37,7 +37,7 @@ pub enum ModeView {
 }
 
 /// Everything controller-side that a frame shows.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct UiState {
     pub mode: ModeView,
     pub notices: Vec<Notice>,
@@ -50,27 +50,9 @@ pub struct UiState {
     pub scroll: BTreeMap<ModuleId, u16>,
     /// Each module's inner tab (D-72), 0 when absent.
     pub tabs: BTreeMap<ModuleId, u8>,
-    /// Power tab cost estimate: index into the tariff table (presentation
-    /// only; nothing is sent to the Manager).
-    pub power_tariff: usize,
     /// Power tab cost estimate: index into the cost windows (0 = the current
     /// timeline window, the rest the database's 1h/6h/12h/24h windows).
     pub power_cost_window: u8,
-}
-
-impl Default for UiState {
-    fn default() -> Self {
-        Self {
-            mode: ModeView::default(),
-            notices: Vec::new(),
-            awaiting_confirmation: false,
-            expanded: BTreeSet::new(),
-            scroll: BTreeMap::new(),
-            tabs: BTreeMap::new(),
-            power_tariff: crate::format::DEFAULT_TARIFF,
-            power_cost_window: 0,
-        }
-    }
 }
 
 impl UiState {

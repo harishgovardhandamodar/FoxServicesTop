@@ -6,8 +6,10 @@
 //! lists total, CPU packages and GPUs with now/mean/peak watts and kWh over
 //! the window; the windows table lists kWh per series over 1 h, 6 h, 12 h
 //! and 24 h; the cost row prices the total of one window (`t`/`T` to pick
-//! the window, `c`/`C` to pick the country tariff) from the energy the
-//! local database holds. Read-only: nothing here changes a power limit or cap.
+//! the window) and the tariff list below prices it per country (`j`/`k`
+//! move the selected row, live on the cost above). The priced energy is what
+//! the local database holds. Read-only: nothing here changes a power limit
+//! or cap.
 
 use fox_services_top_core::metric::CanonicalUnit;
 use fox_services_top_core::view::{PowerView, PowerWindowView, ViewModel};
@@ -23,7 +25,8 @@ use super::common::{
     render_chart,
 };
 use crate::format::{
-    COST_WINDOWS, clean, format_cost_eur, format_energy, format_span_ns, format_value, tariff,
+    COST_WINDOWS, TARIFFS, clean, format_cost_eur, format_energy, format_span_ns, format_value,
+    tariff,
 };
 use crate::registry::{DisplayContext, DisplayModule, DisplayModuleManifest, RenderOutput, Slot};
 
@@ -33,10 +36,15 @@ use super::history::{
 };
 
 /// The keys acting on the view, at the right of its title.
-const POWER_KEYS: &str = "w/W timescale · c/C country · t/T cost range · / filter";
+const POWER_KEYS: &str = "w/W timescale · j/k country · t/T cost range · / filter";
 
 /// Rows the cost estimate takes: its caption plus the priced total.
 const COST_ROWS: u16 = 2;
+
+/// Rows the tariff list takes: its caption plus one row per country.
+fn tariff_rows() -> u16 {
+    1 + crate::num::saturate_u16(crate::format::TARIFFS.len())
+}
 
 /// Rows the watts chart takes: its caption plus the plot.
 const CHART_ROWS: u16 = 4;
@@ -101,7 +109,8 @@ impl DisplayModule for PowerModule {
             CHART_ROWS
                 + crate::num::saturate_u16(power.rows.len() + 1)
                 + crate::num::saturate_u16(window_groups(&power.windows).len() + 1)
-                + COST_ROWS,
+                + COST_ROWS
+                + tariff_rows(),
         )
     }
 
@@ -157,6 +166,7 @@ impl DisplayModule for PowerModule {
         render_series(frame, &mut rows, power, &filter, context, &mut output);
         render_windows(frame, &mut rows, power, &filter, context, &mut output);
         render_cost(frame, &mut rows, power, context, &mut output);
+        render_tariffs(frame, &mut rows, context, &mut output);
         output.finish()
     }
 }
@@ -454,8 +464,15 @@ fn cost_of(power: &PowerView, cost_window: u8) -> CostSelection {
     }
 }
 
+/// Selected country tariff: the module's scroll cursor (`j`/`k`), clamped
+/// to the tariff list. Position 0 is the default (Netherlands).
+fn selected_tariff(context: &DisplayContext) -> (usize, crate::format::Tariff) {
+    let index = usize::from(context.scroll).min(TARIFFS.len() - 1);
+    (index, tariff(index))
+}
+
 /// Priced total for the selected country and database window
-/// (`c`/`C` country, `t`/`T` range), with the kWh beside its cost.
+/// (`j`/`k` country, `t`/`T` range), with the kWh beside its cost.
 fn render_cost(
     frame: &mut Frame<'_>,
     rows: &mut RowCursor,
@@ -467,7 +484,7 @@ fn render_cost(
         return;
     }
     let selection = cost_of(power, context.power_cost_window);
-    let current = tariff(context.power_tariff);
+    let (_, current) = selected_tariff(context);
     let caption = rows.next_row();
     let Some(area) = rows.next_row() else {
         return;
@@ -496,7 +513,7 @@ fn render_cost(
                     context.theme.muted_style(),
                 ),
             ]),
-            Some(format!("c/C country · t/T range{coverage}").as_str()),
+            Some(format!("j/k country · t/T range{coverage}").as_str()),
             context,
         );
     }
@@ -511,6 +528,59 @@ fn render_cost(
         "power cost {} {} {energy} {cost}",
         current.code, selection.label
     ));
+}
+
+/// Country tariff list (Detail slot only): one row per country with its
+/// €/kWh price, `j`/`k` moving the selected row that prices the cost above.
+fn render_tariffs(
+    frame: &mut Frame<'_>,
+    rows: &mut RowCursor,
+    context: &DisplayContext,
+    output: &mut Output,
+) {
+    if context.slot != Slot::Detail || rows.remaining() < 2 {
+        return;
+    }
+    let (selected, _) = selected_tariff(context);
+    let Some(caption) = rows.next_row() else {
+        return;
+    };
+    draw_caption(
+        frame.buffer_mut(),
+        caption,
+        &Line::from(vec![
+            Span::styled("tariffs", context.theme.title_style()),
+            Span::styled(" · €/kWh · j/k select", context.theme.muted_style()),
+        ]),
+        None,
+        context,
+    );
+    let visible = usize::from(rows.remaining());
+    let start = selected.saturating_sub(visible.saturating_sub(1));
+    for (index, current) in TARIFFS.iter().enumerate().skip(start) {
+        let Some(area) = rows.next_row() else {
+            break;
+        };
+        let line = Line::from(vec![
+            Span::styled(
+                if index == selected { "▶ " } else { "  " },
+                context.theme.text_style(),
+            ),
+            Span::styled(
+                format!(
+                    "{} {} €{:.2}/kWh",
+                    current.code, current.country, current.price_eur_per_kwh
+                ),
+                if index == selected {
+                    context.theme.selected_row_style()
+                } else {
+                    context.theme.text_style()
+                },
+            ),
+        ]);
+        super::common::draw_line(frame.buffer_mut(), area, &line);
+    }
+    output.label("power tariffs");
 }
 
 #[cfg(test)]
@@ -608,18 +678,67 @@ mod tests {
     fn the_cost_estimate_follows_the_selected_country() {
         let power = test_fixtures::power_view();
         let window = cost_of(&power, 0);
-        let us = crate::format::tariff(0);
-        let de = crate::format::TARIFFS
-            .iter()
-            .find(|tariff| tariff.code == "DE")
-            .copied()
-            .expect("DE tariff");
-        assert_eq!(us.code, "US");
-        assert!(de.price_eur_per_kwh > us.price_eur_per_kwh);
-        let us_cost = crate::format::cost_eur(window.energy_joules, us.price_eur_per_kwh).unwrap();
+        let by_code = |code: &str| {
+            crate::format::TARIFFS
+                .iter()
+                .find(|tariff| tariff.code == code)
+                .copied()
+                .unwrap_or_else(|| panic!("{code} tariff"))
+        };
+        let nl = by_code("NL");
+        let de = by_code("DE");
+        assert!(de.price_eur_per_kwh > nl.price_eur_per_kwh);
+        let nl_cost = crate::format::cost_eur(window.energy_joules, nl.price_eur_per_kwh).unwrap();
         let de_cost = crate::format::cost_eur(window.energy_joules, de.price_eur_per_kwh).unwrap();
-        assert!(de_cost > us_cost);
+        assert!(de_cost > nl_cost);
         // The fixture's window total holds 300 W over 1 h: 0.3 kWh.
-        assert!((us_cost - 0.3 * 0.17).abs() < 1e-9, "{us_cost}");
+        assert!((nl_cost - 0.3 * 0.30).abs() < 1e-9, "{nl_cost}");
+    }
+
+    /// The tariff list names every country with its price and marks the
+    /// scroll cursor's row; the cursor prices the cost above.
+    #[test]
+    fn the_tariff_list_marks_the_scrolled_country() {
+        use ratatui::Terminal;
+        use ratatui::backend::TestBackend;
+
+        let render_at = |scroll: u16| -> String {
+            let model = {
+                let mut model = test_fixtures::view_model(ViewKind::Power, 1);
+                model.modules.power = Some(std::sync::Arc::new(test_fixtures::power_view()));
+                model
+            };
+            let mut context = test_fixtures::display_context();
+            context.slot = crate::registry::Slot::Detail;
+            context.scroll = scroll;
+            let mut terminal = Terminal::new(TestBackend::new(120, 60)).unwrap();
+            terminal
+                .draw(|frame| {
+                    PowerModule::new()
+                        .unwrap()
+                        .render(&context, &model, frame.area(), frame);
+                })
+                .unwrap();
+            let buffer = terminal.backend().buffer().clone();
+            (0..60)
+                .map(|y| {
+                    (0..120)
+                        .map(|x| buffer[(x, y)].symbol())
+                        .collect::<String>()
+                })
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+
+        let top = render_at(0);
+        assert!(top.contains("tariffs"), "{top}");
+        assert!(top.contains("NL Netherlands €0.30/kWh"), "{top}");
+        assert!(top.contains("▶ NL Netherlands"), "{top}");
+        let moved = render_at(4);
+        assert!(moved.contains("▶ DE Germany"), "{moved}");
+        assert!(!moved.contains("▶ NL Netherlands"), "{moved}");
+        // The cursor is clamped to the list, never past it.
+        let clamped = render_at(u16::MAX);
+        assert!(clamped.contains("▶ AE UAE"), "{clamped}");
     }
 }
