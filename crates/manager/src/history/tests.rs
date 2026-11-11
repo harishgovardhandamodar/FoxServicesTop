@@ -335,11 +335,11 @@ fn a_memory_chart_carries_the_parts_the_history_joined() {
     assert_eq!(parts, vec![(2, vec![Some(6.0), None])]);
 }
 
-/// Each GPU series' statistics are one read for its four windows, merged
+/// Each GPU series' statistics are one read for its six windows, merged
 /// by the history from aligned buckets; energy is the power's integral.
 /// They refresh once a minute and a bar size change keeps them.
 #[test]
-fn statistics_are_one_read_per_series_for_four_windows() {
+fn statistics_are_one_read_per_series_for_six_windows() {
     let mut bench = bench(8);
     let power = gpu_series(HistoryChartKind::GpuPower, "gpu.power.draw");
     let util = gpu_series(HistoryChartKind::GpuUtilization, "gpu.utilization.compute");
@@ -353,9 +353,26 @@ fn statistics_are_one_read_per_series_for_four_windows() {
         panic!("windows expected");
     };
     let hour = HOUR.unsigned_abs();
-    assert_eq!(spans_ns, &vec![hour, 6 * hour, 12 * hour, 24 * hour]);
+    assert_eq!(
+        spans_ns,
+        &vec![
+            hour,
+            6 * hour,
+            12 * hour,
+            24 * hour,
+            7 * 24 * hour,
+            30 * 24 * hour
+        ]
+    );
     let window = |minutes: u64| bar(0, minutes, 200.0);
-    let windows = vec![window(60), window(300), window(300), window(300)];
+    let windows = vec![
+        window(60),
+        window(300),
+        window(300),
+        window(300),
+        window(300),
+        window(300),
+    ];
     bench.answer(&stats[0], OverviewAnswer::Windows(windows.clone()));
     bench.answer(&stats[1], OverviewAnswer::Windows(windows));
     let view = bench.service.view(&bench.session);
@@ -368,7 +385,7 @@ fn statistics_are_one_read_per_series_for_four_windows() {
         .iter()
         .map(|row| row.window_label.as_str())
         .collect();
-    assert_eq!(labels, vec!["1h", "6h", "12h", "24h"]);
+    assert_eq!(labels, vec!["1h", "6h", "12h", "24h", "7d", "30d"]);
     assert_eq!(power_rows[1].covered_ns, Some(300 * 60 * SECOND));
     assert_eq!(power_rows[1].mean, Some(200.0));
     assert_eq!(power_rows[1].peak, Some(205.0));
@@ -377,7 +394,7 @@ fn statistics_are_one_read_per_series_for_four_windows() {
     let spans: Vec<u64> = power_rows.iter().map(|row| row.span_ns).collect();
     assert_eq!(
         spans,
-        [1, 6, 12, 24].map(|hours| hours * 3_600 * SECOND),
+        [1, 6, 12, 24, 7 * 24, 30 * 24].map(|hours| hours * 3_600 * SECOND),
         "each window carries its length"
     );
     assert!(view.summaries.iter().all(|row| !row.pending));

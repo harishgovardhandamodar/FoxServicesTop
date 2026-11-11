@@ -66,11 +66,13 @@ pub(crate) const MAX_CHARTS: usize = 42;
 /// platform) and four for each of eight GPUs.
 pub(crate) const MAX_STAT_SERIES: usize = 36;
 /// Windows of the statistics (D-48).
-const STAT_WINDOWS: [HistoryWindow; 4] = [
+const STAT_WINDOWS: [HistoryWindow; 6] = [
     HistoryWindow::OneHour,
     HistoryWindow::SixHours,
     HistoryWindow::TwelveHours,
     HistoryWindow::OneDay,
+    HistoryWindow::SevenDays,
+    HistoryWindow::ThirtyDays,
 ];
 /// Statistics over an hour or more change slowly.
 const STATS_REFRESH_MS: u64 = 60_000;
@@ -84,6 +86,8 @@ pub(crate) enum HistoryWindow {
     SixHours,
     TwelveHours,
     OneDay,
+    SevenDays,
+    ThirtyDays,
 }
 
 impl HistoryWindow {
@@ -93,6 +97,8 @@ impl HistoryWindow {
             Self::SixHours => "6h",
             Self::TwelveHours => "12h",
             Self::OneDay => "24h",
+            Self::SevenDays => "7d",
+            Self::ThirtyDays => "30d",
         }
     }
 
@@ -102,6 +108,8 @@ impl HistoryWindow {
             Self::SixHours => 6,
             Self::TwelveHours => 12,
             Self::OneDay => 24,
+            Self::SevenDays => 7 * 24,
+            Self::ThirtyDays => 30 * 24,
         };
         hours * 3_600 * 1_000_000_000
     }

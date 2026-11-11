@@ -246,11 +246,14 @@ visible with its error.
 
 ## The Power tab (7)
 
-The watts timeline over the history window, per-series kWh and a priced
-total for one selectable database window. `c`/`C` picks the country tariff
-(euros/kWh, Netherlands by default) and `t`/`T` picks which window the cost
-prices (`window`, `1h`, `6h`, `12h`, `24h`); the priced energy is what the
-local database holds, with its recorded coverage shown beside it.
+The watts timeline over the history window, per-series kWh and priced
+consumption for one selectable range. `t`/`T` picks which range the cost
+prices (`window`, `1h`, `6h`, `12h`, `24h`, `7d`, `30d`, `all` — everything
+the database holds, i.e. the 30-day window, with its recorded coverage
+shown beside it). The cost block lists three lines: all GPUs together, all
+CPUs together, and the total, each as kWh beside its cost. `j`/`k` move
+through the country tariff list (€/kWh, Netherlands by default), which
+prices the cost lines live; every series row also carries its own COST.
 
 On a host without GPUs there is no `host.power.total` series (it would only
 repeat the CPU), so the tab totals the CPU packages instead. On a host with

@@ -149,9 +149,10 @@ pub fn format_cost_eur(joules: Option<f64>, price_eur_per_kwh: f64) -> String {
     }
 }
 
-/// Cost window labels the Power tab prices: the current timeline window
-/// plus the database windows it keeps (1 h to 24 h).
-pub const COST_WINDOWS: [&str; 5] = ["window", "1h", "6h", "12h", "24h"];
+/// Cost window labels the Power tab prices: the current timeline window,
+/// the database windows, and `all` (everything the database holds, i.e.
+/// the longest database window).
+pub const COST_WINDOWS: [&str; 8] = ["window", "1h", "6h", "12h", "24h", "7d", "30d", "all"];
 
 #[cfg(test)]
 mod tests {

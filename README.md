@@ -183,10 +183,12 @@ of the whole machine.
   responsive, color-coded panels arrange as a graphical dashboard and stack on narrow terminals.
   A node that does not answer stays visible with its error; service and process monitoring are
   read-only.
-- **Power.** Its own tab (key `7`) with the watts timeline, per-series kWh and the priced
-  total: `c`/`C` picks the country tariff (euros/kWh, Netherlands by default) and `t`/`T`
-  picks which database window the cost prices. On a host without GPUs the total is the
-  CPU sum; with GPUs a missing total stays `n/a` rather than a partial sum.
+- **Power.** Its own tab (key `7`) with the watts timeline, per-series kWh and
+  priced consumption: GPU, CPU and total kWh with cost over a selectable range
+  (`t`/`T`: `window`, `1h` … `30d`, `all`), priced by a scrollable country
+  tariff list (`j`/`k`, euros/kWh, Netherlands by default). On a host without
+  GPUs the total is the CPU sum; with GPUs a missing total stays `n/a` rather
+  than a partial sum.
 
 ## Screens
 

@@ -38,8 +38,9 @@ use super::history::{
 /// The keys acting on the view, at the right of its title.
 const POWER_KEYS: &str = "w/W timescale · j/k country · t/T cost range · / filter";
 
-/// Rows the cost estimate takes: its caption plus the priced total.
-const COST_ROWS: u16 = 2;
+/// Rows the cost estimate takes: its caption plus one line each for the
+/// GPUs together, the CPUs together and the total.
+const COST_ROWS: u16 = 4;
 
 /// Rows the tariff list takes: its caption plus one row per country.
 fn tariff_rows() -> u16 {
@@ -50,7 +51,7 @@ fn tariff_rows() -> u16 {
 const CHART_ROWS: u16 = 4;
 
 /// Per-series windows of the kWh table, in order.
-const WINDOW_ORDER: [&str; 4] = ["1h", "6h", "12h", "24h"];
+const WINDOW_ORDER: [&str; 6] = ["1h", "6h", "12h", "24h", "7d", "30d"];
 
 const SERIES_COLUMNS: [ColumnSpec; 7] = [
     ColumnSpec::left("SERIES", 12, 100).flexible().prefer(22),
@@ -62,12 +63,14 @@ const SERIES_COLUMNS: [ColumnSpec; 7] = [
     ColumnSpec::right("COVER", 7, 60),
 ];
 
-const WINDOW_COLUMNS: [ColumnSpec; 5] = [
+const WINDOW_COLUMNS: [ColumnSpec; 7] = [
     ColumnSpec::left("SERIES", 12, 100).flexible().prefer(22),
-    ColumnSpec::right("1H", 9, 80),
-    ColumnSpec::right("6H", 9, 75),
-    ColumnSpec::right("12H", 9, 70),
+    ColumnSpec::right("1H", 8, 70),
+    ColumnSpec::right("6H", 8, 70),
+    ColumnSpec::right("12H", 9, 65),
     ColumnSpec::right("24H", 9, 65),
+    ColumnSpec::right("7D", 9, 65),
+    ColumnSpec::right("30D", 9, 65),
 ];
 
 pub struct PowerModule {
@@ -435,19 +438,57 @@ fn window_cells(group: &[&PowerWindowView], context: &DisplayContext) -> Vec<Tab
     cells
 }
 
-struct CostSelection {
-    label: String,
+struct CostGroup {
+    label: &'static str,
     energy_joules: Option<f64>,
+}
+
+struct CostSelection {
+    /// The range as selected (`window`, `1h` … `30d`, `all`).
+    label: String,
+    /// Priced parts in order: all GPUs together, all CPUs together, total.
+    groups: [CostGroup; 3],
     covered_ns: Option<u64>,
     span_ns: Option<u64>,
 }
 
-/// Total consumption for the selected cost range: the current timeline
-/// window (`total_joules`) or the database's 1 h/6 h/12 h/24 h total-power
-/// window, so the priced energy is what the local database holds.
+impl CostSelection {
+    fn total_joules(&self) -> Option<f64> {
+        self.groups[2].energy_joules
+    }
+}
+
+/// Finite values only; `None` when any part is missing or unusable, so a
+/// grouped cost is never a partial sum.
+fn sum_some(values: &[Option<f64>]) -> Option<f64> {
+    let mut sum = 0.0;
+    for value in values {
+        match value {
+            Some(value) if value.is_finite() && *value >= 0.0 => sum += *value,
+            _ => return None,
+        }
+    }
+    Some(sum)
+}
+
+/// Consumption for the selected cost range, grouped for the cost panel:
+/// all GPUs together, all CPUs together (packages and platform), and the
+/// total. The current timeline window (`total_joules`, live rows) or the
+/// database windows (`all` prices the longest one, 30 days), so the priced
+/// energy is what the local database holds.
 fn cost_of(power: &PowerView, cost_window: u8) -> CostSelection {
+    use fox_services_top_core::view::HistoryChartKind;
+
     let label = COST_WINDOWS[usize::from(cost_window) % COST_WINDOWS.len()].to_owned();
     if label == "window" {
+        let group = |kind: HistoryChartKind| {
+            let rows: Vec<&fox_services_top_core::view::PowerRowView> =
+                power.rows.iter().filter(|row| row.kind == kind).collect();
+            if rows.is_empty() {
+                return None;
+            }
+            sum_some(&rows.iter().map(|row| row.energy_joules).collect::<Vec<_>>())
+        };
         let covered = power
             .rows
             .iter()
@@ -455,21 +496,69 @@ fn cost_of(power: &PowerView, cost_window: u8) -> CostSelection {
             .and_then(|row| row.covered_ns);
         return CostSelection {
             label,
-            energy_joules: power.total_joules,
+            groups: [
+                CostGroup {
+                    label: "GPUs",
+                    energy_joules: group(HistoryChartKind::GpuPower),
+                },
+                CostGroup {
+                    label: "CPUs",
+                    energy_joules: group(HistoryChartKind::CpuPower),
+                },
+                CostGroup {
+                    label: "total",
+                    energy_joules: power.total_joules,
+                },
+            ],
             covered_ns: covered,
             span_ns: Some(power.requested_span_ns),
         };
     }
-    let entry = power.windows.iter().find(|window| {
-        window.window_label == label
-            && window.kind == fox_services_top_core::view::HistoryChartKind::TotalPower
+    // `all` prices everything the database holds, i.e. the longest window.
+    let lookup = if label == "all" {
+        "30d".to_owned()
+    } else {
+        label.clone()
+    };
+    let group = |kind: HistoryChartKind| {
+        let entries: Vec<&PowerWindowView> = power
+            .windows
+            .iter()
+            .filter(|window| window.window_label == lookup && window.kind == kind)
+            .collect();
+        if entries.is_empty() {
+            return None;
+        }
+        sum_some(
+            &entries
+                .iter()
+                .map(|window| window.energy_joules)
+                .collect::<Vec<_>>(),
+        )
+    };
+    let total = power.windows.iter().find(|window| {
+        window.window_label == lookup
+            && window.kind == HistoryChartKind::TotalPower
             && window.subject == "total"
     });
     CostSelection {
         label,
-        energy_joules: entry.and_then(|window| window.energy_joules),
-        covered_ns: entry.and_then(|window| window.covered_ns),
-        span_ns: entry.map(|window| window.span_ns),
+        groups: [
+            CostGroup {
+                label: "GPUs",
+                energy_joules: group(HistoryChartKind::GpuPower),
+            },
+            CostGroup {
+                label: "CPUs",
+                energy_joules: group(HistoryChartKind::CpuPower),
+            },
+            CostGroup {
+                label: "total",
+                energy_joules: total.and_then(|window| window.energy_joules),
+            },
+        ],
+        covered_ns: total.and_then(|window| window.covered_ns),
+        span_ns: total.map(|window| window.span_ns),
     }
 }
 
@@ -494,60 +583,63 @@ fn render_cost(
     }
     let selection = cost_of(power, context.power_cost_window);
     let (_, current) = selected_tariff(context);
-    let caption = rows.next_row();
-    let Some(area) = rows.next_row() else {
+    let Some(caption) = rows.next_row() else {
         return;
     };
-    if let Some(row) = caption {
-        let coverage = match (selection.covered_ns, selection.span_ns) {
-            (Some(covered), Some(span)) if span > 0 && covered < span => {
+    let coverage = match (selection.covered_ns, selection.span_ns) {
+        (Some(covered), Some(span)) if span > 0 && covered < span => {
+            format!(
+                " · recorded {} of {}",
+                super::history::history_recorded_text(covered / 1_000_000_000),
+                format_span_ns(span)
+            )
+        }
+        _ => String::new(),
+    };
+    draw_caption(
+        frame.buffer_mut(),
+        caption,
+        &Line::from(vec![
+            Span::styled("cost", context.theme.title_style()),
+            Span::styled(
                 format!(
-                    " · recorded {} of {}",
-                    super::history::history_recorded_text(covered / 1_000_000_000),
-                    format_span_ns(span)
-                )
-            }
-            _ => String::new(),
-        };
-        draw_caption(
-            frame.buffer_mut(),
-            row,
-            &Line::from(vec![
-                Span::styled("cost", context.theme.title_style()),
-                Span::styled(
-                    format!(
-                        " · {} {} €{:.2}/kWh · {}",
-                        current.code, current.country, current.price_eur_per_kwh, selection.label
-                    ),
-                    context.theme.muted_style(),
+                    " · {} {} €{:.2}/kWh · {}",
+                    current.code, current.country, current.price_eur_per_kwh, selection.label
                 ),
-            ]),
-            Some(format!("j/k country · t/T range{coverage}").as_str()),
-            context,
-        );
-    }
-    let energy = selection
-        .energy_joules
-        .filter(|joules| joules.is_finite())
-        .map_or_else(|| "n/a".to_owned(), format_energy);
-    let cost = format_cost_eur(selection.energy_joules, current.price_eur_per_kwh);
-    // A missing total with GPU series present means a part is unreadable:
-    // say so instead of leaving a bare `n/a`.
-    let text = if selection.energy_joules.is_none()
+                context.theme.muted_style(),
+            ),
+        ]),
+        Some(format!("j/k country · t/T range{coverage}").as_str()),
+        context,
+    );
+    let groups_missing_total = selection.total_joules().is_none()
         && power
             .rows
             .iter()
-            .any(|row| row.kind == fox_services_top_core::view::HistoryChartKind::GpuPower)
-    {
-        format!("total {energy} ≈ {cost} · needs every CPU and GPU reading")
-    } else {
-        format!("total {energy} ≈ {cost}")
-    };
-    crate::modules::common::message(frame, area, &text, context.theme.text_style());
-    output.label(format!(
-        "power cost {} {} {energy} {cost}",
-        current.code, selection.label
-    ));
+            .any(|row| row.kind == fox_services_top_core::view::HistoryChartKind::GpuPower);
+    for group in &selection.groups {
+        let Some(area) = rows.next_row() else {
+            break;
+        };
+        let energy = group
+            .energy_joules
+            .filter(|joules| joules.is_finite())
+            .map_or_else(|| "n/a".to_owned(), format_energy);
+        let cost = format_cost_eur(group.energy_joules, current.price_eur_per_kwh);
+        // A missing total with GPU series present means a part is
+        // unreadable: say so instead of leaving a bare `n/a`.
+        let note = if group.label == "total" && groups_missing_total {
+            " · needs every CPU and GPU reading"
+        } else {
+            ""
+        };
+        let text = format!("{} {energy} ≈ {cost}{note}", group.label);
+        crate::modules::common::message(frame, area, &text, context.theme.text_style());
+        output.label(format!(
+            "power cost {} {} {} {energy} {cost}",
+            current.code, selection.label, group.label
+        ));
+    }
 }
 
 /// Country tariff list (Detail slot only): one row per country with its
@@ -631,6 +723,8 @@ mod tests {
             "24H",
             "cost",
             "COST",
+            "GPUs",
+            "CPUs",
             "€0.06",
             "NL",
             "€0.30/kWh",
@@ -677,22 +771,62 @@ mod tests {
     }
 
     /// The cost estimate prices the current window by default and the
-    /// database's 24 h total on request.
+    /// database's 24 h groups on request: GPUs together, CPUs together,
+    /// total.
     #[test]
     fn the_cost_estimate_prices_the_selected_database_window() {
         let power = test_fixtures::power_view();
         let window = cost_of(&power, 0);
         assert_eq!(window.label, "window");
-        assert_eq!(window.energy_joules, power.total_joules);
+        let joules: Vec<Option<f64>> = window
+            .groups
+            .iter()
+            .map(|group| group.energy_joules)
+            .collect();
+        assert_eq!(
+            joules,
+            vec![
+                Some(720_000.0 + 288_000.0),
+                Some(144_000.0 + 198_000.0),
+                power.total_joules,
+            ],
+            "GPUs, CPUs, total"
+        );
         let day = cost_of(&power, 4);
         assert_eq!(day.label, "24h");
-        // The fixture's 24 h total holds 200 W over 24 h: 4.8 kWh.
-        assert_eq!(day.energy_joules, Some(200.0 * 24.0 * 3_600.0));
+        let joules: Vec<Option<f64>> = day.groups.iter().map(|group| group.energy_joules).collect();
         assert_eq!(
-            crate::format::format_cost_eur(day.energy_joules, 0.30),
+            joules,
+            vec![
+                Some(150.0 * 24.0 * 3_600.0),
+                Some(35.0 * 24.0 * 3_600.0 + 50.0 * 24.0 * 3_600.0),
+                Some(200.0 * 24.0 * 3_600.0),
+            ],
+            "GPUs, CPUs, total"
+        );
+        assert_eq!(
+            crate::format::format_cost_eur(day.total_joules(), 0.30),
             "€1.44",
             "4.8 kWh at €0.30/kWh"
         );
+    }
+
+    /// Windows the database does not hold stay `n/a`, including `all`
+    /// while no 30-day window is recorded.
+    #[test]
+    fn unrecorded_windows_price_nothing() {
+        let power = test_fixtures::power_view();
+        for index in [2, 6, 7] {
+            let selection = cost_of(&power, index);
+            assert!(
+                selection
+                    .groups
+                    .iter()
+                    .all(|group| group.energy_joules.is_none()),
+                "{:?} holds nothing",
+                selection.label
+            );
+        }
     }
 
     /// Selecting another country reprices the same logged consumption.
@@ -710,8 +844,9 @@ mod tests {
         let nl = by_code("NL");
         let de = by_code("DE");
         assert!(de.price_eur_per_kwh > nl.price_eur_per_kwh);
-        let nl_cost = crate::format::cost_eur(window.energy_joules, nl.price_eur_per_kwh).unwrap();
-        let de_cost = crate::format::cost_eur(window.energy_joules, de.price_eur_per_kwh).unwrap();
+        let total = window.total_joules();
+        let nl_cost = crate::format::cost_eur(total, nl.price_eur_per_kwh).unwrap();
+        let de_cost = crate::format::cost_eur(total, de.price_eur_per_kwh).unwrap();
         assert!(de_cost > nl_cost);
         // The fixture's window total holds 300 W over 1 h: 0.3 kWh.
         assert!((nl_cost - 0.3 * 0.30).abs() < 1e-9, "{nl_cost}");
