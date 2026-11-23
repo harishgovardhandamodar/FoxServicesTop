@@ -221,6 +221,7 @@ fn poll_once(
             .window_label
             .clone_from(&previous.tokens.window_label);
         tokens.timeline = previous.tokens.timeline.clone();
+        tokens.runtime = previous.tokens.runtime.clone();
         tokens.stale = true;
     }
     cluster.peers.truncate(128);
@@ -525,6 +526,7 @@ mod tests {
             apps: vec![app],
             timeline: Vec::new(),
             engines: Vec::new(),
+            runtime: Default::default(),
         };
         let samples = token_samples(1_000, "axiom", &tokens);
         assert_eq!(samples.len(), MAX_LOGGED_MODELS_PER_APP);

@@ -89,9 +89,10 @@ impl DisplayModule for TokensModule {
         if !tokens.enabled {
             return None;
         }
+        let runtime_rows = runtime_detail_rows(&tokens.runtime);
         Some(
-            // The chart's caption and rows lead the tab.
             CHART_ROWS
+                + runtime_rows
                 + crate::num::saturate_u16(2 + tokens.apps.len().min(10) * 3)
                 + crate::num::saturate_u16(tokens.engines.len().min(2) * 2),
         )
@@ -171,6 +172,7 @@ impl DisplayModule for TokensModule {
                 &mut rows,
                 &apps,
                 &tokens.engines,
+                &tokens.runtime,
                 &flow,
                 context,
                 &mut output,
@@ -178,6 +180,7 @@ impl DisplayModule for TokensModule {
             return output.finish();
         }
         render_chart(frame, &mut rows, &flow, context);
+        render_runtime_detail(frame, &mut rows, &tokens.runtime, context, &mut output);
         render_apps(frame, &mut rows, &apps, context, &mut output);
         render_engines(frame, &mut rows, &tokens.engines, context, &mut output);
         output.finish()
@@ -302,20 +305,23 @@ fn render_chart(
     );
 }
 
-/// The Overview card: the rate chart, the busiest model, then the engine.
+/// The Overview card: the rate chart, the busiest model, runtime, then engine.
 fn render_summary(
     frame: &mut Frame<'_>,
     rows: &mut RowCursor,
     apps: &[&TokenAppView],
     engines: &[TokenEngineView],
+    runtime: &fox_services_top_core::view::LlmRuntimeView,
     flow: &Flow,
     context: &DisplayContext,
     output: &mut Output,
 ) {
     let engine = engines.first().map(engine_summary);
     let mut models = busiest_models(apps);
-    // The chart and the engine keep their rows; models fill what is left.
-    let fixed_rows = usize::from(!models.is_empty()) + usize::from(engine.is_some());
+    let runtime_lines = runtime_summary_lines(runtime, &context.theme);
+    let fixed_rows = usize::from(!models.is_empty())
+        + usize::from(engine.is_some())
+        + runtime_lines.len().min(2);
     let budget = (rows.remaining() as usize).saturating_sub(fixed_rows + 1);
     if let Some(area) = rows.take(crate::num::saturate_u16(budget.min(2))) {
         render_chart_with_parts(
@@ -332,6 +338,11 @@ fn render_summary(
             None,
             context,
         );
+    }
+    for line in runtime_lines.into_iter().take(2) {
+        let Some(row) = rows.next_row() else { break };
+        draw_line(frame.buffer_mut(), row, &line);
+        output.label("llm runtime".to_owned());
     }
     if !models.is_empty() {
         let remaining = (rows.remaining() as usize).saturating_sub(usize::from(engine.is_some()));
@@ -543,5 +554,228 @@ fn render_engines(
                 )),
             );
         }
+    }
+}
+
+fn runtime_detail_rows(runtime: &fox_services_top_core::view::LlmRuntimeView) -> u16 {
+    let mut rows = 1u16; // header
+    rows += 1; // KV
+    rows += 1; // context
+    rows += 1; // compaction
+    rows += 1; // vram
+    let entries = runtime
+        .kv_cache
+        .entries
+        .len()
+        .max(runtime.context.entries.len())
+        .max(runtime.compaction.entries.len());
+    rows += crate::num::saturate_u16(entries.min(4));
+    rows
+}
+
+fn pct_text(used: Option<u64>, cap: Option<u64>, pct: Option<f64>) -> String {
+    match (used, cap) {
+        (Some(u), Some(c)) if c > 0 => format!(
+            "{} / {} ({:.0}%)",
+            format_bytes(u),
+            format_bytes(c),
+            pct.unwrap_or((u as f64 / c as f64) * 100.0)
+        ),
+        _ => "n/a".to_owned(),
+    }
+}
+
+fn pct_tokens(used: Option<u64>, cap: Option<u64>, pct: Option<f64>) -> String {
+    match (used, cap) {
+        (Some(u), Some(c)) if c > 0 => format!(
+            "{u} / {c} tok ({:.0}%)",
+            pct.unwrap_or((u as f64 / c as f64) * 100.0)
+        ),
+        (Some(u), None) => format!("{u} tok"),
+        _ => "n/a".to_owned(),
+    }
+}
+
+fn runtime_summary_lines(
+    runtime: &fox_services_top_core::view::LlmRuntimeView,
+    theme: &ThemePalette,
+) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
+    let kv = &runtime.kv_cache;
+    let ctx = &runtime.context;
+    let cmp = &runtime.compaction;
+    let vram = &runtime.vram;
+    let kv_text = match (kv.used_bytes, kv.capacity_bytes) {
+        (Some(u), Some(c)) if c > 0 => format!(
+            "KV {} / {} ({:.0}%)",
+            format_bytes(u),
+            format_bytes(c),
+            kv.utilization_pct.unwrap_or((u as f64 / c as f64) * 100.0)
+        ),
+        (Some(u), _) => format!("KV {}", format_bytes(u)),
+        _ => "KV n/a".to_owned(),
+    };
+    let ctx_text = match (ctx.used_tokens, ctx.limit_tokens) {
+        (Some(u), Some(c)) if c > 0 => format!(
+            "CTX {} / {} ({:.0}%)",
+            u,
+            c,
+            ctx.utilization_pct.unwrap_or((u as f64 / c as f64) * 100.0)
+        ),
+        (Some(u), _) => format!("CTX {u} tok"),
+        _ => "CTX n/a".to_owned(),
+    };
+    let cmp_text = match cmp.events {
+        Some(e) => format!("CMP {} ev", e),
+        None => "CMP n/a".to_owned(),
+    };
+    let vram_text = match (vram.total_bytes, vram.kv_cache_bytes) {
+        (Some(t), Some(k)) => format!("VRAM {} (KV {})", format_bytes(t), format_bytes(k)),
+        (Some(t), None) => format!("VRAM {}", format_bytes(t)),
+        _ => "VRAM n/a".to_owned(),
+    };
+    lines.push(Line::from(vec![
+        Span::styled(kv_text, theme.text_style()),
+        Span::styled(" · ", theme.muted_style()),
+        Span::styled(ctx_text, theme.text_style()),
+        Span::styled(" · ", theme.muted_style()),
+        Span::styled(cmp_text, theme.text_style()),
+        Span::styled(" · ", theme.muted_style()),
+        Span::styled(vram_text, theme.text_style()),
+    ]));
+    if !runtime.kv_cache.entries.is_empty() || !runtime.context.entries.is_empty() {
+        let detail = format!(
+            "{} KV entries · {} CTX entries · {} saturated",
+            runtime.kv_cache.entries.len(),
+            runtime.context.entries.len(),
+            runtime.context.saturated_entries
+        );
+        lines.push(Line::from(Span::styled(detail, theme.muted_style())));
+    }
+    lines
+}
+
+fn render_runtime_detail(
+    frame: &mut Frame<'_>,
+    rows: &mut RowCursor,
+    runtime: &fox_services_top_core::view::LlmRuntimeView,
+    context: &DisplayContext,
+    output: &mut Output,
+) {
+    let Some(header) = rows.next_row() else {
+        return;
+    };
+    draw_line(
+        frame.buffer_mut(),
+        header,
+        &Line::from(Span::styled(
+            "LLM Runtime · KV cache / context / compaction / VRAM",
+            context.theme.title_style(),
+        )),
+    );
+    output.label("llm runtime detail".to_owned());
+
+    if let Some(row) = rows.next_row() {
+        let kv = &runtime.kv_cache;
+        let text = format!(
+            "KV cache: {}{}",
+            pct_text(kv.used_bytes, kv.capacity_bytes, kv.utilization_pct),
+            kv.hit_rate_pct
+                .map(|h| format!(" · hit {:.0}%", h))
+                .unwrap_or_default()
+        );
+        draw_line(
+            frame.buffer_mut(),
+            row,
+            &Line::from(Span::styled(text, context.theme.text_style())),
+        );
+    }
+    if let Some(row) = rows.next_row() {
+        let ctx = &runtime.context;
+        let text = format!(
+            "Context: {} · saturated {}",
+            pct_tokens(ctx.used_tokens, ctx.limit_tokens, ctx.utilization_pct),
+            ctx.saturated_entries
+        );
+        draw_line(
+            frame.buffer_mut(),
+            row,
+            &Line::from(Span::styled(text, context.theme.text_style())),
+        );
+    }
+    if let Some(row) = rows.next_row() {
+        let cmp = &runtime.compaction;
+        let events = cmp
+            .events
+            .map(|e| e.to_string())
+            .unwrap_or_else(|| "n/a".to_owned());
+        let reclaimed = cmp
+            .reclaimed_bytes
+            .map(format_bytes)
+            .unwrap_or_else(|| "n/a".to_owned());
+        let last = cmp
+            .last_event_s_ago
+            .map(|s| format!("{s}s ago"))
+            .unwrap_or_else(|| "n/a".to_owned());
+        draw_line(
+            frame.buffer_mut(),
+            row,
+            &Line::from(Span::styled(
+                format!("Compaction: {events} events · reclaimed {reclaimed} · last {last}"),
+                context.theme.text_style(),
+            )),
+        );
+    }
+    if let Some(row) = rows.next_row() {
+        let v = &runtime.vram;
+        let total = v
+            .total_bytes
+            .map(format_bytes)
+            .unwrap_or_else(|| "n/a".to_owned());
+        let model = v
+            .model_bytes
+            .map(format_bytes)
+            .unwrap_or_else(|| "n/a".to_owned());
+        let kv = v
+            .kv_cache_bytes
+            .map(format_bytes)
+            .unwrap_or_else(|| "n/a".to_owned());
+        draw_line(
+            frame.buffer_mut(),
+            row,
+            &Line::from(Span::styled(
+                format!("VRAM: total {total} · model {model} · kv {kv}"),
+                context.theme.text_style(),
+            )),
+        );
+    }
+
+    let mut entries: Vec<String> = Vec::new();
+    for e in runtime.kv_cache.entries.iter().take(4) {
+        let node = e.node.as_deref().unwrap_or("local");
+        let kv = pct_text(e.used_bytes, e.capacity_bytes, e.utilization_pct);
+        let ctx = pct_tokens(e.context_used_tokens, e.context_limit_tokens, None);
+        let vram = e
+            .vram_bytes
+            .map(format_bytes)
+            .unwrap_or_else(|| "n/a".to_owned());
+        entries.push(format!(
+            "{} · {} · KV {kv} · CTX {ctx} · VRAM {vram}",
+            clean(&e.model),
+            node
+        ));
+    }
+    for line in entries {
+        let Some(row) = rows.next_row() else {
+            break;
+        };
+        draw_line(
+            frame.buffer_mut(),
+            row,
+            &Line::from(Span::styled(
+                format!("  {line}"),
+                context.theme.muted_style(),
+            )),
+        );
     }
 }

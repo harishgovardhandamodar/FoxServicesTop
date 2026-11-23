@@ -13,8 +13,9 @@
 use std::collections::BTreeMap;
 
 use fox_services_top_core::view::{
-    TokenAppView, TokenBucketView, TokenEngineModelView, TokenEngineView, TokenModelView,
-    TokensView,
+    CompactionEntryView, CompactionSummaryView, ContextEntryView, ContextMonitorSummaryView,
+    KvCacheEntryView, KvCacheSummaryView, LlmRuntimeView, LlmVramSummaryView, TokenAppView,
+    TokenBucketView, TokenEngineModelView, TokenEngineView, TokenModelView, TokensView,
 };
 use serde_json::Value;
 
@@ -86,13 +87,16 @@ impl TokenPoll {
                 }
             }
         }
+        let engines = stats
+            .map(|stats| vec![ollama_engine(stats)])
+            .unwrap_or_default();
+        let runtime = build_runtime(&engines, stats, self.window_hours);
         NodeTokens {
             window_label: format!("{}h", self.window_hours),
             apps: finish_apps(apps),
             timeline: finish_buckets(buckets, now, bucket_seconds),
-            engines: stats
-                .map(|stats| vec![ollama_engine(stats)])
-                .unwrap_or_default(),
+            engines,
+            runtime,
         }
     }
 
@@ -126,6 +130,7 @@ pub struct NodeTokens {
     pub apps: Vec<TokenAppView>,
     pub timeline: Vec<TokenBucketView>,
     pub engines: Vec<TokenEngineView>,
+    pub runtime: LlmRuntimeView,
 }
 
 impl NodeTokens {
@@ -200,7 +205,8 @@ pub fn merge(into: &mut TokensView, node: &str, tokens: NodeTokens) {
         });
         engine.models.truncate(MAX_ENGINE_MODELS);
     }
-    into.idle = into.total_requests == 0;
+    merge_runtime(&mut into.runtime, node, tokens.runtime);
+    into.idle = into.total_requests == 0 && runtime_is_empty(&into.runtime);
 }
 
 /// Adds one node's buckets to another's, matching them on their start: two
@@ -234,6 +240,161 @@ fn merge_timeline(into: &[TokenBucketView], other: &[TokenBucketView]) -> Vec<To
         })
         .collect();
     merged
+}
+
+fn runtime_is_empty(runtime: &LlmRuntimeView) -> bool {
+    runtime.kv_cache.used_bytes.is_none()
+        && runtime.kv_cache.capacity_bytes.is_none()
+        && runtime.kv_cache.entries.is_empty()
+        && runtime.context.used_tokens.is_none()
+        && runtime.context.limit_tokens.is_none()
+        && runtime.context.entries.is_empty()
+        && runtime.compaction.events.is_none()
+        && runtime.compaction.reclaimed_bytes.is_none()
+        && runtime.compaction.entries.is_empty()
+        && runtime.vram.total_bytes.is_none()
+        && runtime.vram.model_bytes.is_none()
+        && runtime.vram.kv_cache_bytes.is_none()
+        && runtime.timeline.is_empty()
+}
+
+fn merge_runtime(into: &mut LlmRuntimeView, node: &str, other: LlmRuntimeView) {
+    merge_kv_cache(&mut into.kv_cache, node, other.kv_cache);
+    merge_context(&mut into.context, node, other.context);
+    merge_compaction(&mut into.compaction, node, other.compaction);
+    merge_vram(&mut into.vram, other.vram);
+    into.timeline = merge_runtime_timeline(&into.timeline, &other.timeline);
+}
+
+fn sum_opt_u64(a: Option<u64>, b: Option<u64>) -> Option<u64> {
+    match (a, b) {
+        (Some(x), Some(y)) => Some(x.saturating_add(y)),
+        (Some(x), None) | (None, Some(x)) => Some(x),
+        (None, None) => None,
+    }
+}
+
+fn pct(used: Option<u64>, cap: Option<u64>) -> Option<f64> {
+    match (used, cap) {
+        (Some(u), Some(c)) if c > 0 => Some((u as f64 / c as f64) * 100.0),
+        _ => None,
+    }
+}
+
+fn merge_kv_cache(into: &mut KvCacheSummaryView, node: &str, other: KvCacheSummaryView) {
+    into.used_bytes = sum_opt_u64(into.used_bytes, other.used_bytes);
+    into.capacity_bytes = sum_opt_u64(into.capacity_bytes, other.capacity_bytes);
+    into.utilization_pct = pct(into.used_bytes, into.capacity_bytes)
+        .or(into.utilization_pct)
+        .or(other.utilization_pct);
+    into.hit_rate_pct = into.hit_rate_pct.or(other.hit_rate_pct);
+    for mut entry in other.entries {
+        if entry.node.is_none() {
+            entry.node = Some(node.to_owned());
+        }
+        into.entries.push(entry);
+    }
+}
+
+fn merge_context(
+    into: &mut ContextMonitorSummaryView,
+    node: &str,
+    other: ContextMonitorSummaryView,
+) {
+    into.used_tokens = sum_opt_u64(into.used_tokens, other.used_tokens);
+    into.limit_tokens = sum_opt_u64(into.limit_tokens, other.limit_tokens);
+    into.utilization_pct = pct(into.used_tokens, into.limit_tokens)
+        .or(into.utilization_pct)
+        .or(other.utilization_pct);
+    into.saturated_entries = into
+        .saturated_entries
+        .saturating_add(other.saturated_entries);
+    for mut entry in other.entries {
+        if entry.node.is_none() {
+            entry.node = Some(node.to_owned());
+        }
+        into.entries.push(entry);
+    }
+}
+
+fn merge_compaction(into: &mut CompactionSummaryView, node: &str, other: CompactionSummaryView) {
+    into.events = sum_opt_u64(into.events, other.events);
+    into.reclaimed_bytes = sum_opt_u64(into.reclaimed_bytes, other.reclaimed_bytes);
+    into.reclaimed_tokens = sum_opt_u64(into.reclaimed_tokens, other.reclaimed_tokens);
+    into.events_per_min = match (into.events_per_min, other.events_per_min) {
+        (Some(a), Some(b)) => Some(a + b),
+        (Some(a), None) | (None, Some(a)) => Some(a),
+        (None, None) => None,
+    };
+    into.last_event_s_ago = match (into.last_event_s_ago, other.last_event_s_ago) {
+        (Some(a), Some(b)) => Some(a.min(b)),
+        (Some(a), None) | (None, Some(a)) => Some(a),
+        (None, None) => None,
+    };
+    for mut entry in other.entries {
+        if entry.node.is_none() {
+            entry.node = Some(node.to_owned());
+        }
+        into.entries.push(entry);
+    }
+}
+
+fn merge_vram(into: &mut LlmVramSummaryView, other: LlmVramSummaryView) {
+    into.total_bytes = sum_opt_u64(into.total_bytes, other.total_bytes);
+    into.model_bytes = sum_opt_u64(into.model_bytes, other.model_bytes);
+    into.kv_cache_bytes = sum_opt_u64(into.kv_cache_bytes, other.kv_cache_bytes);
+    into.runtime_bytes = sum_opt_u64(into.runtime_bytes, other.runtime_bytes);
+    into.free_bytes = sum_opt_u64(into.free_bytes, other.free_bytes);
+}
+
+fn merge_runtime_timeline(
+    into: &[fox_services_top_core::view::LlmRuntimeBucketView],
+    other: &[fox_services_top_core::view::LlmRuntimeBucketView],
+) -> Vec<fox_services_top_core::view::LlmRuntimeBucketView> {
+    if into.is_empty() {
+        return other.to_vec();
+    }
+    if other.is_empty() {
+        return into.to_vec();
+    }
+    let width = other
+        .get(1)
+        .map_or(1, |next| next.at_s.abs_diff(other[0].at_s).max(1));
+    other
+        .iter()
+        .map(|bucket| {
+            let matching = into
+                .iter()
+                .find(|held| bucket.at_s.abs_diff(held.at_s) <= width / 2)
+                .cloned();
+            match matching {
+                Some(held) => fox_services_top_core::view::LlmRuntimeBucketView {
+                    at_s: bucket.at_s,
+                    kv_cache_used_bytes: sum_opt_u64(
+                        held.kv_cache_used_bytes,
+                        bucket.kv_cache_used_bytes,
+                    ),
+                    kv_cache_capacity_bytes: held
+                        .kv_cache_capacity_bytes
+                        .or(bucket.kv_cache_capacity_bytes),
+                    context_used_tokens: sum_opt_u64(
+                        held.context_used_tokens,
+                        bucket.context_used_tokens,
+                    ),
+                    context_limit_tokens: held.context_limit_tokens.or(bucket.context_limit_tokens),
+                    compaction_events: sum_opt_u64(
+                        held.compaction_events,
+                        bucket.compaction_events,
+                    ),
+                    compaction_reclaimed_bytes: sum_opt_u64(
+                        held.compaction_reclaimed_bytes,
+                        bucket.compaction_reclaimed_bytes,
+                    ),
+                },
+                None => bucket.clone(),
+            }
+        })
+        .collect()
 }
 
 #[derive(Default)]
@@ -386,6 +547,23 @@ fn ollama_engine(stats: &Value) -> TokenEngineView {
                     .and_then(|d| text(d, "quantization_level"))
                     .unwrap_or_default(),
                 expires_in_s: None,
+                context_used_tokens: f64_at(model, "context_used_tokens")
+                    .or_else(|| f64_at(model, "context_length"))
+                    .map(super::nonnegative_f64_to_u64),
+                context_limit_tokens: f64_at(model, "context_limit_tokens")
+                    .or_else(|| f64_at(model, "context_limit"))
+                    .or_else(|| f64_at(model, "num_ctx"))
+                    .map(super::nonnegative_f64_to_u64),
+                kv_cache_bytes: f64_at(model, "kv_cache_bytes")
+                    .or_else(|| f64_at(model, "kv_cache_vram_bytes"))
+                    .map(super::nonnegative_f64_to_u64),
+                kv_cache_utilization_pct: f64_at(model, "kv_cache_utilization_pct").or_else(|| {
+                    f64_at(model, "kv_cache_utilization")
+                        .map(|v| if v <= 1.0 { v * 100.0 } else { v })
+                }),
+                compaction_events: f64_at(model, "compaction_events")
+                    .or_else(|| f64_at(model, "compactions"))
+                    .map(super::nonnegative_f64_to_u64),
             }
         })
         .collect();
@@ -419,6 +597,199 @@ fn text(value: &Value, key: &str) -> Option<String> {
         .map(str::trim)
         .filter(|text| !text.is_empty())
         .map(|text| text.chars().take(128).collect())
+}
+
+fn build_runtime(
+    engines: &[TokenEngineView],
+    stats: Option<&Value>,
+    _window_hours: u32,
+) -> LlmRuntimeView {
+    let mut runtime = LlmRuntimeView::default();
+    let mut kv_used = 0u64;
+    let mut kv_cap = 0u64;
+    let mut kv_seen = false;
+    let mut ctx_used = 0u64;
+    let mut ctx_limit = 0u64;
+    let mut ctx_seen = false;
+    let mut saturated = 0u32;
+    let mut comp_events = 0u64;
+    let mut comp_seen = false;
+    let mut model_vram = 0u64;
+    let mut model_vram_seen = false;
+    let mut total_vram = 0u64;
+    let mut total_vram_seen = false;
+
+    for engine in engines {
+        total_vram = total_vram.saturating_add(engine.vram_total_bytes);
+        if engine.vram_total_bytes > 0 {
+            total_vram_seen = true;
+        }
+        for model in &engine.models {
+            if let Some(vram) = model.size_vram_bytes.or((engine.models.len() == 1)
+                .then_some(engine.vram_total_bytes)
+                .filter(|b| *b > 0))
+            {
+                model_vram = model_vram.saturating_add(vram);
+                model_vram_seen = true;
+            }
+            if model.kv_cache_bytes.is_some() || model.kv_cache_utilization_pct.is_some() {
+                kv_seen = true;
+                let used = model.kv_cache_bytes.unwrap_or(0);
+                let cap = match (model.kv_cache_bytes, model.kv_cache_utilization_pct) {
+                    (Some(u), Some(p)) if p > 0.0 => Some(((u as f64) * 100.0 / p).round() as u64),
+                    _ => None,
+                };
+                kv_used = kv_used.saturating_add(used);
+                if let Some(c) = cap {
+                    kv_cap = kv_cap.saturating_add(c);
+                }
+                runtime.kv_cache.entries.push(KvCacheEntryView {
+                    engine: engine.engine.clone(),
+                    model: model.model.clone(),
+                    node: None,
+                    used_bytes: model.kv_cache_bytes,
+                    capacity_bytes: cap,
+                    utilization_pct: model
+                        .kv_cache_utilization_pct
+                        .or(pct(model.kv_cache_bytes, cap)),
+                    vram_bytes: model.kv_cache_bytes.or(model.size_vram_bytes),
+                    context_used_tokens: model.context_used_tokens,
+                    context_limit_tokens: model.context_limit_tokens,
+                });
+            }
+            if model.context_used_tokens.is_some() || model.context_limit_tokens.is_some() {
+                ctx_seen = true;
+                let used = model.context_used_tokens.unwrap_or(0);
+                let limit = model.context_limit_tokens.unwrap_or(0);
+                ctx_used = ctx_used.saturating_add(used);
+                ctx_limit = ctx_limit.saturating_add(limit);
+                let util = pct(model.context_used_tokens, model.context_limit_tokens);
+                if util.is_some_and(|p| p >= 90.0) {
+                    saturated = saturated.saturating_add(1);
+                }
+                runtime.context.entries.push(ContextEntryView {
+                    engine: engine.engine.clone(),
+                    model: model.model.clone(),
+                    node: None,
+                    used_tokens: model.context_used_tokens,
+                    limit_tokens: model.context_limit_tokens,
+                    utilization_pct: util,
+                    active_requests: None,
+                });
+            }
+            if let Some(events) = model.compaction_events {
+                comp_seen = true;
+                comp_events = comp_events.saturating_add(events);
+                runtime.compaction.entries.push(CompactionEntryView {
+                    engine: engine.engine.clone(),
+                    model: model.model.clone(),
+                    node: None,
+                    events: Some(events),
+                    reclaimed_bytes: None,
+                    reclaimed_tokens: None,
+                    last_event_s_ago: None,
+                });
+            }
+        }
+    }
+
+    if let Some(stats) = stats {
+        // Optional normalized runtime payload: {runtime:{kv_cache:{...}, context:{...}, compaction:{...}, vram:{...}}}
+        let runtime_obj = stats.get("runtime").or_else(|| stats.get("llm_runtime"));
+        if let Some(obj) = runtime_obj {
+            if let Some(kv) = obj.get("kv_cache") {
+                kv_seen = true;
+                runtime.kv_cache.used_bytes = f64_at(kv, "used_bytes")
+                    .map(super::nonnegative_f64_to_u64)
+                    .or(runtime.kv_cache.used_bytes);
+                runtime.kv_cache.capacity_bytes = f64_at(kv, "capacity_bytes")
+                    .map(super::nonnegative_f64_to_u64)
+                    .or(runtime.kv_cache.capacity_bytes);
+                runtime.kv_cache.hit_rate_pct = f64_at(kv, "hit_rate_pct").or_else(|| {
+                    f64_at(kv, "hit_rate").map(|v| if v <= 1.0 { v * 100.0 } else { v })
+                });
+            }
+            if let Some(ctx) = obj.get("context") {
+                ctx_seen = true;
+                runtime.context.used_tokens = f64_at(ctx, "used_tokens")
+                    .map(super::nonnegative_f64_to_u64)
+                    .or(runtime.context.used_tokens);
+                runtime.context.limit_tokens = f64_at(ctx, "limit_tokens")
+                    .map(super::nonnegative_f64_to_u64)
+                    .or(runtime.context.limit_tokens);
+            }
+            if let Some(cmp) = obj.get("compaction") {
+                comp_seen = true;
+                runtime.compaction.events = f64_at(cmp, "events")
+                    .map(super::nonnegative_f64_to_u64)
+                    .or(runtime.compaction.events);
+                runtime.compaction.reclaimed_bytes = f64_at(cmp, "reclaimed_bytes")
+                    .map(super::nonnegative_f64_to_u64)
+                    .or(runtime.compaction.reclaimed_bytes);
+                runtime.compaction.reclaimed_tokens = f64_at(cmp, "reclaimed_tokens")
+                    .map(super::nonnegative_f64_to_u64)
+                    .or(runtime.compaction.reclaimed_tokens);
+                runtime.compaction.last_event_s_ago = f64_at(cmp, "last_event_s_ago")
+                    .map(super::nonnegative_f64_to_u64)
+                    .or(runtime.compaction.last_event_s_ago);
+            }
+            if let Some(vram) = obj.get("vram") {
+                runtime.vram.total_bytes = f64_at(vram, "total_bytes")
+                    .map(super::nonnegative_f64_to_u64)
+                    .or(runtime.vram.total_bytes);
+                runtime.vram.model_bytes = f64_at(vram, "model_bytes")
+                    .map(super::nonnegative_f64_to_u64)
+                    .or(runtime.vram.model_bytes);
+                runtime.vram.kv_cache_bytes = f64_at(vram, "kv_cache_bytes")
+                    .map(super::nonnegative_f64_to_u64)
+                    .or(runtime.vram.kv_cache_bytes);
+                runtime.vram.runtime_bytes = f64_at(vram, "runtime_bytes")
+                    .map(super::nonnegative_f64_to_u64)
+                    .or(runtime.vram.runtime_bytes);
+                runtime.vram.free_bytes = f64_at(vram, "free_bytes")
+                    .map(super::nonnegative_f64_to_u64)
+                    .or(runtime.vram.free_bytes);
+            }
+        }
+    }
+
+    if kv_seen {
+        runtime.kv_cache.used_bytes = runtime.kv_cache.used_bytes.or(Some(kv_used));
+        runtime.kv_cache.capacity_bytes = runtime
+            .kv_cache
+            .capacity_bytes
+            .or((kv_cap > 0).then_some(kv_cap));
+        runtime.kv_cache.utilization_pct = runtime.kv_cache.utilization_pct.or(pct(
+            runtime.kv_cache.used_bytes,
+            runtime.kv_cache.capacity_bytes,
+        ));
+    }
+    if ctx_seen {
+        runtime.context.used_tokens = runtime.context.used_tokens.or(Some(ctx_used));
+        runtime.context.limit_tokens = runtime
+            .context
+            .limit_tokens
+            .or((ctx_limit > 0).then_some(ctx_limit));
+        runtime.context.utilization_pct = runtime.context.utilization_pct.or(pct(
+            runtime.context.used_tokens,
+            runtime.context.limit_tokens,
+        ));
+        runtime.context.saturated_entries = saturated;
+    }
+    if comp_seen {
+        runtime.compaction.events = runtime.compaction.events.or(Some(comp_events));
+    }
+
+    runtime.vram.total_bytes = runtime
+        .vram
+        .total_bytes
+        .or(total_vram_seen.then_some(total_vram));
+    runtime.vram.model_bytes = runtime
+        .vram
+        .model_bytes
+        .or(model_vram_seen.then_some(model_vram));
+    runtime.vram.kv_cache_bytes = runtime.vram.kv_cache_bytes.or(runtime.kv_cache.used_bytes);
+    runtime
 }
 
 #[cfg(test)]
@@ -571,5 +942,36 @@ mod tests {
         merge(&mut view, "axiom", tokens);
         assert!(view.idle);
         assert_eq!(view.total_requests, 0);
+    }
+
+    #[test]
+    fn runtime_stats_are_parsed_and_merged() {
+        let stats: Value = serde_json::from_str(
+            r#"{"total_models":1,"total_vram_bytes":8589934592,"models":[
+                {"name":"qwen3:8b","size":5000000000,"running":true,"size_vram":4294967296,
+                 "context_used_tokens":4096,"context_limit_tokens":8192,
+                 "kv_cache_bytes":1073741824,"kv_cache_utilization_pct":50.0,
+                 "compaction_events":2}
+            ],
+            "runtime":{"compaction":{"events":2,"reclaimed_bytes":1048576,"last_event_s_ago":30},"vram":{"total_bytes":8589934592,"kv_cache_bytes":1073741824}}}"#,
+        ).unwrap();
+        let tokens = TokenPoll::new(24, 500).apply(&serde_json::json!({"usage":[]}), Some(&stats));
+        assert_eq!(tokens.runtime.kv_cache.used_bytes, Some(1_073_741_824));
+        assert_eq!(tokens.runtime.context.used_tokens, Some(4096));
+        assert_eq!(tokens.runtime.context.limit_tokens, Some(8192));
+        assert_eq!(tokens.runtime.compaction.events, Some(2));
+        assert_eq!(tokens.runtime.compaction.reclaimed_bytes, Some(1_048_576));
+        assert_eq!(tokens.runtime.vram.total_bytes, Some(8_589_934_592));
+
+        let mut view = TokensView {
+            enabled: true,
+            ..TokensView::default()
+        };
+        merge(&mut view, "axiom", tokens.clone());
+        merge(&mut view, "dgx", tokens);
+        assert_eq!(view.runtime.kv_cache.used_bytes, Some(2_147_483_648));
+        assert_eq!(view.runtime.context.used_tokens, Some(8192));
+        assert_eq!(view.runtime.compaction.events, Some(4));
+        assert!(!view.idle);
     }
 }

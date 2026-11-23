@@ -1099,6 +1099,163 @@ pub struct TokenBucketView {
     pub egress_tps: f64,
 }
 
+/// One runtime sample for KV cache / context / compaction in the window.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct LlmRuntimeBucketView {
+    /// Bucket start, Unix seconds.
+    pub at_s: u64,
+    /// KV cache bytes in use, when reported.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kv_cache_used_bytes: Option<u64>,
+    /// KV cache bytes available/capacity, when reported.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kv_cache_capacity_bytes: Option<u64>,
+    /// Context tokens in use, when reported.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_used_tokens: Option<u64>,
+    /// Context token limit/capacity, when reported.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_limit_tokens: Option<u64>,
+    /// Compaction/reclaim events observed in the bucket.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compaction_events: Option<u64>,
+    /// Bytes reclaimed by compaction in the bucket.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compaction_reclaimed_bytes: Option<u64>,
+}
+
+/// Aggregated KV cache visibility for LLM runtime.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct KvCacheSummaryView {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub used_bytes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capacity_bytes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub utilization_pct: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hit_rate_pct: Option<f64>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub entries: Vec<KvCacheEntryView>,
+}
+
+/// One model/engine KV cache entry.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct KvCacheEntryView {
+    pub engine: String,
+    pub model: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub node: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub used_bytes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capacity_bytes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub utilization_pct: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vram_bytes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_used_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_limit_tokens: Option<u64>,
+}
+
+/// Aggregated context-window monitor stats.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct ContextMonitorSummaryView {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub used_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub utilization_pct: Option<f64>,
+    #[serde(default)]
+    pub saturated_entries: u32,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub entries: Vec<ContextEntryView>,
+}
+
+/// One model/engine context monitor entry.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct ContextEntryView {
+    pub engine: String,
+    pub model: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub node: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub used_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub utilization_pct: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_requests: Option<u32>,
+}
+
+/// Aggregated compaction/reclaim stats.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct CompactionSummaryView {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub events: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub events_per_min: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reclaimed_bytes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reclaimed_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_event_s_ago: Option<u64>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub entries: Vec<CompactionEntryView>,
+}
+
+/// One model/engine compaction entry.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct CompactionEntryView {
+    pub engine: String,
+    pub model: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub node: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub events: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reclaimed_bytes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reclaimed_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_event_s_ago: Option<u64>,
+}
+
+/// Video memory breakdown associated with LLM runtime.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct LlmVramSummaryView {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub total_bytes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_bytes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kv_cache_bytes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime_bytes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub free_bytes: Option<u64>,
+}
+
+/// LLM runtime stats: KV cache, context monitor, compaction, VRAM.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct LlmRuntimeView {
+    #[serde(default)]
+    pub kv_cache: KvCacheSummaryView,
+    #[serde(default)]
+    pub context: ContextMonitorSummaryView,
+    #[serde(default)]
+    pub compaction: CompactionSummaryView,
+    #[serde(default)]
+    pub vram: LlmVramSummaryView,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub timeline: Vec<LlmRuntimeBucketView>,
+}
+
 /// The Ollama models a node currently serves: installed, which are loaded
 /// in memory, and what each holds (`/api/ollama/stats`).
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
@@ -1139,6 +1296,21 @@ pub struct TokenEngineModelView {
     pub quantization: String,
     /// Seconds until the resident copy unloads.
     pub expires_in_s: Option<u64>,
+    /// Context tokens currently used, when reported.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_used_tokens: Option<u64>,
+    /// Context token limit, when reported.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_limit_tokens: Option<u64>,
+    /// KV cache bytes used by this model, when reported.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kv_cache_bytes: Option<u64>,
+    /// KV cache utilization percent, when reported.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kv_cache_utilization_pct: Option<f64>,
+    /// Compaction events observed in the window, when reported.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compaction_events: Option<u64>,
 }
 
 /// Token ingress/egress by app and model, plus the engine's models.
@@ -1161,6 +1333,9 @@ pub struct TokensView {
     /// True while these totals are the last ones that answered: the node
     /// was too busy to serve the usage endpoint in time (D-118).
     pub stale: bool,
+    /// LLM runtime stats: KV cache, context monitor, compaction, VRAM.
+    #[serde(default)]
+    pub runtime: LlmRuntimeView,
 }
 
 impl TokensView {
@@ -1177,6 +1352,7 @@ impl TokensView {
             timeline: Vec::new(),
             idle: true,
             stale: false,
+            runtime: LlmRuntimeView::default(),
         }
     }
 }
