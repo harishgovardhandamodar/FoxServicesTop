@@ -114,6 +114,12 @@ up by itself. Details and how to undo it are in the
 [User Guide](docs/USER_GUIDE.md#cpu-power-without-root). Hosts with no powercap
 zone (and no `spbm` hwmon power sensor) have no CPU power to read either way.
 
+## What's new
+
+- **LLM runtime visibility in Tokens:** KV cache usage, context-window monitor, compaction activity, and associated VRAM consumption are now surfaced in LLM stats.
+- **Overview + detailed views:** the Overview Tokens card shows compact runtime health, while the detailed Tokens tab includes KV cache capacity/utilization, context saturation, compaction events/reclaimed memory, and VRAM breakdown.
+- **Defensive data handling:** runtime metrics are optional and rendered as `n/a` when an upstream source does not report them, avoiding misleading zeros.
+
 ## Features
 
 htop centers on the CPU, and nvtop and nvidia-smi show GPUs only while you watch. fox-services-top puts the
@@ -190,6 +196,12 @@ of the whole machine.
   responsive, color-coded panels arrange as a graphical dashboard and stack on narrow terminals.
   A node that does not answer stays visible with its error; service and process monitoring are
   read-only.
+- **LLM runtime stats.** The Tokens view now shows KV cache usage, context-window monitor,
+  compaction activity, and associated VRAM consumption alongside token ingress/egress. The
+  Overview card surfaces compact runtime health, while the detailed tab breaks out KV cache
+  capacity/utilization, context saturation, compaction events/reclaimed memory, and VRAM totals
+  per model/engine when the upstream stats report them. Missing metrics stay explicit as `n/a`
+  instead of being shown as zero.
 - **Power.** Its own tab (key `7`) with the watts timeline, per-series kWh and
   priced consumption: GPU, CPU and total kWh with cost over a selectable range
   (`t`/`T`: `window`, `1h` … `30d`, `all`), priced by a scrollable country
@@ -271,6 +283,15 @@ Press `6` for the responsive, multi-widget dashboard. Its panels show configured
 live per-app service/model usage with recent requests, token ingress/egress flow, and a watts
 timeline with current and peak power. `/` filters the node and service tables; the dashboard is
 read-only.
+
+### Tokens / LLM runtime
+
+The Tokens view includes LLM runtime stats alongside token flow: KV cache usage, context-window
+monitor, compaction activity, and associated VRAM consumption. The Overview card shows compact
+runtime health, and the detailed tab provides a per-model/engine breakdown when upstream stats
+are available.
+
+<img src="docs/images/screenshots/workstation-tokens-kv-cache.png" alt="Tokens view showing LLM runtime stats: KV cache usage, context monitor, compaction events, and VRAM breakdown alongside token flow" width="100%">
 
 ## Capabilities
 
